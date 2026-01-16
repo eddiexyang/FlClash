@@ -285,28 +285,96 @@ class Utils {
     return '${appName}_${DateTime.now().show}.log';
   }
 
-  Future<String?> getLocalIpAddress() async {
-    List<NetworkInterface> interfaces =
-        await NetworkInterface.list(includeLoopback: false)
-          ..sort((a, b) {
-            if (a.isWifi && !b.isWifi) return -1;
-            if (!a.isWifi && b.isWifi) return 1;
-            if (a.includesIPv4 && !b.includesIPv4) return -1;
-            if (!a.includesIPv4 && b.includesIPv4) return 1;
-            return 0;
-          });
-    for (final interface in interfaces) {
-      final addresses = interface.addresses;
-      if (addresses.isEmpty) {
-        continue;
-      }
-      addresses.sort((a, b) {
-        if (a.isIPv4 && !b.isIPv4) return -1;
-        if (!a.isIPv4 && b.isIPv4) return 1;
-        return 0;
-      });
-      return addresses.first.address;
+  bool _isPrivateIpv4(InternetAddress address) {
+    if (address.type != InternetAddressType.IPv4) return false;
+    final b = address.rawAddress;
+    final x = b[0], y = b[1];
+
+    // 10.0.0.0/8
+    if (x == 10) return true;
+    // 172.16.0.0/12
+    if (x == 172 && (y >= 16 && y <= 31)) return true;
+    // 192.168.0.0/16
+    if (x == 192 && y == 168) return true;
+
+    return false;
+  }
+
+  bool _isLinkLocalIpv4(InternetAddress address) {
+    if (address.type != InternetAddressType.IPv4) return false;
+    final b = address.rawAddress;
+    // 169.254.0.0/16
+    return b[0] == 169 && b[1] == 254;
+  }
+
+  bool _isBadInterfaceName(String name) {
+    final n = name.toLowerCase();
+    const badKeywords = [
+      'lo',
+      'loopback',
+      'utun',
+      'tun',
+      'tap',
+      'ppp',
+      'docker',
+      'br-',
+      'virbr',
+      'vboxnet',
+      'vmnet',
+      'hamachi',
+      'tailscale',
+      'zerotier',
+      'vethernet'
+    ];
+    return badKeywords.any(n.contains);
+  }
+
+  int _interfaceScore(NetworkInterface interface) {
+    final n = interface.name.toLowerCase();
+
+    if (_isBadInterfaceName(interface.name)) return -1000;
+
+    int score = 0;
+
+    // Wi-Fi first, then IPv4-capable.
+    if (interface.isWifi) score += 300;
+    if (interface.includesIPv4) score += 100;
+
+    // Extra heuristics for common naming to stabilize ordering.
+    if (n.contains('wifi') || n.contains('wi-fi') || n.contains('wlan')) {
+      score += 80;
     }
+    if (n.startsWith('en0') || n.startsWith('en1')) score += 60; // macOS
+    if (n.contains('ethernet') || n.startsWith('eth')) score += 50;
+
+    return score;
+  }
+
+  Future<String?> getLocalIpAddress() async {
+    final interfaces = await NetworkInterface.list(
+      includeLoopback: false,
+      type: InternetAddressType.IPv4,
+    );
+
+    final sorted = [...interfaces]
+      ..sort((a, b) => _interfaceScore(b) - _interfaceScore(a));
+
+    for (final interface in sorted) {
+      if (_isBadInterfaceName(interface.name)) continue;
+
+      final candidates = interface.addresses.where((addr) {
+        if (addr.isLoopback) return false;
+        if (_isLinkLocalIpv4(addr)) return false;
+        return _isPrivateIpv4(addr);
+      }).toList();
+
+      if (candidates.isEmpty) continue;
+
+      // Stable pick if multiple candidates exist.
+      candidates.sort((a, b) => a.address.compareTo(b.address));
+      return candidates.first.address;
+    }
+
     return '';
   }
 
