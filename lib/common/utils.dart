@@ -324,7 +324,8 @@ class Utils {
       'hamachi',
       'tailscale',
       'zerotier',
-      'vethernet'
+      'vethernet',
+      'flclash',
     ];
     return badKeywords.any(n.contains);
   }
