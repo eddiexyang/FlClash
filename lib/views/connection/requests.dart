@@ -521,7 +521,7 @@ class _RequestRow extends StatelessWidget {
           message: info.chains.reversed.join(' -> '),
           waitDuration: const Duration(milliseconds: 500),
           child: Text(
-            info.chains.reversed.join(' ← '),
+            info.chains.reversed.join(' -> '),
             style: style?.copyWith(color: colorScheme.secondary),
           ),
         );

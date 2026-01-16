@@ -611,7 +611,7 @@ class _ConnectionRow extends StatelessWidget {
         return Text(info.rule, style: style);
       case ConnectionColumn.chains:
         return Text(
-          info.chains.reversed.join(' ← '),
+          info.chains.reversed.join(' -> '),
           style: style?.copyWith(color: colorScheme.secondary),
         );
       case ConnectionColumn.uploadSpeed:
