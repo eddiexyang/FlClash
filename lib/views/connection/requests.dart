@@ -129,11 +129,31 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
     });
   }
 
-  void _handleResize(RequestColumn column, double delta) {
+  void _handleResize(int columnIndex, double delta) {
+    if (columnIndex < 0 || columnIndex >= _columns.length - 1) return;
+    
     setState(() {
-      final currentWidth = _columnWidths[column]!;
-      final newWidth = max(40.0, currentWidth + delta);
-      _columnWidths[column] = newWidth;
+      final leftColumn = _columns[columnIndex];
+      final rightColumn = _columns[columnIndex + 1];
+      
+      final leftWidth = _columnWidths[leftColumn]!;
+      final rightWidth = _columnWidths[rightColumn]!;
+      
+      const minWidth = 40.0;
+      var newLeftWidth = leftWidth + delta;
+      var newRightWidth = rightWidth - delta;
+      
+      if (newLeftWidth < minWidth) {
+        newLeftWidth = minWidth;
+        newRightWidth = leftWidth + rightWidth - minWidth;
+      }
+      if (newRightWidth < minWidth) {
+        newRightWidth = minWidth;
+        newLeftWidth = leftWidth + rightWidth - minWidth;
+      }
+      
+      _columnWidths[leftColumn] = newLeftWidth;
+      _columnWidths[rightColumn] = newRightWidth;
     });
   }
 
@@ -303,8 +323,8 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
                                 sortColumn: _sortColumn,
                                 isAscending: _sortAscending,
                                 onSort: _handleSort,
-                                onResizeDelta: (col, delta) {
-                                  _handleResize(col, delta / scaleRatio);
+                                onResizeDelta: (index, delta) {
+                                  _handleResize(index, delta / scaleRatio);
                                 },
                               ),
                               const Divider(height: 1),
@@ -349,7 +369,7 @@ class _ResizableHeaderRow extends StatelessWidget {
   final RequestColumn sortColumn;
   final bool isAscending;
   final ValueChanged<RequestColumn> onSort;
-  final Function(RequestColumn, double) onResizeDelta;
+  final Function(int, double) onResizeDelta;
 
   const _ResizableHeaderRow({
     required this.columns,
@@ -366,13 +386,17 @@ class _ResizableHeaderRow extends StatelessWidget {
       height: 40,
       color: Theme.of(context).colorScheme.surface,
       child: Row(
-        children: columns.map((col) {
+        children: columns.asMap().entries.map((entry) {
+          final index = entry.key;
+          final col = entry.value;
           final width = columnWidths[col]!;
           final isSorted = col == sortColumn;
+          final isLast = index == columns.length - 1;
 
           return SizedBox(
             width: width,
             child: Stack(
+              clipBehavior: Clip.none,
               children: [
                 Positioned.fill(
                   child: InkWell(
@@ -409,36 +433,37 @@ class _ResizableHeaderRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: 5,
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.resizeColumn,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onHorizontalDragUpdate: (details) {
-                        if (details.primaryDelta != null) {
-                          onResizeDelta(col, details.primaryDelta!);
-                        }
-                      },
-                      child: Container(
-                        color: Colors.transparent,
-                        width: 5,
+                if (!isLast)
+                  Positioned(
+                    right: 0,
+                    top: 8,
+                    bottom: 8,
+                    child: Container(
+                      width: 1,
+                      color: Theme.of(context).dividerColor.withOpacity(0.5),
+                    ),
+                  ),
+                if (!isLast)
+                  Positioned(
+                    right: -4,
+                    top: 0,
+                    bottom: 0,
+                    width: 9,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.resizeColumn,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onHorizontalDragUpdate: (details) {
+                          if (details.primaryDelta != null) {
+                            onResizeDelta(index, details.primaryDelta!);
+                          }
+                        },
+                        child: Container(
+                          color: Colors.transparent,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  right: 0,
-                  top: 8,
-                  bottom: 8,
-                  child: Container(
-                    width: 1,
-                    color: Theme.of(context).dividerColor.withOpacity(0.5),
-                  ),
-                )
               ],
             ),
           );
