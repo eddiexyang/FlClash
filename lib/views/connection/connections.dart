@@ -203,11 +203,23 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       list = list.where((info) {
-        return info.metadata.host.toLowerCase().contains(q) ||
-            info.metadata.destinationIP.contains(q) ||
-            info.metadata.process.toLowerCase().contains(q) ||
-            info.metadata.sourceIP.contains(q) ||
-            info.rule.toLowerCase().contains(q);
+        final host = info.metadata.host.toLowerCase();
+        final ip = info.metadata.destinationIP.toLowerCase();
+        final process = info.metadata.process.toLowerCase();
+        final sourceIP = info.metadata.sourceIP.toLowerCase();
+        final sourcePort = info.metadata.sourcePort.toLowerCase();
+        final rule = info.rule.toLowerCase();
+        final chains = info.chains.join(' ').toLowerCase();
+        final time = info.start.toString().toLowerCase();
+        
+        return host.contains(q) ||
+            ip.contains(q) ||
+            process.contains(q) ||
+            sourceIP.contains(q) ||
+            sourcePort.contains(q) ||
+            rule.contains(q) ||
+            chains.contains(q) ||
+            time.contains(q);
       }).toList();
     }
 
@@ -307,113 +319,115 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         ),
         const SizedBox(width: 8),
       ],
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final totalFixedWidth = _columns.fold<double>(
-              0, (sum, col) => sum + (_columnWidths[col] ?? col.defaultWidth));
-          
-          double scaleRatio = 1.0;
-          if (constraints.maxWidth > totalFixedWidth) {
-            scaleRatio = constraints.maxWidth / totalFixedWidth;
-          }
+      body: SelectionArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final totalFixedWidth = _columns.fold<double>(
+                0, (sum, col) => sum + (_columnWidths[col] ?? col.defaultWidth));
+            
+            double scaleRatio = 1.0;
+            if (constraints.maxWidth > totalFixedWidth) {
+              scaleRatio = constraints.maxWidth / totalFixedWidth;
+            }
 
-          final effectiveColumnWidths = {
-            for (var col in _columns)
-              col: (_columnWidths[col] ?? col.defaultWidth) * scaleRatio
-          };
+            final effectiveColumnWidths = {
+              for (var col in _columns)
+                col: (_columnWidths[col] ?? col.defaultWidth) * scaleRatio
+            };
 
-          final contentWidth = max(constraints.maxWidth, totalFixedWidth);
+            final contentWidth = max(constraints.maxWidth, totalFixedWidth);
 
-          return Column(
-            children: [
-              Expanded(
-                child: Scrollbar(
-                  controller: _verticalScrollController,
-                  thumbVisibility: true,
+            return Column(
+              children: [
+                Expanded(
                   child: Scrollbar(
-                    controller: _horizontalScrollController,
+                    controller: _verticalScrollController,
                     thumbVisibility: true,
-                    notificationPredicate: (notification) => notification.depth == 1,
-                    child: SingleChildScrollView(
+                    child: Scrollbar(
                       controller: _horizontalScrollController,
-                      scrollDirection: Axis.horizontal,
-                      physics: scaleRatio > 1.0 ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
-                      child: SizedBox(
-                        width: contentWidth,
-                        child: Column(
-                          children: [
-                            _ResizableHeaderRow(
-                              columns: _columns,
-                              columnWidths: effectiveColumnWidths,
-                              sortColumn: _sortColumn,
-                              isAscending: _sortAscending,
-                              onSort: _handleSort,
-                              onResizeDelta: (col, delta) {
-                                _handleResize(col, delta / scaleRatio);
-                              },
-                            ),
-                            const Divider(height: 1),
-                            Expanded(
-                              child: connections.isEmpty
-                                  ? Center(child: Text(appLocalizations.noData))
-                                  : ListView.builder(
-                                      // 1. 绑定垂直控制器
-                                      controller: _verticalScrollController,
-                                      itemCount: connections.length,
-                                      itemExtent: 40,
-                                      itemBuilder: (context, index) {
-                                        final info = connections[index];
-                                        return _ConnectionRow(
-                                          key: ValueKey(info.id),
-                                          info: info,
-                                          columns: _columns,
-                                          columnWidths: effectiveColumnWidths,
-                                          onTap: () => _showConnectionDetails(info),
-                                          onClose: () {
-                                            coreController.closeConnection(info.id);
-                                            setState(() {
-                                              _connections.removeWhere(
-                                                  (e) => e.id == info.id);
-                                              _lastConnectionStates.remove(info.id);
-                                            });
-                                          },
-                                        );
-                                      },
-                                    ),
-                            ),
-                          ],
+                      thumbVisibility: true,
+                      notificationPredicate: (notification) => notification.depth == 1,
+                      child: SingleChildScrollView(
+                        controller: _horizontalScrollController,
+                        scrollDirection: Axis.horizontal,
+                        physics: scaleRatio > 1.0 ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
+                        child: SizedBox(
+                          width: contentWidth,
+                          child: Column(
+                            children: [
+                              _ResizableHeaderRow(
+                                columns: _columns,
+                                columnWidths: effectiveColumnWidths,
+                                sortColumn: _sortColumn,
+                                isAscending: _sortAscending,
+                                onSort: _handleSort,
+                                onResizeDelta: (col, delta) {
+                                  _handleResize(col, delta / scaleRatio);
+                                },
+                              ),
+                              const Divider(height: 1),
+                              Expanded(
+                                child: connections.isEmpty
+                                    ? Center(child: Text(appLocalizations.noData))
+                                    : ListView.builder(
+                                        // 1. 绑定垂直控制器
+                                        controller: _verticalScrollController,
+                                        itemCount: connections.length,
+                                        itemExtent: 40,
+                                        itemBuilder: (context, index) {
+                                          final info = connections[index];
+                                          return _ConnectionRow(
+                                            key: ValueKey(info.id),
+                                            info: info,
+                                            columns: _columns,
+                                            columnWidths: effectiveColumnWidths,
+                                            onTap: () => _showConnectionDetails(info),
+                                            onClose: () {
+                                              coreController.closeConnection(info.id);
+                                              setState(() {
+                                                _connections.removeWhere(
+                                                    (e) => e.id == info.id);
+                                                _lastConnectionStates.remove(info.id);
+                                              });
+                                            },
+                                          );
+                                        },
+                                      ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              // Footer
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: context.colorScheme.surfaceContainer,
-                child: Row(
-                  children: [
-                    Text(
-                      'Total: ${_connections.length}',
-                      style: context.textTheme.labelMedium,
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Download: ${_connections.fold<int>(0, (p, c) => p + (c.downloadSpeed ?? 0)).traffic.show}/s',
-                      style: context.textTheme.labelSmall,
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'Upload: ${_connections.fold<int>(0, (p, c) => p + (c.uploadSpeed ?? 0)).traffic.show}/s',
-                      style: context.textTheme.labelSmall,
-                    ),
-                  ],
+                // Footer
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: context.colorScheme.surfaceContainer,
+                  child: Row(
+                    children: [
+                      Text(
+                        'Total: ${_connections.length}',
+                        style: context.textTheme.labelMedium,
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Download: ${_connections.fold<int>(0, (p, c) => p + (c.downloadSpeed ?? 0)).traffic.show}/s',
+                        style: context.textTheme.labelSmall,
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Upload: ${_connections.fold<int>(0, (p, c) => p + (c.uploadSpeed ?? 0)).traffic.show}/s',
+                        style: context.textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }

@@ -144,10 +144,19 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       list = list.where((info) {
-        return info.metadata.host.toLowerCase().contains(q) ||
-            info.metadata.destinationIP.contains(q) ||
-            info.metadata.process.toLowerCase().contains(q) ||
-            info.rule.toLowerCase().contains(q);
+        final host = info.metadata.host.toLowerCase();
+        final ip = info.metadata.destinationIP.toLowerCase();
+        final process = info.metadata.process.toLowerCase();
+        final rule = info.rule.toLowerCase();
+        final chains = info.chains.join(' ').toLowerCase();
+        final time = DateFormat('yyyy-MM-dd HH:mm:ss').format(info.start).toLowerCase();
+        
+        return host.contains(q) ||
+            ip.contains(q) ||
+            process.contains(q) ||
+            rule.contains(q) ||
+            chains.contains(q) ||
+            time.contains(q);
       }).toList();
     }
 
@@ -252,81 +261,83 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
               : const Icon(Icons.play_arrow),
         ),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final totalFixedWidth = _columns.fold<double>(
-              0, (sum, col) => sum + (_columnWidths[col] ?? col.defaultWidth));
-          
-          double scaleRatio = 1.0;
-          if (constraints.maxWidth > totalFixedWidth) {
-            scaleRatio = constraints.maxWidth / totalFixedWidth;
-          }
+      body: SelectionArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final totalFixedWidth = _columns.fold<double>(
+                0, (sum, col) => sum + (_columnWidths[col] ?? col.defaultWidth));
+            
+            double scaleRatio = 1.0;
+            if (constraints.maxWidth > totalFixedWidth) {
+              scaleRatio = constraints.maxWidth / totalFixedWidth;
+            }
 
-          final effectiveColumnWidths = {
-            for (var col in _columns)
-              col: (_columnWidths[col] ?? col.defaultWidth) * scaleRatio
-          };
+            final effectiveColumnWidths = {
+              for (var col in _columns)
+                col: (_columnWidths[col] ?? col.defaultWidth) * scaleRatio
+            };
 
-          final contentWidth = max(constraints.maxWidth, totalFixedWidth);
+            final contentWidth = max(constraints.maxWidth, totalFixedWidth);
 
-          return Column(
-            children: [
-              Expanded(
-                child: Scrollbar(
-                  controller: _verticalScrollController,
-                  thumbVisibility: true,
+            return Column(
+              children: [
+                Expanded(
                   child: Scrollbar(
-                    controller: _horizontalScrollController,
+                    controller: _verticalScrollController,
                     thumbVisibility: true,
-                    notificationPredicate: (notification) => notification.depth == 1,
-                    child: SingleChildScrollView(
+                    child: Scrollbar(
                       controller: _horizontalScrollController,
-                      scrollDirection: Axis.horizontal,
-                      physics: scaleRatio > 1.0 ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
-                      child: SizedBox(
-                        width: contentWidth,
-                        child: Column(
-                          children: [
-                            _ResizableHeaderRow(
-                              columns: _columns,
-                              columnWidths: effectiveColumnWidths,
-                              sortColumn: _sortColumn,
-                              isAscending: _sortAscending,
-                              onSort: _handleSort,
-                              onResizeDelta: (col, delta) {
-                                _handleResize(col, delta / scaleRatio);
-                              },
-                            ),
-                            const Divider(height: 1),
-                            Expanded(
-                              child: requests.isEmpty
-                                  ? Center(child: Text(appLocalizations.noData))
-                                  : ListView.builder(
-                                      controller: _verticalScrollController,
-                                      itemCount: requests.length,
-                                      itemExtent: 40,
-                                      itemBuilder: (context, index) {
-                                        final info = requests[index];
-                                        return _RequestRow(
-                                          key: ValueKey(info.id),
-                                          info: info,
-                                          columns: _columns,
-                                          columnWidths: effectiveColumnWidths,
-                                          onTap: () => _showRequestDetails(info),
-                                        );
-                                      },
-                                    ),
-                            ),
-                          ],
+                      thumbVisibility: true,
+                      notificationPredicate: (notification) => notification.depth == 1,
+                      child: SingleChildScrollView(
+                        controller: _horizontalScrollController,
+                        scrollDirection: Axis.horizontal,
+                        physics: scaleRatio > 1.0 ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
+                        child: SizedBox(
+                          width: contentWidth,
+                          child: Column(
+                            children: [
+                              _ResizableHeaderRow(
+                                columns: _columns,
+                                columnWidths: effectiveColumnWidths,
+                                sortColumn: _sortColumn,
+                                isAscending: _sortAscending,
+                                onSort: _handleSort,
+                                onResizeDelta: (col, delta) {
+                                  _handleResize(col, delta / scaleRatio);
+                                },
+                              ),
+                              const Divider(height: 1),
+                              Expanded(
+                                child: requests.isEmpty
+                                    ? Center(child: Text(appLocalizations.noData))
+                                    : ListView.builder(
+                                        controller: _verticalScrollController,
+                                        itemCount: requests.length,
+                                        itemExtent: 40,
+                                        itemBuilder: (context, index) {
+                                          final info = requests[index];
+                                          return _RequestRow(
+                                            key: ValueKey(info.id),
+                                            info: info,
+                                            columns: _columns,
+                                            columnWidths: effectiveColumnWidths,
+                                            onTap: () => _showRequestDetails(info),
+                                          );
+                                        },
+                                      ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -499,7 +510,7 @@ class _RequestRow extends StatelessWidget {
 
     switch (col) {
       case RequestColumn.time:
-        return Text(DateFormat('y/d/M HH:mm:ss').format(info.start), style: style);
+        return Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(info.start), style: style);
       case RequestColumn.process:
         return Text(info.metadata.process, style: style);
       case RequestColumn.host:
