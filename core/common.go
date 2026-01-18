@@ -5,6 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sync"
+
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/inbound"
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
@@ -23,10 +28,6 @@ import (
 	"github.com/metacubex/mihomo/log"
 	rp "github.com/metacubex/mihomo/rules/provider"
 	"github.com/metacubex/mihomo/tunnel"
-	"os"
-	"path/filepath"
-	"runtime"
-	"sync"
 )
 
 var (
@@ -238,6 +239,9 @@ func updateConfig(params *UpdateParams) {
 		general.Tun.Stack = *params.Tun.Stack
 	}
 
+	// Set MTU to 1500 on config update to fix issues on some systems
+	general.Tun.MTU = 1500
+
 	updateListeners()
 }
 
@@ -268,6 +272,10 @@ func setupConfig(params *SetupParams) error {
 	if err != nil {
 		currentConfig, _ = config.ParseRawConfig(config.DefaultRawConfig())
 	}
+
+	// Set MTU to 1500 to fix issues on some systems
+	currentConfig.General.Tun.MTU = 1500
+
 	hub.ApplyConfig(currentConfig)
 	patchSelectGroup(params.SelectedMap)
 	updateListeners()
