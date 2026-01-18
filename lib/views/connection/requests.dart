@@ -108,10 +108,14 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
           });
           // 如果开启了自动滚动，且当前不是处于搜索或自定义排序状态(通常自动滚动意味着看最新的)
           if (_autoScroll && _searchQuery.isEmpty && _sortColumn == RequestColumn.time && _sortAscending == true) {
-             // 列表是倒序的(最新的在最前)，所以不需要滚动到底部，只需要保持在顶部
-             if (_verticalScrollController.hasClients) {
-                _verticalScrollController.jumpTo(0);
-             }
+            // 仅在已经位于顶部时保持当前位置，避免新请求导致跳转
+            if (_verticalScrollController.hasClients) {
+              final position = _verticalScrollController.position;
+              final isAtTop = (position.pixels - position.minScrollExtent).abs() <= 1;
+              if (isAtTop) {
+                _verticalScrollController.jumpTo(position.minScrollExtent);
+              }
+            }
           }
         }
       }, duration: commonDuration);
@@ -169,10 +173,17 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
         final process = info.metadata.process.toLowerCase();
         final rule = info.rule.toLowerCase();
         final chains = info.chains.join(' ').toLowerCase();
-        final time = DateFormat('yyyy-MM-dd HH:mm:ss').format(info.start).toLowerCase();
+        final time =
+            DateFormat('yyyy-MM-dd HH:mm:ss').format(info.start.toLocal()).toLowerCase();
+        final port = info.metadata.destinationPort.toLowerCase();
+        final hostWithPort = '$host:$port';
+        final ipWithPort = '$ip:$port';
         
         return host.contains(q) ||
             ip.contains(q) ||
+            port.contains(q) ||
+            hostWithPort.contains(q) ||
+            ipWithPort.contains(q) ||
             process.contains(q) ||
             rule.contains(q) ||
             chains.contains(q) ||
@@ -535,7 +546,10 @@ class _RequestRow extends StatelessWidget {
 
     switch (col) {
       case RequestColumn.time:
-        return Text(DateFormat('yyyy-MM-dd HH:mm:ss').format(info.start), style: style);
+        return Text(
+          DateFormat('yyyy-MM-dd HH:mm:ss').format(info.start.toLocal()),
+          style: style,
+        );
       case RequestColumn.process:
         return Text(info.metadata.process, style: style);
       case RequestColumn.host:
