@@ -67,6 +67,8 @@ class RequestsView extends ConsumerStatefulWidget {
 }
 
 class _RequestsViewState extends ConsumerState<RequestsView> {
+  static const double _rowExtent = 40;
+
   // Data State
   List<TrackerInfo> _requests = [];
   bool _autoScroll = true;
@@ -103,6 +105,24 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
       throttler.call(FunctionTag.requests, () {
         if (!mounted) return;
         if (!trackerInfoListEquality.equals(_requests, next)) {
+          final canKeepOffset = _verticalScrollController.hasClients &&
+              (_verticalScrollController.position.pixels -
+                          _verticalScrollController.position.minScrollExtent)
+                      .abs() >
+                  1;
+          final oldOffset = canKeepOffset ? _verticalScrollController.position.pixels : 0.0;
+          final oldSorted = canKeepOffset ? _filterAndSortRequests(_requests) : const <TrackerInfo>[];
+          final newSorted = canKeepOffset ? _filterAndSortRequests(next) : const <TrackerInfo>[];
+          int? deltaIndex;
+          if (canKeepOffset && oldSorted.isNotEmpty && newSorted.isNotEmpty) {
+            final firstVisibleIndex =
+                (oldOffset / _rowExtent).floor().clamp(0, oldSorted.length - 1);
+            final anchor = oldSorted[firstVisibleIndex];
+            final newIndex = newSorted.indexWhere((item) => item.id == anchor.id);
+            if (newIndex != -1) {
+              deltaIndex = newIndex - firstVisibleIndex;
+            }
+          }
           setState(() {
             _requests = next;
           });
@@ -116,6 +136,17 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
                 _verticalScrollController.jumpTo(position.minScrollExtent);
               }
             }
+          }
+          if (canKeepOffset && deltaIndex != null && deltaIndex != 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || !_verticalScrollController.hasClients) return;
+              final position = _verticalScrollController.position;
+              final target = (oldOffset + deltaIndex! * _rowExtent)
+                  .clamp(position.minScrollExtent, position.maxScrollExtent);
+              if ((position.pixels - target).abs() > 0.5) {
+                _verticalScrollController.jumpTo(target);
+              }
+            });
           }
         }
       }, duration: commonDuration);
@@ -161,8 +192,8 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
     });
   }
 
-  List<TrackerInfo> get _filteredAndSortedRequests {
-    var list = _requests;
+  List<TrackerInfo> _filterAndSortRequests(List<TrackerInfo> source) {
+    var list = source;
     
     // Search
     if (_searchQuery.isNotEmpty) {
@@ -199,6 +230,10 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
     });
     
     return sortedList;
+  }
+
+  List<TrackerInfo> get _filteredAndSortedRequests {
+    return _filterAndSortRequests(_requests);
   }
 
   void _showRequestDetails(TrackerInfo info) {
@@ -345,7 +380,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
                                     : ListView.builder(
                                         controller: _verticalScrollController,
                                         itemCount: requests.length,
-                                        itemExtent: 40,
+                                        itemExtent: _rowExtent,
                                         itemBuilder: (context, index) {
                                           final info = requests[index];
                                           return _RequestRow(
