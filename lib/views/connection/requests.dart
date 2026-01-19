@@ -208,17 +208,12 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
             DateFormat('yyyy-MM-dd HH:mm:ss').format(info.start.toLocal()).toLowerCase();
         final port = info.metadata.destinationPort.toLowerCase();
         final hostWithPort = '$host:$port';
-        final ipWithPort = '$ip:$port';
         
-        return host.contains(q) ||
-            ip.contains(q) ||
-            port.contains(q) ||
-            hostWithPort.contains(q) ||
-            ipWithPort.contains(q) ||
-            process.contains(q) ||
-            rule.contains(q) ||
-            chains.contains(q) ||
-            time.contains(q);
+        return hostWithPort.contains(q) ||
+               process.contains(q) ||
+               rule.contains(q) ||
+               chains.contains(q) ||
+               time.contains(q);
       }).toList();
     }
 
