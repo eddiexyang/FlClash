@@ -226,20 +226,17 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         final host = info.metadata.host.toLowerCase();
         final ip = info.metadata.destinationIP.toLowerCase();
         final process = info.metadata.process.toLowerCase();
-        final sourceIP = info.metadata.sourceIP.toLowerCase();
-        final sourcePort = info.metadata.sourcePort.toLowerCase();
+        final port = info.metadata.destinationPort.toLowerCase();
         final rule = info.rule.toLowerCase();
         final chains = info.chains.join(' ').toLowerCase();
         final time = info.start.toString().toLowerCase();
+        final hostWithPort = '$host:$port';
         
-        return host.contains(q) ||
-            ip.contains(q) ||
-            process.contains(q) ||
-            sourceIP.contains(q) ||
-            sourcePort.contains(q) ||
-            rule.contains(q) ||
-            chains.contains(q) ||
-            time.contains(q);
+        return hostWithPort.contains(q) ||
+               process.contains(q) ||
+               rule.contains(q) ||
+               chains.contains(q) ||
+               time.contains(q);
       }).toList();
     }
 
