@@ -23,7 +23,6 @@ enum ConnectionColumn {
   uploadSpeed,
   downloadSpeed,
   time,
-  source,
   action;
 
   String get label {
@@ -49,7 +48,6 @@ enum ConnectionColumn {
       ConnectionColumn.uploadSpeed => 100,
       ConnectionColumn.downloadSpeed => 100,
       ConnectionColumn.time => 100,
-      ConnectionColumn.source => 150,
       ConnectionColumn.action => 60,
     };
   }
@@ -72,8 +70,6 @@ enum ConnectionColumn {
         return (a.downloadSpeed ?? 0).compareTo(b.downloadSpeed ?? 0);
       case ConnectionColumn.time:
         return b.start.compareTo(a.start);
-      case ConnectionColumn.source:
-        return a.metadata.sourceIP.compareTo(b.metadata.sourceIP);
       case ConnectionColumn.action:
         return 0;
     }
@@ -113,7 +109,6 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
     ConnectionColumn.uploadSpeed,
     ConnectionColumn.downloadSpeed,
     ConnectionColumn.time,
-    ConnectionColumn.source,
     ConnectionColumn.action,
   ];
 
@@ -657,9 +652,6 @@ class _ConnectionRow extends StatelessWidget {
       case ConnectionColumn.time:
         final duration = DateTime.now().difference(info.start);
         return Text(_formatDuration(duration), style: style);
-      case ConnectionColumn.source:
-        return Text('${info.metadata.sourceIP}:${info.metadata.sourcePort}',
-            style: style);
       case ConnectionColumn.action:
         return IconButton(
           icon: Icon(Icons.close, size: 16, color: colorScheme.error),
