@@ -32,10 +32,9 @@ enum ConnectionColumn {
       ConnectionColumn.process => 'Process',
       ConnectionColumn.rule => 'Rule',
       ConnectionColumn.chains => 'Chains',
-      ConnectionColumn.uploadSpeed => 'Upload/s',
-      ConnectionColumn.downloadSpeed => 'Download/s',
+      ConnectionColumn.uploadSpeed => 'Up/s',
+      ConnectionColumn.downloadSpeed => 'Down/s',
       ConnectionColumn.time => 'Duration',
-      ConnectionColumn.source => 'Source',
       ConnectionColumn.action => 'Action',
     };
   }
@@ -106,9 +105,6 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
 
   // Vertical Scroll Controller for the list
   final ScrollController _verticalScrollController = ScrollController();
-  // Horizontal Scroll Controller
-  final ScrollController _horizontalScrollController = ScrollController();
-
   final List<ConnectionColumn> _columns = [
     ConnectionColumn.host,
     ConnectionColumn.process,
@@ -227,12 +223,15 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         final ip = info.metadata.destinationIP.toLowerCase();
         final process = info.metadata.process.toLowerCase();
         final port = info.metadata.destinationPort.toLowerCase();
+        final remotePort =
+            _extractRemotePort(info.metadata.remoteDestination).toLowerCase();
         final rule = info.rule.toLowerCase();
         final chains = info.chains.join(' ').toLowerCase();
         final time = info.start.toString().toLowerCase();
         final hostWithPort = '$host:$port';
         
         return hostWithPort.contains(q) ||
+               (remotePort.isNotEmpty && remotePort.contains(q)) ||
                process.contains(q) ||
                rule.contains(q) ||
                chains.contains(q) ||
@@ -282,8 +281,16 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
     _timer?.cancel();
     _searchController.dispose();
     _verticalScrollController.dispose();
-    _horizontalScrollController.dispose();
     super.dispose();
+  }
+
+  String _extractRemotePort(String remoteDestination) {
+    if (remoteDestination.isEmpty) return '';
+    final lastColon = remoteDestination.lastIndexOf(':');
+    if (lastColon == -1 || lastColon == remoteDestination.length - 1) return '';
+    final portPart = remoteDestination.substring(lastColon + 1).trim();
+    if (int.tryParse(portPart) == null) return '';
+    return portPart;
   }
 
   @override
@@ -343,7 +350,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                 0, (sum, col) => sum + (_columnWidths[col] ?? col.defaultWidth));
             
             double scaleRatio = 1.0;
-            if (constraints.maxWidth > totalFixedWidth) {
+            if (totalFixedWidth > 0 && constraints.maxWidth > 0) {
               scaleRatio = constraints.maxWidth / totalFixedWidth;
             }
 
@@ -352,69 +359,54 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                 col: (_columnWidths[col] ?? col.defaultWidth) * scaleRatio
             };
 
-            final contentWidth = max(constraints.maxWidth, totalFixedWidth);
-
             return Column(
               children: [
                 Expanded(
                   child: Scrollbar(
                     controller: _verticalScrollController,
                     thumbVisibility: true,
-                    child: Scrollbar(
-                      controller: _horizontalScrollController,
-                      thumbVisibility: true,
-                      notificationPredicate: (notification) => notification.depth == 1,
-                      child: SingleChildScrollView(
-                        controller: _horizontalScrollController,
-                        scrollDirection: Axis.horizontal,
-                        physics: scaleRatio > 1.0 ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
-                        child: SizedBox(
-                          width: contentWidth,
-                          child: Column(
-                            children: [
-                              _ResizableHeaderRow(
-                                columns: _columns,
-                                columnWidths: effectiveColumnWidths,
-                                sortColumn: _sortColumn,
-                                isAscending: _sortAscending,
-                                onSort: _handleSort,
-                                onResizeDelta: (index, delta) {
-                                  _handleResize(index, delta / scaleRatio);
-                                },
-                              ),
-                              const Divider(height: 1),
-                              Expanded(
-                                child: connections.isEmpty
-                                    ? Center(child: Text(appLocalizations.noData))
-                                    : ListView.builder(
-                                        // 1. 绑定垂直控制器
-                                        controller: _verticalScrollController,
-                                        itemCount: connections.length,
-                                        itemExtent: 40,
-                                        itemBuilder: (context, index) {
-                                          final info = connections[index];
-                                          return _ConnectionRow(
-                                            key: ValueKey(info.id),
-                                            info: info,
-                                            columns: _columns,
-                                            columnWidths: effectiveColumnWidths,
-                                            onTap: () => _showConnectionDetails(info),
-                                            onClose: () {
-                                              coreController.closeConnection(info.id);
-                                              setState(() {
-                                                _connections.removeWhere(
-                                                    (e) => e.id == info.id);
-                                                _lastConnectionStates.remove(info.id);
-                                              });
-                                            },
-                                          );
-                                        },
-                                      ),
-                              ),
-                            ],
-                          ),
+                    child: Column(
+                      children: [
+                        _ResizableHeaderRow(
+                          columns: _columns,
+                          columnWidths: effectiveColumnWidths,
+                          sortColumn: _sortColumn,
+                          isAscending: _sortAscending,
+                          onSort: _handleSort,
+                          onResizeDelta: (index, delta) {
+                            _handleResize(index, delta / scaleRatio);
+                          },
                         ),
-                      ),
+                        const Divider(height: 1),
+                        Expanded(
+                          child: connections.isEmpty
+                              ? Center(child: Text(appLocalizations.noData))
+                              : ListView.builder(
+                                  // 1. 绑定垂直控制器
+                                  controller: _verticalScrollController,
+                                  itemCount: connections.length,
+                                  itemExtent: 40,
+                                  itemBuilder: (context, index) {
+                                    final info = connections[index];
+                                    return _ConnectionRow(
+                                      key: ValueKey(info.id),
+                                      info: info,
+                                      columns: _columns,
+                                      columnWidths: effectiveColumnWidths,
+                                      onTap: () => _showConnectionDetails(info),
+                                      onClose: () {
+                                        coreController.closeConnection(info.id);
+                                        setState(() {
+                                          _connections.removeWhere(
+                                              (e) => e.id == info.id);
+                                          _lastConnectionStates.remove(info.id);
+                                        });
+                                      },
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
