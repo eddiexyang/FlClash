@@ -223,7 +223,8 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         final rule = info.rule.toLowerCase();
         final chains = info.chains.join(' ').toLowerCase();
         final time = info.start.toString().toLowerCase();
-        final hostWithPort = '$host:$port';
+        final hostOrIp = host.isEmpty ? ip : host;
+        final hostWithPort = '$hostOrIp:$port';
         
         return hostWithPort.contains(q) ||
                (remotePort.isNotEmpty && remotePort.contains(q)) ||

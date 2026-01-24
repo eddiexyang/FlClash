@@ -207,7 +207,8 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
         final time =
             DateFormat('yyyy-MM-dd HH:mm:ss').format(info.start.toLocal()).toLowerCase();
         final port = info.metadata.destinationPort.toLowerCase();
-        final hostWithPort = '$host:$port';
+        final hostOrIp = host.isEmpty ? ip : host;
+        final hostWithPort = '$hostOrIp:$port';
         
         return hostWithPort.contains(q) ||
                process.contains(q) ||
