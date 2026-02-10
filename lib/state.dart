@@ -15,6 +15,7 @@ import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/widgets/dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_js/flutter_js.dart';
 import 'package:material_color_utilities/palettes/core_palette.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -68,6 +69,11 @@ class GlobalState {
     return _instance!;
   }
 
+  Future<ProviderContainer> init(int version) async {
+    await initApp(version);
+    return ProviderContainer();
+  }
+
   Future<void> initApp(int version) async {
     coreSHA256 = const String.fromEnvironment('CORE_SHA256');
     isPre = const String.fromEnvironment('APP_ENV') != 'stable';
@@ -82,7 +88,7 @@ class GlobalState {
       systemUiOverlayStyle: const SystemUiOverlayStyle(),
     );
     await _initDynamicColor();
-    await init();
+    await initConfig();
     await window?.init(version);
     _shakingStore();
   }
@@ -128,7 +134,7 @@ class GlobalState {
     } catch (_) {}
   }
 
-  Future<void> init() async {
+  Future<void> initConfig() async {
     packageInfo = await PackageInfo.fromPlatform();
     config =
         await preferences.getConfig() ?? Config(themeProps: defaultThemeProps);
