@@ -97,7 +97,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
     };
     
     // 初始化数据
-    _requests = globalState.appState.requests.list;
+    _requests = ref.read(requestsProvider).list;
     
     // 监听数据源变化
     ref.listenManual(requestsProvider.select((state) => state.list), (prev, next) {
