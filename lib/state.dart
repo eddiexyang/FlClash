@@ -531,7 +531,12 @@ class GlobalState {
       final isEnableDns = rawConfig['dns']['enable'] == true;
       final systemDns = 'system://';
       if (overrideDns || !isEnableDns) {
-        final dns = realPatchConfig.dns;
+        final dns = switch (!isEnableDns) {
+          true => realPatchConfig.dns.copyWith(
+            nameserver: [...realPatchConfig.dns.nameserver, systemDns],
+          ),
+          false => realPatchConfig.dns,
+        };
         rawConfig['dns'] = dns.toJson();
         rawConfig['dns']['nameserver-policy'] = {};
         for (final entry in dns.nameserverPolicy.entries) {
