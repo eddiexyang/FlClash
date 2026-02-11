@@ -71,6 +71,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
 
   // Data State
   List<TrackerInfo> _requests = [];
+  List<TrackerInfo>? _cachedRequests;
   bool _autoScroll = true;
 
   // Search
@@ -98,58 +99,46 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
     
     // 初始化数据
     _requests = ref.read(requestsProvider).list;
+    _verticalScrollController.addListener(_flushCachedRequestsIfAtTop);
     
     // 监听数据源变化
     ref.listenManual(requestsProvider.select((state) => state.list), (prev, next) {
       // 使用 throttler 避免过于频繁刷新导致表格重绘卡顿
       throttler.call(FunctionTag.requests, () {
         if (!mounted) return;
-        if (!trackerInfoListEquality.equals(_requests, next)) {
-          final canKeepOffset = _verticalScrollController.hasClients &&
-              (_verticalScrollController.position.pixels -
-                          _verticalScrollController.position.minScrollExtent)
-                      .abs() >
-                  1;
-          final oldOffset = canKeepOffset ? _verticalScrollController.position.pixels : 0.0;
-          final oldSorted = canKeepOffset ? _filterAndSortRequests(_requests) : const <TrackerInfo>[];
-          final newSorted = canKeepOffset ? _filterAndSortRequests(next) : const <TrackerInfo>[];
-          int? deltaIndex;
-          if (canKeepOffset && oldSorted.isNotEmpty && newSorted.isNotEmpty) {
-            final firstVisibleIndex =
-                (oldOffset / _rowExtent).floor().clamp(0, oldSorted.length - 1);
-            final anchor = oldSorted[firstVisibleIndex];
-            final newIndex = newSorted.indexWhere((item) => item.id == anchor.id);
-            if (newIndex != -1) {
-              deltaIndex = newIndex - firstVisibleIndex;
-            }
-          }
+        if (trackerInfoListEquality.equals(_requests, next)) return;
+        if (_isAtTop) {
+          _cachedRequests = null;
           setState(() {
             _requests = next;
           });
-          // 如果开启了自动滚动，且当前不是处于搜索或自定义排序状态(通常自动滚动意味着看最新的)
-          if (_autoScroll && _searchQuery.isEmpty && _sortColumn == RequestColumn.time && _sortAscending == true) {
-            // 仅在已经位于顶部时保持当前位置，避免新请求导致跳转
-            if (_verticalScrollController.hasClients) {
-              final position = _verticalScrollController.position;
-              final isAtTop = (position.pixels - position.minScrollExtent).abs() <= 1;
-              if (isAtTop) {
-                _verticalScrollController.jumpTo(position.minScrollExtent);
-              }
-            }
-          }
-          if (canKeepOffset && deltaIndex != null && deltaIndex != 0) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || !_verticalScrollController.hasClients) return;
-              final position = _verticalScrollController.position;
-              final target = (oldOffset + deltaIndex! * _rowExtent)
-                  .clamp(position.minScrollExtent, position.maxScrollExtent);
-              if ((position.pixels - target).abs() > 0.5) {
-                _verticalScrollController.jumpTo(target);
-              }
-            });
-          }
+          return;
         }
+        _cachedRequests = next;
       }, duration: commonDuration);
+    });
+  }
+
+  bool get _isAtTop {
+    if (!_verticalScrollController.hasClients) {
+      return true;
+    }
+    final position = _verticalScrollController.position;
+    return (position.pixels - position.minScrollExtent).abs() <= 1;
+  }
+
+  void _flushCachedRequestsIfAtTop() {
+    if (!mounted || !_isAtTop || _cachedRequests == null) {
+      return;
+    }
+    final cachedRequests = _cachedRequests!;
+    if (trackerInfoListEquality.equals(_requests, cachedRequests)) {
+      _cachedRequests = null;
+      return;
+    }
+    setState(() {
+      _requests = cachedRequests;
+      _cachedRequests = null;
     });
   }
 
@@ -249,12 +238,14 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
     ref.read(requestsProvider.notifier).value = FixedList(maxLength);
     setState(() {
       _requests = [];
+      _cachedRequests = null;
     });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _verticalScrollController.removeListener(_flushCachedRequestsIfAtTop);
     _verticalScrollController.dispose();
     _horizontalScrollController.dispose();
     super.dispose();

@@ -358,52 +358,47 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
             return Column(
               children: [
                 Expanded(
-                  child: Scrollbar(
-                    controller: _verticalScrollController,
-                    thumbVisibility: true,
-                    child: Column(
-                      children: [
-                        _ResizableHeaderRow(
-                          columns: _columns,
-                          columnWidths: effectiveColumnWidths,
-                          sortColumn: _sortColumn,
-                          isAscending: _sortAscending,
-                          onSort: _handleSort,
-                          onResizeDelta: (index, delta) {
-                            _handleResize(index, delta / scaleRatio);
-                          },
-                        ),
-                        const Divider(height: 1),
-                        Expanded(
-                          child: connections.isEmpty
-                              ? Center(child: Text(appLocalizations.noData))
-                              : ListView.builder(
-                                  // 1. 绑定垂直控制器
-                                  controller: _verticalScrollController,
-                                  itemCount: connections.length,
-                                  itemExtent: 40,
-                                  itemBuilder: (context, index) {
-                                    final info = connections[index];
-                                    return _ConnectionRow(
-                                      key: ValueKey(info.id),
-                                      info: info,
-                                      columns: _columns,
-                                      columnWidths: effectiveColumnWidths,
-                                      onTap: () => _showConnectionDetails(info),
-                                      onClose: () {
-                                        coreController.closeConnection(info.id);
-                                        setState(() {
-                                          _connections.removeWhere(
-                                              (e) => e.id == info.id);
-                                          _lastConnectionStates.remove(info.id);
-                                        });
-                                      },
-                                    );
-                                  },
-                                ),
-                        ),
-                      ],
-                    ),
+                  child: Column(
+                    children: [
+                      _ResizableHeaderRow(
+                        columns: _columns,
+                        columnWidths: effectiveColumnWidths,
+                        sortColumn: _sortColumn,
+                        isAscending: _sortAscending,
+                        onSort: _handleSort,
+                        onResizeDelta: (index, delta) {
+                          _handleResize(index, delta / scaleRatio);
+                        },
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: connections.isEmpty
+                            ? Center(child: Text(appLocalizations.noData))
+                            : ListView.builder(
+                                controller: _verticalScrollController,
+                                itemCount: connections.length,
+                                itemExtent: 40,
+                                itemBuilder: (context, index) {
+                                  final info = connections[index];
+                                  return _ConnectionRow(
+                                    key: ValueKey(info.id),
+                                    info: info,
+                                    columns: _columns,
+                                    columnWidths: effectiveColumnWidths,
+                                    onTap: () => _showConnectionDetails(info),
+                                    onClose: () {
+                                      coreController.closeConnection(info.id);
+                                      setState(() {
+                                        _connections.removeWhere(
+                                            (e) => e.id == info.id);
+                                        _lastConnectionStates.remove(info.id);
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   ),
                 ),
                 // Footer
