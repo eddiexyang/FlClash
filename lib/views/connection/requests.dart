@@ -72,7 +72,6 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
   // Data State
   List<TrackerInfo> _requests = [];
   List<TrackerInfo>? _cachedRequests;
-  bool _autoScroll = true;
 
   // Search
   final TextEditingController _searchController = TextEditingController();
@@ -301,19 +300,6 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
         ),
         const SizedBox(width: 8),
       ],
-      floatingActionButton: FadeRotationScaleBox(
-        child: FloatingActionButton(
-          key: ValueKey(_autoScroll),
-          onPressed: () {
-            setState(() {
-              _autoScroll = !_autoScroll;
-            });
-          },
-          child: _autoScroll
-              ? const Icon(Icons.pause)
-              : const Icon(Icons.play_arrow),
-        ),
-      ),
       body: SelectionArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
