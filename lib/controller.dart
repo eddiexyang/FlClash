@@ -758,15 +758,89 @@ extension SetupControllerExt on AppController {
     final configFilePath = await appPath.configFilePath;
     final yamlString = await encodeYamlTask(config);
     await File(configFilePath).safeWriteAsString(yamlString);
-    final message = await coreController.setupConfig(
+    var message = await coreController.setupConfig(
       setupState: setupState,
       params: setupParams,
       preloadInvoke: preloadInvoke,
     );
     if (message.isNotEmpty) {
+      message = await _retrySetupConfigForMacOSSshAuthorization(
+        message: message,
+        setupState: setupState,
+      );
+    }
+    if (message.isNotEmpty) {
       throw message;
     }
     addCheckIp();
+  }
+
+  bool _isMacOSSshPrivateKeyPermissionError(String message) {
+    if (!system.isMacOS) {
+      return false;
+    }
+    final lowerMessage = message.toLowerCase();
+    final isPermissionDenied =
+        lowerMessage.contains('operation not permitted') ||
+        lowerMessage.contains('permission denied');
+    if (!isPermissionDenied) {
+      return false;
+    }
+    final hasSshPath =
+        lowerMessage.contains('/.ssh/') || lowerMessage.contains('~/.ssh');
+    if (!hasSshPath) {
+      return false;
+    }
+    return lowerMessage.contains('private key') ||
+        lowerMessage.contains('private-key');
+  }
+
+  String? _extractSshPrivateKeyPath(String message) {
+    final pathRegExp = RegExp(
+      r'((?:~|/Users/[^/\s]+)/(?:\.ssh)/[^\s\'"]+)',
+      caseSensitive: false,
+    );
+    final match = pathRegExp.firstMatch(message);
+    return match?.group(1);
+  }
+
+  Future<String> _retrySetupConfigForMacOSSshAuthorization({
+    required String message,
+    required SetupState setupState,
+  }) async {
+    if (!_isMacOSSshPrivateKeyPermissionError(message)) {
+      return message;
+    }
+    final privateKeyPath = _extractSshPrivateKeyPath(message) ?? '~/.ssh/*';
+    final shouldAuthorize = await globalState.showMessage(
+      title: appLocalizations.tip,
+      message: TextSpan(
+        text:
+            'macOS blocked access to SSH private key:\n$privateKeyPath\n\n'
+            'Please grant system file access permission, then retry.',
+      ),
+      confirmText: appLocalizations.go,
+    );
+    if (shouldAuthorize != true) {
+      return message;
+    }
+    await system.openMacOSFileAuthorizationSettings();
+    final retry = await globalState.showMessage(
+      title: appLocalizations.tip,
+      cancelable: false,
+      confirmText: appLocalizations.confirm,
+      message: TextSpan(
+        text:
+            'After granting permission in macOS settings, return and click Confirm to retry reading this key.',
+      ),
+    );
+    if (retry != true) {
+      return message;
+    }
+    return await coreController.setupConfig(
+      setupState: setupState,
+      params: setupParams,
+    );
   }
 }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
+import 'dart:math';
 
 import 'package:animations/animations.dart';
 import 'package:dynamic_color/dynamic_color.dart';
@@ -166,12 +167,20 @@ class GlobalState {
   }) async {
     return await showCommonDialog<bool>(
       context: context,
-      dismissible: dismissible,
+      dismissible: dismissible ?? false,
       child: Builder(
         builder: (context) {
+          final messageText = message.toPlainText();
           return CommonDialog(
             title: title ?? appLocalizations.tip,
             actions: [
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: messageText));
+                  showNotifier(appLocalizations.copySuccess);
+                },
+                child: Text(appLocalizations.copy),
+              ),
               if (cancelable)
                 TextButton(
                   onPressed: () {
@@ -187,15 +196,21 @@ class GlobalState {
               ),
             ],
             child: Container(
-              width: 300,
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: SingleChildScrollView(
-                child: SelectableText.rich(
-                  TextSpan(
-                    style: Theme.of(context).textTheme.labelLarge,
-                    children: [message],
+              constraints: BoxConstraints(
+                maxHeight: min(
+                  MediaQuery.sizeOf(context).height - 180,
+                  420,
+                ),
+              ),
+              child: Scrollbar(
+                child: SingleChildScrollView(
+                  child: SelectableText.rich(
+                    TextSpan(
+                      style: Theme.of(context).textTheme.labelLarge,
+                      children: [message],
+                    ),
+                    style: const TextStyle(overflow: TextOverflow.visible),
                   ),
-                  style: const TextStyle(overflow: TextOverflow.visible),
                 ),
               ),
             ),

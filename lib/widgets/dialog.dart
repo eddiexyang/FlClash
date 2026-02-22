@@ -25,20 +25,19 @@ class CommonDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, ref) {
     final size = ref.watch(viewSizeProvider);
+    final maxDialogWidth = min(size.width - 40, 560.0);
+    final maxDialogHeight = min(size.height - 40, 640.0);
     return AlertDialog(
       title: Text(title),
       actions: actions,
       contentPadding: padding,
       backgroundColor: backgroundColor,
-      content: Container(
+      content: SizedBox(
         constraints: BoxConstraints(
-          maxHeight: min(
-            size.height - 40,
-            500,
-          ),
-          maxWidth: 300,
+          maxHeight: maxDialogHeight,
+          maxWidth: maxDialogWidth,
         ),
-        width: size.width - 40,
+        width: maxDialogWidth,
         child: !overrideScroll
             ? SingleChildScrollView(
                 child: child,

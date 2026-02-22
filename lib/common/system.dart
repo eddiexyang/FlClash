@@ -126,6 +126,24 @@ class System {
     }
     await window?.close();
   }
+
+  Future<void> openMacOSFileAuthorizationSettings() async {
+    if (!system.isMacOS) {
+      return;
+    }
+    const filesAndFoldersSettings =
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders';
+    const fullDiskAccessSettings =
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles';
+    var result = await Process.run('open', [filesAndFoldersSettings]);
+    if (result.exitCode == 0) {
+      return;
+    }
+    result = await Process.run('open', [fullDiskAccessSettings]);
+    if (result.exitCode != 0) {
+      throw 'failed to open macOS privacy settings';
+    }
+  }
 }
 
 final system = System();
