@@ -32,7 +32,7 @@ class CommonDialog extends ConsumerWidget {
       actions: actions,
       contentPadding: padding,
       backgroundColor: backgroundColor,
-      content: SizedBox(
+      content: Container(
         constraints: BoxConstraints(
           maxHeight: maxDialogHeight,
           maxWidth: maxDialogWidth,

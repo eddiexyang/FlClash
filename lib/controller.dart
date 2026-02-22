@@ -797,7 +797,7 @@ extension SetupControllerExt on AppController {
 
   String? _extractSshPrivateKeyPath(String message) {
     final pathRegExp = RegExp(
-      r'((?:~|/Users/[^/\s]+)/(?:\.ssh)/[^\s\'"]+)',
+      r'((?:~|/Users/[^/\s]+)/(?:\.ssh)/[^\s]+)',
       caseSensitive: false,
     );
     final match = pathRegExp.firstMatch(message);
