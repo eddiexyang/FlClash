@@ -369,9 +369,38 @@ class BuildCommand extends Command {
       .map((e) => e.arch!)
       .toList();
 
+  Future<String> _resolveAppTag() async {
+    final environment = Platform.environment;
+    final tag = environment['TAG'] ?? environment['GITHUB_REF_NAME'];
+    if (tag != null && tag.trim().isNotEmpty) {
+      return tag.trim();
+    }
+    final githubRef = environment['GITHUB_REF'];
+    if (githubRef != null && githubRef.startsWith('refs/tags/')) {
+      return githubRef.substring('refs/tags/'.length).trim();
+    }
+    try {
+      final result = await Process.run(
+        'git',
+        ['describe', '--tags', '--exact-match'],
+        workingDirectory: current,
+        runInShell: true,
+      );
+      if (result.exitCode == 0) {
+        final gitTag = result.stdout.toString().trim();
+        if (gitTag.isNotEmpty) {
+          return gitTag;
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
   Future<void> _buildEnvFile(String env, {String? coreSha256}) async {
+    final appTag = await _resolveAppTag();
     final data = {
       'APP_ENV': env,
+      if (appTag.isNotEmpty) 'APP_TAG': appTag,
       if (coreSha256 != null) 'CORE_SHA256': coreSha256,
     };
     final envFile = File(join(current, 'env.json'))..create();

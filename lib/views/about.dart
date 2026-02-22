@@ -9,6 +9,8 @@ import 'package:fl_clash/widgets/scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+const _appTag = String.fromEnvironment('APP_TAG');
+
 @immutable
 class Contributor {
   final String avatar;
@@ -134,7 +136,9 @@ class AboutView extends StatelessWidget {
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           Text(
-                            globalState.packageInfo.version,
+                            _appTag.isNotEmpty
+                                ? _appTag
+                                : globalState.packageInfo.version,
                             style: Theme.of(context).textTheme.labelLarge,
                           ),
                         ],
