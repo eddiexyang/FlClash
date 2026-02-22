@@ -93,6 +93,34 @@ class CoreService extends CoreHandlerInterface {
     );
   }
 
+  Map<String, String> _buildCoreEnvironment() {
+    final env = Map<String, String>.from(Platform.environment);
+    if (!system.isMacOS) {
+      return env;
+    }
+    final home = env['HOME'];
+    if (home == null || home.isEmpty) {
+      return env;
+    }
+    final sshPath = '$home/.ssh';
+    final delimiter = Platform.isWindows ? ';' : ':';
+    final current = env['SAFE_PATHS'];
+    if (current == null || current.trim().isEmpty) {
+      env['SAFE_PATHS'] = sshPath;
+      return env;
+    }
+    final paths = current
+        .split(delimiter)
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    if (!paths.contains(sshPath)) {
+      paths.add(sshPath);
+      env['SAFE_PATHS'] = paths.join(delimiter);
+    }
+    return env;
+  }
+
   Future<void> start() async {
     if (_process != null) {
       await shutdown(false);
@@ -107,7 +135,11 @@ class CoreService extends CoreHandlerInterface {
         return;
       }
     }
-    _process = await Process.start(appPath.corePath, [arg]);
+    _process = await Process.start(
+      appPath.corePath,
+      [arg],
+      environment: _buildCoreEnvironment(),
+    );
     _process?.stdout.listen((_) {});
     _process?.stderr.listen((e) {
       final error = utf8.decode(e);

@@ -38,6 +38,31 @@ class AppController {
   }
 }
 
+class _SetupConfigMessageResult {
+  final String message;
+  final bool hasShownDialog;
+
+  const _SetupConfigMessageResult({
+    required this.message,
+    required this.hasShownDialog,
+  });
+}
+
+class _SetupConfigException implements Exception {
+  final String message;
+  final bool hasShownDialog;
+
+  const _SetupConfigException({
+    required this.message,
+    this.hasShownDialog = false,
+  });
+
+  @override
+  String toString() {
+    return message;
+  }
+}
+
 extension InitControllerExt on AppController {
   Future<void> _init() async {
     FlutterError.onError = (details) {
@@ -763,14 +788,20 @@ extension SetupControllerExt on AppController {
       params: setupParams,
       preloadInvoke: preloadInvoke,
     );
+    var hasShownDialog = false;
     if (message.isNotEmpty) {
-      message = await _retrySetupConfigForMacOSSshAuthorization(
+      final result = await _handleSetupConfigForMacOSSshAuthorization(
         message: message,
         setupState: setupState,
       );
+      message = result.message;
+      hasShownDialog = result.hasShownDialog;
     }
     if (message.isNotEmpty) {
-      throw message;
+      throw _SetupConfigException(
+        message: message,
+        hasShownDialog: hasShownDialog,
+      );
     }
     addCheckIp();
   }
@@ -804,42 +835,97 @@ extension SetupControllerExt on AppController {
     return match?.group(1);
   }
 
-  Future<String> _retrySetupConfigForMacOSSshAuthorization({
+  bool _isMacOSSshSafePathsError(String message) {
+    if (!system.isMacOS) {
+      return false;
+    }
+    final lowerMessage = message.toLowerCase();
+    final isSafePathError = lowerMessage.contains(
+      'path is not subpath of home directory or safe_paths',
+    );
+    if (!isSafePathError) {
+      return false;
+    }
+    return lowerMessage.contains('/.ssh/') || lowerMessage.contains('~/.ssh');
+  }
+
+  String? _extractAllowedPaths(String message) {
+    final match = RegExp(
+      r'allowed paths:\s*(.+)',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(message);
+    return match?.group(1)?.trim();
+  }
+
+  Future<_SetupConfigMessageResult> _handleSetupConfigForMacOSSshAuthorization({
     required String message,
     required SetupState setupState,
   }) async {
-    if (!_isMacOSSshPrivateKeyPermissionError(message)) {
-      return message;
+    if (_isMacOSSshPrivateKeyPermissionError(message)) {
+      final privateKeyPath = _extractSshPrivateKeyPath(message) ?? '~/.ssh/*';
+      final shouldAuthorize = await globalState.showMessage(
+        title: appLocalizations.tip,
+        message: TextSpan(
+          text:
+              'macOS blocked access to SSH private key:\n$privateKeyPath\n\n'
+              'Please grant system file access permission, then retry.',
+        ),
+        confirmText: appLocalizations.go,
+      );
+      if (shouldAuthorize != true) {
+        return _SetupConfigMessageResult(message: message, hasShownDialog: true);
+      }
+      await system.openMacOSFileAuthorizationSettings();
+      final retry = await globalState.showMessage(
+        title: appLocalizations.tip,
+        cancelable: false,
+        confirmText: appLocalizations.confirm,
+        message: TextSpan(
+          text:
+              'After granting permission in macOS settings, return and click Confirm to retry reading this key.',
+        ),
+      );
+      if (retry != true) {
+        return _SetupConfigMessageResult(message: message, hasShownDialog: true);
+      }
+      final retryMessage = await coreController.setupConfig(
+        setupState: setupState,
+        params: setupParams,
+      );
+      return _SetupConfigMessageResult(
+        message: retryMessage,
+        hasShownDialog: true,
+      );
     }
-    final privateKeyPath = _extractSshPrivateKeyPath(message) ?? '~/.ssh/*';
-    final shouldAuthorize = await globalState.showMessage(
-      title: appLocalizations.tip,
-      message: TextSpan(
-        text:
-            'macOS blocked access to SSH private key:\n$privateKeyPath\n\n'
-            'Please grant system file access permission, then retry.',
-      ),
-      confirmText: appLocalizations.go,
-    );
-    if (shouldAuthorize != true) {
-      return message;
+
+    if (_isMacOSSshSafePathsError(message)) {
+      final privateKeyPath = _extractSshPrivateKeyPath(message) ?? '~/.ssh/*';
+      final coreHomeDir = await appPath.homeDirPath;
+      final allowedPaths = _extractAllowedPaths(message);
+      await globalState.showMessage(
+        title: appLocalizations.tip,
+        cancelable: false,
+        message: TextSpan(
+          text:
+              '无法读取 SSH 私钥：\n$privateKeyPath\n\n'
+              '原因：当前 core 只允许读取 Home Dir 或 SAFE_PATHS 白名单中的路径，'
+              '而 ~/.ssh 不在允许列表里。\n\n'
+              'Core Home Dir:\n$coreHomeDir\n\n'
+              '${allowedPaths != null ? 'allowed paths:\n$allowedPaths\n\n' : ''}'
+              '解决方案：\n'
+              '1. 将私钥复制到 Home Dir 下（例如：$coreHomeDir/ssh/id_ed25519）。\n'
+              '2. 在节点/配置里把 private key 路径改成新路径。\n'
+              '3. 重新应用配置。\n\n'
+              '高级方案：启动应用时设置 SAFE_PATHS，显式包含 ~/.ssh。',
+        ),
+      );
+      return _SetupConfigMessageResult(message: message, hasShownDialog: true);
     }
-    await system.openMacOSFileAuthorizationSettings();
-    final retry = await globalState.showMessage(
-      title: appLocalizations.tip,
-      cancelable: false,
-      confirmText: appLocalizations.confirm,
-      message: TextSpan(
-        text:
-            'After granting permission in macOS settings, return and click Confirm to retry reading this key.',
-      ),
-    );
-    if (retry != true) {
-      return message;
-    }
-    return await coreController.setupConfig(
-      setupState: setupState,
-      params: setupParams,
+
+    return _SetupConfigMessageResult(
+      message: message,
+      hasShownDialog: false,
     );
   }
 }
@@ -1256,6 +1342,9 @@ extension CommonControllerExt on AppController {
       return res;
     } catch (e, s) {
       commonPrint.log('$title ===> $e, $s', logLevel: LogLevel.warning);
+      if (e is _SetupConfigException && e.hasShownDialog) {
+        return null;
+      }
       if (silence) {
         globalState.showNotifier(e.toString());
       } else {
