@@ -446,7 +446,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "reload": MessageLookupByLibrary.simpleMessage("重载"),
     "remote": MessageLookupByLibrary.simpleMessage("远程"),
     "remoteBackupDesc": MessageLookupByLibrary.simpleMessage("备份数据到WebDAV"),
-    "remoteDestination": MessageLookupByLibrary.simpleMessage("远程目标"),
+    "remoteDestination": MessageLookupByLibrary.simpleMessage("Next hop"),
     "remove": MessageLookupByLibrary.simpleMessage("移除"),
     "rename": MessageLookupByLibrary.simpleMessage("重命名"),
     "request": MessageLookupByLibrary.simpleMessage("请求"),

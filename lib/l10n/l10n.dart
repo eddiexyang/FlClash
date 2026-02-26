@@ -3169,10 +3169,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Remote destination`
+  /// `Next hop`
   String get remoteDestination {
     return Intl.message(
-      'Remote destination',
+      'Next hop',
       name: 'remoteDestination',
       desc: '',
       args: [],

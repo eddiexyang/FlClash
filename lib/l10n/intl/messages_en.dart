@@ -665,9 +665,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "remoteBackupDesc": MessageLookupByLibrary.simpleMessage(
       "Backup local data to WebDAV",
     ),
-    "remoteDestination": MessageLookupByLibrary.simpleMessage(
-      "Remote destination",
-    ),
+    "remoteDestination": MessageLookupByLibrary.simpleMessage("Next hop"),
     "remove": MessageLookupByLibrary.simpleMessage("Remove"),
     "rename": MessageLookupByLibrary.simpleMessage("Rename"),
     "request": MessageLookupByLibrary.simpleMessage("Request"),

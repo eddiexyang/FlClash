@@ -7,7 +7,6 @@ class Navigation {
   static Navigation? _instance;
 
   List<NavigationItem> getItems({
-    bool openLogs = false,
     bool hasProxies = false,
   }) {
     return [
@@ -50,21 +49,19 @@ class Navigation {
         modes: [NavigationItemMode.desktop, NavigationItemMode.more],
       ),
       NavigationItem(
+        icon: const Icon(Icons.adb),
+        label: PageLabel.logs,
+        builder: (_) => const LogsView(key: GlobalObjectKey(PageLabel.logs)),
+        description: 'logsDesc',
+        modes: [NavigationItemMode.desktop, NavigationItemMode.more],
+      ),
+      NavigationItem(
         icon: Icon(Icons.storage),
         label: PageLabel.resources,
         description: 'resourcesDesc',
         builder: (_) =>
             const ResourcesView(key: GlobalObjectKey(PageLabel.resources)),
         modes: [NavigationItemMode.more],
-      ),
-      NavigationItem(
-        icon: const Icon(Icons.adb),
-        label: PageLabel.logs,
-        builder: (_) => const LogsView(key: GlobalObjectKey(PageLabel.logs)),
-        description: 'logsDesc',
-        modes: openLogs
-            ? [NavigationItemMode.desktop, NavigationItemMode.more]
-            : [],
       ),
       NavigationItem(
         icon: Icon(Icons.construction),

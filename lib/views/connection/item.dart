@@ -336,10 +336,10 @@ class TrackerInfoDetailView extends StatelessWidget {
           title: appLocalizations.specialRules,
           desc: trackerInfo.metadata.specialRules,
         ),
-      if (trackerInfo.metadata.remoteDestination.isNotEmpty)
+      if (trackerInfo.metadata.nextHop.isNotEmpty)
         _buildItem(
           title: appLocalizations.remoteDestination,
-          desc: trackerInfo.metadata.remoteDestination,
+          desc: trackerInfo.metadata.nextHop,
         ),
       _buildChains(),
     ];

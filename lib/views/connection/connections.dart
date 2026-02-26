@@ -218,8 +218,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         final ip = info.metadata.destinationIP.toLowerCase();
         final process = info.metadata.process.toLowerCase();
         final port = info.metadata.destinationPort.toLowerCase();
-        final remotePort =
-            _extractRemotePort(info.metadata.remoteDestination).toLowerCase();
+        final remotePort = _extractRemotePort(info.metadata.nextHop).toLowerCase();
         final rule = info.rule.toLowerCase();
         final chains = info.chains.join(' ').toLowerCase();
         final time = info.start.toString().toLowerCase();
@@ -247,6 +246,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
     final res = await globalState.showMessage(
       title: appLocalizations.closeConnections,
       message: TextSpan(text: appLocalizations.resetTip),
+      showCopyAction: false,
     );
     if (res == true) {
       coreController.closeConnections();
@@ -823,10 +823,10 @@ class TrackerInfoDetailView extends StatelessWidget {
           title: appLocalizations.specialRules,
           desc: trackerInfo.metadata.specialRules,
         ),
-      if (trackerInfo.metadata.remoteDestination.isNotEmpty)
+      if (trackerInfo.metadata.nextHop.isNotEmpty)
         _buildItem(
           title: appLocalizations.remoteDestination,
-          desc: trackerInfo.metadata.remoteDestination,
+          desc: trackerInfo.metadata.nextHop,
         ),
       _buildChains(),
     ];

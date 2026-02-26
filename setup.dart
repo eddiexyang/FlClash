@@ -142,6 +142,9 @@ class Build {
     if (name != null) print('run $name');
     print('exec: ${executable.join(' ')}');
     print('env: ${environment.toString()}');
+    final isCompactLogs =
+        Platform.environment['COMPACT_LOGS'] == 'true' ||
+        Platform.environment['GITHUB_ACTIONS'] == 'true';
     final process = await Process.start(
       executable[0],
       executable.sublist(1),
@@ -149,13 +152,45 @@ class Build {
       workingDirectory: workingDirectory,
       runInShell: runInShell,
     );
-    process.stdout.listen((data) {
-      print(utf8.decode(data));
-    });
-    process.stderr.listen((data) {
-      print(utf8.decode(data));
-    });
+    final stdoutFuture = process.stdout.transform(utf8.decoder).join();
+    final stderrFuture = process.stderr.transform(utf8.decoder).join();
     final exitCode = await process.exitCode;
+    final stdout = await stdoutFuture;
+    final stderr = await stderrFuture;
+    if (!isCompactLogs) {
+      if (stdout.isNotEmpty) {
+        print(stdout);
+      }
+      if (stderr.isNotEmpty) {
+        print(stderr);
+      }
+    } else {
+      if (exitCode != 0) {
+        final errorPattern = RegExp(
+          r'(error:|fatal|exception|failed|build failed|✗)',
+          caseSensitive: false,
+        );
+        final matched = [
+          ...stdout.split('\n'),
+          ...stderr.split('\n'),
+        ].where((line) => errorPattern.hasMatch(line.trim())).toList();
+        if (matched.isNotEmpty) {
+          for (final line in matched) {
+            print(line);
+          }
+        } else {
+          final combined = [...stdout.split('\n'), ...stderr.split('\n')]
+              .where((line) => line.trim().isNotEmpty)
+              .toList();
+          final tail = combined.length > 120
+              ? combined.sublist(combined.length - 120)
+              : combined;
+          for (final line in tail) {
+            print(line);
+          }
+        }
+      }
+    }
     if (exitCode != 0 && name != null) throw '$name error';
   }
 
@@ -450,7 +485,7 @@ class BuildCommand extends Command {
     await Build.exec(
       name: name,
       Build.getExecutable(
-        'flutter_distributor package --skip-clean --platform ${target.name} --targets $targets --flutter-build-args=verbose,dart-define-from-file=env.json$args',
+        'flutter_distributor package --skip-clean --platform ${target.name} --targets $targets --flutter-build-args=dart-define-from-file=env.json$args',
       ),
     );
   }

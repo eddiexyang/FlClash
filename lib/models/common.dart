@@ -90,6 +90,25 @@ abstract class Metadata with _$Metadata {
       _$MetadataFromJson(json);
 }
 
+extension MetadataExt on Metadata {
+  String get nextHop {
+    final value = remoteDestination.trim();
+    if (value.isEmpty) {
+      return '';
+    }
+    final lower = value.toLowerCase();
+    if (lower == '0.0.0.0' ||
+        lower.startsWith('0.0.0.0:') ||
+        lower == '::' ||
+        lower == '[::]' ||
+        lower == '[::]:0' ||
+        lower == '::0') {
+      return '';
+    }
+    return value;
+  }
+}
+
 @freezed
 abstract class TrackerInfo with _$TrackerInfo {
   const factory TrackerInfo({
@@ -172,9 +191,21 @@ abstract class LogsState with _$LogsState {
 extension LogsStateExt on LogsState {
   List<Log> get list {
     final lowQuery = query.toLowerCase();
+    LogLevel? minLogLevel;
+    if (keywords.isNotEmpty) {
+      final levelName = keywords.first;
+      for (final level in LogLevel.values) {
+        if (level.name == levelName) {
+          minLogLevel = level;
+          break;
+        }
+      }
+    }
     return logs.where((log) {
       final logLevelName = log.logLevel.name;
-      return {logLevelName}.containsAll(keywords) &&
+      final levelMatched =
+          minLogLevel == null || log.logLevel.index >= minLogLevel.index;
+      return levelMatched &&
           ((log.payload.toLowerCase().contains(lowQuery)) ||
               logLevelName.contains(lowQuery));
     }).toList();

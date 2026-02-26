@@ -19,21 +19,23 @@ class LogsView extends ConsumerStatefulWidget {
 class _LogsViewState extends ConsumerState<LogsView> {
   final _logsStateNotifier = ValueNotifier<LogsState>(LogsState());
   late ScrollController _scrollController;
+  List<Log>? _pendingLogs;
 
   List<Log> _logs = [];
+  static const _topThreshold = 12.0;
 
   @override
   void initState() {
     super.initState();
     _logs = ref.read(logsProvider).list;
     _scrollController = ScrollController(initialScrollOffset: double.maxFinite);
+    _scrollController.addListener(_flushLogsWhenReachTop);
     _logsStateNotifier.value = _logsStateNotifier.value.copyWith(logs: _logs);
     ref.listenManual(logsProvider.select((state) => state.list), (prev, next) {
       if (prev != next) {
         final isEquality = logListEquality.equals(prev, next);
         if (!isEquality) {
-          _logs = next;
-          updateLogsThrottler();
+          _onLogsChanged(next);
         }
       }
     });
@@ -41,6 +43,36 @@ class _LogsViewState extends ConsumerState<LogsView> {
 
   List<Widget> _buildActions() {
     return [
+      ValueListenableBuilder<LogsState>(
+        valueListenable: _logsStateNotifier,
+        builder: (_, state, _) {
+          final selectedLevel = _parseSelectedLevel(state.keywords);
+          return PopupMenuButton<LogLevel?>(
+            icon: Icon(
+              selectedLevel == null ? Icons.tune : Icons.filter_alt_outlined,
+            ),
+            tooltip: appLocalizations.logLevel,
+            onSelected: _setLevelFilter,
+            itemBuilder: (context) {
+              return [
+                CheckedPopupMenuItem<LogLevel?>(
+                  value: null,
+                  checked: selectedLevel == null,
+                  child: const Text('all'),
+                ),
+                const PopupMenuDivider(),
+                ...LogLevel.values.map(
+                  (level) => CheckedPopupMenuItem<LogLevel?>(
+                    value: level,
+                    checked: selectedLevel == level,
+                    child: Text(level.name),
+                  ),
+                ),
+              ];
+            },
+          );
+        },
+      ),
       IconButton(
         onPressed: () {
           _handleExport();
@@ -50,18 +82,61 @@ class _LogsViewState extends ConsumerState<LogsView> {
     ];
   }
 
+  bool get _isAtTop {
+    if (!_scrollController.hasClients) {
+      return false;
+    }
+    final position = _scrollController.position;
+    return (position.maxScrollExtent - position.pixels).abs() <= _topThreshold;
+  }
+
+  bool get _shouldUpdateNow => _logsStateNotifier.value.autoScrollToEnd || _isAtTop;
+
+  LogLevel? _parseSelectedLevel(List<String> keywords) {
+    if (keywords.isEmpty) {
+      return null;
+    }
+    final target = keywords.first;
+    for (final level in LogLevel.values) {
+      if (level.name == target) {
+        return level;
+      }
+    }
+    return null;
+  }
+
+  void _setLevelFilter(LogLevel? level) {
+    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
+      keywords: level == null ? [] : [level.name],
+    );
+  }
+
+  void _onLogsChanged(List<Log> next) {
+    _logs = next;
+    if (_shouldUpdateNow) {
+      _pendingLogs = null;
+      updateLogsThrottler(next);
+      return;
+    }
+    _pendingLogs = List<Log>.from(next);
+  }
+
+  void _flushLogsWhenReachTop() {
+    if (_pendingLogs == null || !_shouldUpdateNow) {
+      return;
+    }
+    final pendingLogs = _pendingLogs!;
+    _pendingLogs = null;
+    updateLogsThrottler(pendingLogs);
+  }
+
   void _onSearch(String value) {
     _logsStateNotifier.value = _logsStateNotifier.value.copyWith(query: value);
   }
 
-  void _onKeywordsUpdate(List<String> keywords) {
-    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-      keywords: keywords,
-    );
-  }
-
   @override
   void dispose() {
+    _scrollController.removeListener(_flushLogsWhenReachTop);
     _logsStateNotifier.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -78,13 +153,13 @@ class _LogsViewState extends ConsumerState<LogsView> {
     );
   }
 
-  void updateLogsThrottler() {
+  void updateLogsThrottler(List<Log> logs) {
     throttler.call(FunctionTag.logs, () {
       if (!mounted) {
         return;
       }
       final isEquality = logListEquality.equals(
-        _logs,
+        logs,
         _logsStateNotifier.value.logs,
       );
       if (isEquality) {
@@ -93,7 +168,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-            logs: _logs,
+            logs: logs,
           );
         }
       });
@@ -104,7 +179,6 @@ class _LogsViewState extends ConsumerState<LogsView> {
   Widget build(BuildContext context) {
     return CommonScaffold(
       actions: _buildActions(),
-      onKeywordsUpdate: _onKeywordsUpdate,
       searchState: AppBarSearchState(onSearch: _onSearch),
       title: appLocalizations.logs,
       floatingActionButton: ValueListenableBuilder(
@@ -115,9 +189,13 @@ class _LogsViewState extends ConsumerState<LogsView> {
             child: FloatingActionButton(
               key: ValueKey(autoScrollToEnd),
               onPressed: () {
+                final nextAutoScrollToEnd = !autoScrollToEnd;
                 _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-                  autoScrollToEnd: !_logsStateNotifier.value.autoScrollToEnd,
+                  autoScrollToEnd: nextAutoScrollToEnd,
                 );
+                if (nextAutoScrollToEnd) {
+                  _flushLogsWhenReachTop();
+                }
               },
               child: autoScrollToEnd
                   ? const Icon(Icons.block)
@@ -141,9 +219,6 @@ class _LogsViewState extends ConsumerState<LogsView> {
                 (log) => LogItem(
                   key: Key(log.dateTime),
                   log: log,
-                  onClick: (value) {
-                    context.commonScaffoldState?.addKeyword(value);
-                  },
                 ),
               )
               .separated(const Divider(height: 0))

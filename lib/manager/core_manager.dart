@@ -4,7 +4,6 @@ import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
-import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/material.dart';
@@ -43,20 +42,12 @@ class _CoreContainerState extends ConsumerState<CoreManager>
         appController.updateConfigDebounce();
       }
     });
-    ref.listenManual(appSettingProvider.select((state) => state.openLogs), (
-      prev,
-      next,
-    ) {
-      if (next) {
-        coreController.startLog();
-      } else {
-        coreController.stopLog();
-      }
-    }, fireImmediately: true);
+    coreController.startLog();
   }
 
   @override
   Future<void> dispose() async {
+    coreController.stopLog();
     coreEventManager.removeListener(this);
     super.dispose();
   }

@@ -508,7 +508,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "remoteBackupDesc": MessageLookupByLibrary.simpleMessage(
       "WebDAVにデータをバックアップ",
     ),
-    "remoteDestination": MessageLookupByLibrary.simpleMessage("リモート宛先"),
+    "remoteDestination": MessageLookupByLibrary.simpleMessage("Next hop"),
     "remove": MessageLookupByLibrary.simpleMessage("削除"),
     "rename": MessageLookupByLibrary.simpleMessage("リネーム"),
     "request": MessageLookupByLibrary.simpleMessage("リクエスト"),

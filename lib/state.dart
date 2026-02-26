@@ -77,7 +77,7 @@ class GlobalState {
       version: version,
       viewSize: Size.zero,
       requests: FixedList(maxLength),
-      logs: FixedList(maxLength),
+      logs: FixedList(5000),
       traffics: FixedList(30),
       totalTraffic: Traffic(),
       systemUiOverlayStyle: const SystemUiOverlayStyle(),
@@ -164,6 +164,7 @@ class GlobalState {
     String? cancelText,
     bool cancelable = true,
     bool? dismissible,
+    bool showCopyAction = true,
   }) async {
     return await showCommonDialog<bool>(
       context: context,
@@ -174,13 +175,14 @@ class GlobalState {
           return CommonDialog(
             title: title ?? appLocalizations.tip,
             actions: [
-              TextButton(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: messageText));
-                  showNotifier(appLocalizations.copySuccess);
-                },
-                child: Text(appLocalizations.copy),
-              ),
+              if (showCopyAction)
+                TextButton(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: messageText));
+                    showNotifier(appLocalizations.copySuccess);
+                  },
+                  child: Text(appLocalizations.copy),
+                ),
               if (cancelable)
                 TextButton(
                   onPressed: () {

@@ -177,7 +177,7 @@ extension InitControllerExt on AppController {
     if (status == true) {
       await updateStatus(true, isInit: true);
     } else {
-      await applyProfile(force: true);
+      await applyProfile(force: true, allowTunAuthorization: false);
     }
   }
 
@@ -574,7 +574,7 @@ extension SetupControllerExt on AppController {
     }
     _ref.read(delayDataSourceProvider.notifier).value = {};
     applyProfile(force: true);
-    _ref.read(logsProvider.notifier).value = FixedList(500);
+    _ref.read(logsProvider.notifier).value = FixedList(5000);
     _ref.read(requestsProvider.notifier).value = FixedList(500);
   }
 
@@ -676,6 +676,7 @@ extension SetupControllerExt on AppController {
   Future<void> applyProfile({
     bool silence = false,
     bool force = false,
+    bool allowTunAuthorization = true,
     VoidCallback? preloadInvoke,
   }) async {
     if (!force && !await needSetup()) {
@@ -683,7 +684,10 @@ extension SetupControllerExt on AppController {
     }
     await loadingRun(
       () async {
-        await _setupConfig(preloadInvoke);
+        await _setupConfig(
+          preloadInvoke,
+          allowTunAuthorization: allowTunAuthorization,
+        );
         await updateGroups();
         await updateProviders();
       },
@@ -755,7 +759,12 @@ extension SetupControllerExt on AppController {
     return res;
   }
 
-  Future<void> _setupConfig([VoidCallback? preloadInvoke]) async {
+  Future<void> _setupConfig(
+    [
+      VoidCallback? preloadInvoke,
+      bool allowTunAuthorization = true,
+    ]
+  ) async {
     commonPrint.log('setup ===>');
     var profile = _ref.read(currentProfileProvider);
     final nextProfile = await profile?.checkAndUpdateAndCopy();
@@ -764,11 +773,17 @@ extension SetupControllerExt on AppController {
       _ref.read(profilesProvider.notifier).put(nextProfile);
     }
     final patchConfig = _ref.read(patchClashConfigProvider);
-    final res = await _requestAdmin(patchConfig.tun.enable);
-    if (res.isError) {
-      return;
+    bool realTunEnable;
+    if (allowTunAuthorization) {
+      final res = await _requestAdmin(patchConfig.tun.enable);
+      if (res.isError) {
+        return;
+      }
+      realTunEnable = _ref.read(realTunEnableProvider);
+    } else {
+      realTunEnable = false;
+      _ref.read(realTunEnableProvider.notifier).value = false;
     }
-    final realTunEnable = _ref.read(realTunEnableProvider);
     final realPatchConfig = patchConfig.copyWith.tun(enable: realTunEnable);
     final setupState = await _ref.read(setupStateProvider(profile?.id).future);
     globalState.lastSetupState = setupState;
