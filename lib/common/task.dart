@@ -250,7 +250,46 @@ Future<Map<String, dynamic>> _makeRealProfileTask(
     rules = [...finalAddedRules, ...rules];
   }
   rawConfig['rules'] = rules;
+  _rewriteSshPrivateKeyPath(rawConfig);
   return Map<String, dynamic>.from(rawConfig);
+}
+
+void _rewriteSshPrivateKeyPath(dynamic node) {
+  if (node is Map) {
+    for (final mapKey in node.keys.toList()) {
+      final key = mapKey.toString();
+      final value = node[mapKey];
+      if (key == 'private-key' && value is String) {
+        final rewrittenPath = _resolveSshPrivateKeyPath(value);
+        if (rewrittenPath != null) {
+          node[mapKey] = rewrittenPath;
+        }
+      } else {
+        _rewriteSshPrivateKeyPath(value);
+      }
+    }
+    return;
+  }
+  if (node is List) {
+    for (final item in node) {
+      _rewriteSshPrivateKeyPath(item);
+    }
+  }
+}
+
+String? _resolveSshPrivateKeyPath(String path) {
+  final trimmed = path.trim();
+  final sshKeyPathRegExp = RegExp(r'^~[\\/]\.ssh[\\/]id_[^\\/]+$');
+  if (!sshKeyPathRegExp.hasMatch(trimmed)) {
+    return null;
+  }
+  final homeDir = Platform.environment['HOME'] ??
+      Platform.environment['USERPROFILE'];
+  if (homeDir == null || homeDir.isEmpty) {
+    return null;
+  }
+  final suffix = trimmed.substring(2).replaceAll('\\', '/');
+  return normalize(join(homeDir, suffix));
 }
 
 Future<List<String>> shakingProfileTask(
