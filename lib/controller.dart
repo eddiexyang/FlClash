@@ -685,7 +685,7 @@ extension SetupControllerExt on AppController {
     await loadingRun(
       () async {
         await _setupConfig(
-          preloadInvoke,
+          preloadInvoke: preloadInvoke,
           allowTunAuthorization: allowTunAuthorization,
         );
         await updateGroups();
@@ -759,12 +759,10 @@ extension SetupControllerExt on AppController {
     return res;
   }
 
-  Future<void> _setupConfig(
-    [
-      VoidCallback? preloadInvoke,
-      bool allowTunAuthorization = true,
-    ]
-  ) async {
+  Future<void> _setupConfig({
+    VoidCallback? preloadInvoke,
+    bool allowTunAuthorization = true,
+  }) async {
     commonPrint.log('setup ===>');
     var profile = _ref.read(currentProfileProvider);
     final nextProfile = await profile?.checkAndUpdateAndCopy();
