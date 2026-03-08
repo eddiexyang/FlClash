@@ -345,7 +345,10 @@ Future<String> encodeLogsTask(List<Log> data) async {
 }
 
 Future<String> _encodeLogsTask(List<Log> data) async {
-  final logsRaw = data.map((item) => item.toString());
+  final logsRaw = data.map(
+    (item) =>
+        'Log(logLevel: ${item.logLevel}, payload: ${item.payload}, dateTime: ${item.dateTime})',
+  );
   final logsRawString = logsRaw.join('\n');
   return logsRawString;
 }

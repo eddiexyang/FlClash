@@ -154,14 +154,17 @@ String _logDateTime(dynamic _) {
   return DateTime.now().showFull;
 }
 
-// String _logId(_) {
-//   return utils.id;
-// }
+String _logId(dynamic value) {
+  if (value is String && value.isNotEmpty) {
+    return value;
+  }
+  return utils.id;
+}
 
 @freezed
 abstract class Log with _$Log {
   const factory Log({
-    // @JsonKey(fromJson: _logId) required String id,
+    @JsonKey(includeToJson: false, fromJson: _logId) required String id,
     @JsonKey(name: 'LogLevel') @Default(LogLevel.info) LogLevel logLevel,
     @JsonKey(name: 'Payload') @Default('') String payload,
     @JsonKey(fromJson: _logDateTime) required String dateTime,
@@ -169,9 +172,9 @@ abstract class Log with _$Log {
 
   factory Log.app(String payload) {
     return Log(
+      id: _logId(null),
       payload: payload,
       dateTime: _logDateTime(null),
-      // id: _logId(null),
     );
   }
 

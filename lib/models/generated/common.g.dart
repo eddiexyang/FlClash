@@ -105,6 +105,7 @@ Map<String, dynamic> _$TrackerInfoToJson(_TrackerInfo instance) =>
     };
 
 _Log _$LogFromJson(Map<String, dynamic> json) => _Log(
+  id: _logId(json['id']),
   logLevel:
       $enumDecodeNullable(_$LogLevelEnumMap, json['LogLevel']) ?? LogLevel.info,
   payload: json['Payload'] as String? ?? '',

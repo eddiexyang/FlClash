@@ -217,7 +217,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
           final items = logs
               .map<Widget>(
                 (log) => LogItem(
-                  key: Key(log.dateTime),
+                  key: ValueKey(log.id),
                   log: log,
                 ),
               )
