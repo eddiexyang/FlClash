@@ -97,7 +97,7 @@ UpdateParams updateParams(Ref ref) {
 
 @riverpod
 ProxyState proxyState(Ref ref) {
-  final isStart = ref.watch(runTimeProvider.select((state) => state != null));
+  final isStart = ref.watch(isStartProvider);
   final vm2 = ref.watch(
     networkSettingProvider.select(
       (state) => VM2(state.systemProxy, state.bypassDomain),
@@ -116,7 +116,7 @@ ProxyState proxyState(Ref ref) {
 
 @riverpod
 TrayState trayState(Ref ref) {
-  final isStart = ref.watch(runTimeProvider.select((state) => state != null));
+  final isStart = ref.watch(isStartProvider);
   final systemProxy = ref.watch(
     networkSettingProvider.select((state) => state.systemProxy),
   );
@@ -296,7 +296,9 @@ ProxiesTabState proxiesTabState(Ref ref) {
 
 @riverpod
 bool isStart(Ref ref) {
-  return ref.watch(runTimeProvider.select((state) => state != null));
+  final hasRunTime = ref.watch(runTimeProvider.select((state) => state != null));
+  final coreStatus = ref.watch(coreStatusProvider);
+  return hasRunTime && coreStatus == CoreStatus.connected;
 }
 
 @riverpod
@@ -564,7 +566,7 @@ Brightness currentBrightness(Ref ref) {
 
 @riverpod
 VM2<bool, bool> autoSetSystemDnsState(Ref ref) {
-  final isStart = ref.watch(runTimeProvider.select((state) => state != null));
+  final isStart = ref.watch(isStartProvider);
   final realTunEnable = ref.watch(realTunEnableProvider);
   final autoSetSystemDns = ref.watch(
     networkSettingProvider.select((state) => state.autoSetSystemDns),

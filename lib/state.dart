@@ -133,9 +133,13 @@ class GlobalState {
   }
 
   void stopUpdateTasks() {
-    if (timer == null || timer?.isActive == false) return;
     timer?.cancel();
     timer = null;
+  }
+
+  void stopRunningState() {
+    startTime = null;
+    stopUpdateTasks();
   }
 
   Future<void> handleStart([UpdateTasks? tasks]) async {
@@ -150,10 +154,9 @@ class GlobalState {
   }
 
   Future handleStop() async {
-    startTime = null;
+    stopRunningState();
     await coreController.stopListener();
     await service?.stop();
-    stopUpdateTasks();
   }
 
   Future<bool?> showMessage({

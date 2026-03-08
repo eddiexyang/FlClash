@@ -20,6 +20,9 @@ class AppController {
   late final BuildContext _context;
   late final WidgetRef _ref;
   bool isAttach = false;
+  bool _expectedRunning = false;
+  bool _isRecoveringCore = false;
+  int _recoverSession = 0;
 
   static AppController? _instance;
 
@@ -36,6 +39,8 @@ class AppController {
     await _init();
     isAttach = true;
   }
+
+  bool get expectedRunning => _expectedRunning;
 }
 
 class _SetupConfigMessageResult {
@@ -568,6 +573,23 @@ extension ProxiesControllerExt on AppController {
 }
 
 extension SetupControllerExt on AppController {
+  void _setExpectedRunning(bool value) {
+    _expectedRunning = value;
+    if (!value) {
+      _recoverSession++;
+    }
+  }
+
+  void _clearRunningState({bool clearTraffic = false}) {
+    globalState.stopRunningState();
+    _ref.read(runTimeProvider.notifier).value = null;
+    if (!clearTraffic) {
+      return;
+    }
+    _ref.read(trafficsProvider.notifier).clear();
+    _ref.read(totalTrafficProvider.notifier).value = Traffic();
+  }
+
   void fullSetup() {
     if (!_ref.read(initProvider)) {
       return;
@@ -580,6 +602,7 @@ extension SetupControllerExt on AppController {
 
   Future<void> updateStatus(bool isStart, {bool isInit = false}) async {
     if (isStart) {
+      _setExpectedRunning(true);
       if (!isInit) {
         final res = await tryStartCore(true);
         if (res) {
@@ -600,11 +623,10 @@ extension SetupControllerExt on AppController {
         );
       }
     } else {
+      _setExpectedRunning(false);
       await globalState.handleStop();
       coreController.resetTraffic();
-      _ref.read(trafficsProvider.notifier).clear();
-      _ref.read(totalTrafficProvider.notifier).value = Traffic();
-      _ref.read(runTimeProvider.notifier).value = null;
+      _clearRunningState(clearTraffic: true);
       addCheckIp();
     }
   }
@@ -971,6 +993,55 @@ extension CoreControllerExt on AppController {
     _ref.read(coreStatusProvider.notifier).value = CoreStatus.connected;
   }
 
+  bool _shouldAutoRecoverCore() {
+    return system.isDesktop && _expectedRunning && _ref.read(initProvider);
+  }
+
+  Future<void> _recoverCoreAfterCrash() async {
+    if (_isRecoveringCore || !_shouldAutoRecoverCore()) {
+      return;
+    }
+    _isRecoveringCore = true;
+    final session = _recoverSession;
+    const backoffSeconds = [1, 3, 10];
+    try {
+      for (var index = 0; index < backoffSeconds.length; index++) {
+        if (session != _recoverSession || !_shouldAutoRecoverCore()) {
+          return;
+        }
+        final attempt = index + 1;
+        commonPrint.log(
+          'auto_recover_start recover_attempt_count=$attempt',
+          logLevel: LogLevel.warning,
+        );
+        try {
+          await coreController.shutdown(false);
+          await _connectCore();
+          await _initCore();
+          await updateStatus(true, isInit: true);
+          if (_ref.read(coreStatusProvider) == CoreStatus.connected) {
+            commonPrint.log('auto_recover_success recover_attempt_count=$attempt');
+            return;
+          }
+          throw Exception('core status is disconnected after recover');
+        } catch (e) {
+          commonPrint.log(
+            'auto_recover_fail recover_attempt_count=$attempt error=$e',
+            logLevel: LogLevel.warning,
+          );
+          if (attempt < backoffSeconds.length) {
+            await Future.delayed(Duration(seconds: backoffSeconds[index]));
+          }
+        }
+      }
+      if (session == _recoverSession && _shouldAutoRecoverCore()) {
+        globalState.showNotifier(appLocalizations.restartCoreTip);
+      }
+    } finally {
+      _isRecoveringCore = false;
+    }
+  }
+
   Future<Result<bool>> _requestAdmin(bool enableTun) async {
     final realTunEnable = _ref.read(realTunEnableProvider);
     if (enableTun != realTunEnable && realTunEnable == false) {
@@ -991,6 +1062,7 @@ extension CoreControllerExt on AppController {
   }
 
   Future<void> restartCore([bool start = false]) async {
+    _recoverSession++;
     _ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
     await coreController.shutdown(true);
     await _connectCore();
@@ -1011,7 +1083,29 @@ extension CoreControllerExt on AppController {
   }
 
   void handleCoreDisconnected() {
+    commonPrint.log('core_disconnected', logLevel: LogLevel.warning);
+    _clearRunningState();
     _ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
+  }
+
+  Future<void> handleCoreCrash(String message) async {
+    final coreStatus = _ref.read(coreStatusProvider);
+    final runTime = _ref.read(runTimeProvider);
+    if (coreStatus != CoreStatus.connected && runTime == null) {
+      return;
+    }
+    if (message.contains('socket done')) {
+      commonPrint.log(
+        'socket_done_detected message=$message',
+        logLevel: LogLevel.warning,
+      );
+    }
+    handleCoreDisconnected();
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      _context.showNotifier(message);
+    }
+    await coreController.shutdown(false);
+    unawaited(_recoverCoreAfterCrash());
   }
 }
 

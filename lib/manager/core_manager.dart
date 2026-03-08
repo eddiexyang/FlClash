@@ -89,14 +89,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
 
   @override
   Future<void> onCrash(String message) async {
-    if (ref.read(coreStatusProvider) != CoreStatus.connected) {
-      return;
-    }
-    ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
-    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-      context.showNotifier(message);
-    }
-    await coreController.shutdown(false);
+    await appController.handleCoreCrash(message);
     super.onCrash(message);
   }
 }
