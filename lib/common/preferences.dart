@@ -85,6 +85,16 @@ class Preferences {
     return preferences?.setString(configKey, json.encode(config)) ?? false;
   }
 
+  Future<bool?> getBool(String key) async {
+    final preferences = await sharedPreferencesCompleter.future;
+    return preferences?.getBool(key);
+  }
+
+  Future<bool> setBool(String key, bool value) async {
+    final preferences = await sharedPreferencesCompleter.future;
+    return preferences?.setBool(key, value) ?? false;
+  }
+
   Future<void> clearPreferences() async {
     final sharedPreferencesIns = await sharedPreferencesCompleter.future;
     await sharedPreferencesIns?.clear();

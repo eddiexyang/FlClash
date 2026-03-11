@@ -42,7 +42,7 @@ class System {
   }
 
   Future<bool> checkIsAdmin() async {
-    final corePath = appPath.corePath.replaceAll(' ', '\\\\ ');
+    final corePath = appPath.corePath;
     if (system.isWindows) {
       final result = await windows?.checkService();
       return result == WindowsHelperServiceStatus.running;
@@ -68,7 +68,7 @@ class System {
     if (system.isAndroid) {
       return AuthorizeCode.error;
     }
-    final corePath = appPath.corePath.replaceAll(' ', '\\\\ ');
+    final corePath = appPath.corePath;
     final isAdmin = await checkIsAdmin();
     if (isAdmin) {
       return AuthorizeCode.none;
@@ -83,16 +83,7 @@ class System {
     }
 
     if (system.isMacOS) {
-      final shell = 'chown root:admin $corePath; chmod +sx $corePath';
-      final arguments = [
-        '-e',
-        'do shell script "$shell" with administrator privileges',
-      ];
-      final result = await Process.run('osascript', arguments);
-      if (result.exitCode != 0) {
-        return AuthorizeCode.error;
-      }
-      return AuthorizeCode.success;
+      return _authorizeCoreForMacOS(corePath);
     } else if (Platform.isLinux) {
       final shell = Platform.environment['SHELL'] ?? 'bash';
       final password = await globalState.showCommonDialog<String>(
@@ -113,6 +104,177 @@ class System {
       return AuthorizeCode.success;
     }
     return AuthorizeCode.error;
+  }
+
+  Future<AuthorizeCode> _authorizeCoreForMacOS(String corePath) async {
+    final touchIdEnabled = await _isMacOSSudoTouchIdEnabled();
+    final shouldContinue = await _showMacOSAuthorizationNotice(
+      corePath: corePath,
+      touchIdEnabled: touchIdEnabled,
+    );
+    if (shouldContinue != true) {
+      return AuthorizeCode.error;
+    }
+
+    commonPrint.log(
+      'macOS authorize core start: prefer sudo (touchId=$touchIdEnabled)',
+    );
+    var result = await _runMacOSSudo(corePath: corePath, nonInteractive: true);
+    if (result.exitCode == 0) {
+      return AuthorizeCode.success;
+    }
+    if (_shouldFallbackToPassword(result.stderr.toString())) {
+      final passwordResult = await _runMacOSSudoWithPassword(corePath);
+      if (passwordResult == AuthorizeCode.success) {
+        return AuthorizeCode.success;
+      }
+    } else {
+      result = await _runMacOSSudo(corePath: corePath);
+      if (result.exitCode == 0) {
+        return AuthorizeCode.success;
+      }
+      if (_shouldFallbackToPassword(result.stderr.toString())) {
+        final passwordResult = await _runMacOSSudoWithPassword(corePath);
+        if (passwordResult == AuthorizeCode.success) {
+          return AuthorizeCode.success;
+        }
+      }
+    }
+    commonPrint.log(
+      'macOS authorize core fallback to osascript, sudo stderr=${result.stderr}',
+      logLevel: LogLevel.warning,
+    );
+    final fallbackResult = await _runMacOSAppleScriptAuthorize(corePath);
+    if (fallbackResult.exitCode == 0) {
+      return AuthorizeCode.success;
+    }
+    return AuthorizeCode.error;
+  }
+
+  Future<ProcessResult> _runMacOSSudo({
+    required String corePath,
+    bool nonInteractive = false,
+  }) async {
+    final first = await Process.run('sudo', [
+      if (nonInteractive) '-n',
+      'chown',
+      'root:admin',
+      corePath,
+    ]);
+    if (first.exitCode != 0) {
+      return first;
+    }
+    return Process.run('sudo', [
+      if (nonInteractive) '-n',
+      'chmod',
+      '+sx',
+      corePath,
+    ]);
+  }
+
+  Future<AuthorizeCode> _runMacOSSudoWithPassword(String corePath) async {
+    final password = await globalState.showCommonDialog<String>(
+      child: InputDialog(
+        obscureText: true,
+        title: appLocalizations.pleaseInputAdminPassword,
+        value: '',
+      ),
+    );
+    if (password == null || password.isEmpty) {
+      return AuthorizeCode.error;
+    }
+    final first = await Process.run(
+      'sudo',
+      ['-S', 'chown', 'root:admin', corePath],
+      input: '$password\n',
+    );
+    if (first.exitCode != 0) {
+      commonPrint.log(
+        'macOS sudo password authorization failed on chown: ${first.stderr}',
+        logLevel: LogLevel.warning,
+      );
+      return AuthorizeCode.error;
+    }
+    final second = await Process.run(
+      'sudo',
+      ['-S', 'chmod', '+sx', corePath],
+      input: '$password\n',
+    );
+    if (second.exitCode != 0) {
+      commonPrint.log(
+        'macOS sudo password authorization failed on chmod: ${second.stderr}',
+        logLevel: LogLevel.warning,
+      );
+      return AuthorizeCode.error;
+    }
+    return AuthorizeCode.success;
+  }
+
+  bool _shouldFallbackToPassword(String stderr) {
+    final lower = stderr.toLowerCase();
+    return lower.contains('a terminal is required') ||
+        lower.contains('no tty present') ||
+        lower.contains('password is required') ||
+        lower.contains('sudo: a password is required');
+  }
+
+  Future<ProcessResult> _runMacOSAppleScriptAuthorize(String corePath) async {
+    final escapedCorePath = corePath.replaceAll('"', r'\"');
+    final shell = 'chown root:admin "$escapedCorePath"; chmod +sx "$escapedCorePath"';
+    final arguments = [
+      '-e',
+      'do shell script "$shell" with administrator privileges',
+    ];
+    return Process.run('osascript', arguments);
+  }
+
+  Future<bool?> _showMacOSAuthorizationNotice({
+    required String corePath,
+    required bool? touchIdEnabled,
+  }) {
+    final touchIdText = switch (touchIdEnabled) {
+      true => 'detected',
+      false => 'not detected',
+      null => 'unknown',
+    };
+    return globalState.showMessage(
+      title: appLocalizations.tip,
+      confirmText: appLocalizations.go,
+      message: TextSpan(
+        text:
+            'FlClash needs administrator permission to enable TUN on macOS.\n\n'
+            'It will run:\n'
+            '1. sudo chown root:admin "$corePath"\n'
+            '2. sudo chmod +sx "$corePath"\n\n'
+            'Touch ID for sudo: $touchIdText\n'
+            '(This depends on your /etc/pam.d/sudo configuration.)',
+      ),
+    );
+  }
+
+  Future<bool?> _isMacOSSudoTouchIdEnabled() async {
+    if (!system.isMacOS) {
+      return null;
+    }
+    try {
+      final file = File('/etc/pam.d/sudo');
+      if (!await file.exists()) {
+        return null;
+      }
+      final lines = await file.readAsLines();
+      for (final line in lines) {
+        final trimmed = line.trim();
+        if (trimmed.startsWith('#')) {
+          continue;
+        }
+        if (trimmed.contains('pam_tid.so')) {
+          return true;
+        }
+      }
+      return false;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> back() async {

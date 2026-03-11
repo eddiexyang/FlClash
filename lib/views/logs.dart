@@ -177,6 +177,10 @@ class _LogsViewState extends ConsumerState<LogsView> {
 
   @override
   Widget build(BuildContext context) {
+    final configLogLevel = ref.watch(
+      patchClashConfigProvider.select((state) => state.logLevel),
+    );
+    final isCoreLogFiltered = configLogLevel.index > LogLevel.info.index;
     return CommonScaffold(
       actions: _buildActions(),
       searchState: AppBarSearchState(onSearch: _onSearch),
@@ -207,11 +211,36 @@ class _LogsViewState extends ConsumerState<LogsView> {
       body: ValueListenableBuilder<LogsState>(
         valueListenable: _logsStateNotifier,
         builder: (context, state, _) {
+          final hint = isCoreLogFiltered
+              ? Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: context.colorScheme.errorContainer.opacity80,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '当前核心日志级别为 ${configLogLevel.name}，连接日志会被过滤。'
+                    '请在配置-通用-日志等级切换到 info 或 debug。',
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      color: context.colorScheme.onErrorContainer,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink();
           final logs = state.list;
           if (logs.isEmpty) {
-            return NullStatus(
-              illustration: LogEmptyIllustration(),
-              label: appLocalizations.nullTip(appLocalizations.logs),
+            return Column(
+              children: [
+                hint,
+                Expanded(
+                  child: NullStatus(
+                    illustration: LogEmptyIllustration(),
+                    label: appLocalizations.nullTip(appLocalizations.logs),
+                  ),
+                ),
+              ],
             );
           }
           final items = logs
@@ -223,31 +252,37 @@ class _LogsViewState extends ConsumerState<LogsView> {
               )
               .separated(const Divider(height: 0))
               .toList();
-          return Align(
-            alignment: Alignment.topCenter,
-            child: ScrollToEndBox(
-              onCancelToEnd: () {
-                _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-                  autoScrollToEnd: false,
-                );
-              },
-              controller: _scrollController,
-              enable: state.autoScrollToEnd,
-              dataSource: logs,
-              child: CommonScrollBar(
-                controller: _scrollController,
-                child: SuperListView.builder(
-                  physics: NextClampingScrollPhysics(),
-                  reverse: true,
-                  shrinkWrap: true,
-                  controller: _scrollController,
-                  itemBuilder: (_, index) {
-                    return items[index];
-                  },
-                  itemCount: items.length,
+          return Column(
+            children: [
+              hint,
+              Expanded(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ScrollToEndBox(
+                    onCancelToEnd: () {
+                      _logsStateNotifier.value = _logsStateNotifier.value
+                          .copyWith(autoScrollToEnd: false);
+                    },
+                    controller: _scrollController,
+                    enable: state.autoScrollToEnd,
+                    dataSource: logs,
+                    child: CommonScrollBar(
+                      controller: _scrollController,
+                      child: SuperListView.builder(
+                        physics: NextClampingScrollPhysics(),
+                        reverse: true,
+                        shrinkWrap: true,
+                        controller: _scrollController,
+                        itemBuilder: (_, index) {
+                          return items[index];
+                        },
+                        itemCount: items.length,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           );
         },
       ),
