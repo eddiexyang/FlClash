@@ -8,6 +8,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/input.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 
@@ -183,10 +184,10 @@ class System {
     if (password == null || password.isEmpty) {
       return AuthorizeCode.error;
     }
-    final first = await Process.run(
-      'sudo',
-      ['-S', 'chown', 'root:admin', corePath],
-      input: '$password\n',
+    final first = await _runCommandWithStdin(
+      executable: 'sudo',
+      arguments: ['-S', 'chown', 'root:admin', corePath],
+      stdinText: '$password\n',
     );
     if (first.exitCode != 0) {
       commonPrint.log(
@@ -195,10 +196,10 @@ class System {
       );
       return AuthorizeCode.error;
     }
-    final second = await Process.run(
-      'sudo',
-      ['-S', 'chmod', '+sx', corePath],
-      input: '$password\n',
+    final second = await _runCommandWithStdin(
+      executable: 'sudo',
+      arguments: ['-S', 'chmod', '+sx', corePath],
+      stdinText: '$password\n',
     );
     if (second.exitCode != 0) {
       commonPrint.log(
@@ -226,6 +227,21 @@ class System {
       'do shell script "$shell" with administrator privileges',
     ];
     return Process.run('osascript', arguments);
+  }
+
+  Future<ProcessResult> _runCommandWithStdin({
+    required String executable,
+    required List<String> arguments,
+    required String stdinText,
+  }) async {
+    final process = await Process.start(executable, arguments);
+    process.stdin.write(stdinText);
+    await process.stdin.flush();
+    await process.stdin.close();
+    final stdout = await process.stdout.transform(systemEncoding.decoder).join();
+    final stderr = await process.stderr.transform(systemEncoding.decoder).join();
+    final exitCode = await process.exitCode;
+    return ProcessResult(process.pid, exitCode, stdout, stderr);
   }
 
   Future<bool?> _showMacOSAuthorizationNotice({
