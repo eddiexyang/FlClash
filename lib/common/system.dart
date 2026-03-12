@@ -108,47 +108,17 @@ class System {
   }
 
   Future<AuthorizeCode> _authorizeCoreForMacOS(String corePath) async {
-    final touchIdEnabled = await _isMacOSSudoTouchIdEnabled();
-    final shouldContinue = await _showMacOSAuthorizationNotice(
-      corePath: corePath,
-      touchIdEnabled: touchIdEnabled,
-    );
-    if (shouldContinue != true) {
-      return AuthorizeCode.error;
-    }
-
     commonPrint.log(
-      'macOS authorize core start: prefer sudo (touchId=$touchIdEnabled)',
+      "macOS authorize core start: use AppleScript administrator prompt directly",
     );
-    var result = await _runMacOSSudo(corePath: corePath, nonInteractive: true);
+    final result = await _runMacOSAppleScriptAuthorize(corePath);
     if (result.exitCode == 0) {
       return AuthorizeCode.success;
     }
-    if (_shouldFallbackToPassword(result.stderr.toString())) {
-      final passwordResult = await _runMacOSSudoWithPassword(corePath);
-      if (passwordResult == AuthorizeCode.success) {
-        return AuthorizeCode.success;
-      }
-    } else {
-      result = await _runMacOSSudo(corePath: corePath);
-      if (result.exitCode == 0) {
-        return AuthorizeCode.success;
-      }
-      if (_shouldFallbackToPassword(result.stderr.toString())) {
-        final passwordResult = await _runMacOSSudoWithPassword(corePath);
-        if (passwordResult == AuthorizeCode.success) {
-          return AuthorizeCode.success;
-        }
-      }
-    }
     commonPrint.log(
-      'macOS authorize core fallback to osascript, sudo stderr=${result.stderr}',
+      "macOS authorize core failed: ${result.stderr}",
       logLevel: LogLevel.warning,
     );
-    final fallbackResult = await _runMacOSAppleScriptAuthorize(corePath);
-    if (fallbackResult.exitCode == 0) {
-      return AuthorizeCode.success;
-    }
     return AuthorizeCode.error;
   }
 

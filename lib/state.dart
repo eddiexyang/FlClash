@@ -14,7 +14,6 @@ import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/widgets/dialog.dart';
 import 'package:fl_clash/widgets/list.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_js/flutter_js.dart';
 import 'package:material_color_utilities/palettes/core_palette.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -167,25 +166,15 @@ class GlobalState {
     String? cancelText,
     bool cancelable = true,
     bool? dismissible,
-    bool showCopyAction = true,
   }) async {
     return await showCommonDialog<bool>(
       context: context,
       dismissible: dismissible ?? false,
       child: Builder(
         builder: (context) {
-          final messageText = message.toPlainText();
           return CommonDialog(
             title: title ?? appLocalizations.tip,
             actions: [
-              if (showCopyAction)
-                TextButton(
-                  onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: messageText));
-                    showNotifier(appLocalizations.copySuccess);
-                  },
-                  child: Text(appLocalizations.copy),
-                ),
               if (cancelable)
                 TextButton(
                   onPressed: () {
