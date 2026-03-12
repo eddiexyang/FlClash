@@ -79,7 +79,7 @@ class GlobalState {
       logs: FixedList(5000),
       traffics: FixedList(30),
       totalTraffic: Traffic(),
-      systemUiOverlayStyle: const SystemUiOverlayStyle(),
+      systemUiOverlayStyle: SystemUiOverlayStyle(),
     );
     final appStateOverrides = buildAppStateOverrides(appState);
     packageInfo = await PackageInfo.fromPlatform();
@@ -166,6 +166,7 @@ class GlobalState {
     String? cancelText,
     bool cancelable = true,
     bool? dismissible,
+    bool showCopyAction = true,
   }) async {
     return await showCommonDialog<bool>(
       context: context,
