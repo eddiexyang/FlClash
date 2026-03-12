@@ -86,8 +86,8 @@ class Build {
     BuildItem(target: Target.macos, arch: Arch.amd64),
     BuildItem(target: Target.linux, arch: Arch.arm64),
     BuildItem(target: Target.linux, arch: Arch.amd64),
-    // BuildItem(target: Target.windows, arch: Arch.amd64),
-    // BuildItem(target: Target.windows, arch: Arch.arm64),
+    BuildItem(target: Target.windows, arch: Arch.amd64),
+    BuildItem(target: Target.windows, arch: Arch.arm64),
     BuildItem(target: Target.android, arch: Arch.arm, archName: 'armeabi-v7a'),
     BuildItem(target: Target.android, arch: Arch.arm64, archName: 'arm64-v8a'),
     BuildItem(target: Target.android, arch: Arch.amd64, archName: 'x86_64'),
@@ -594,7 +594,7 @@ Future<void> main(Iterable<String> args) async {
   final runner = CommandRunner('setup', 'build Application');
   runner.addCommand(BuildCommand(target: Target.android));
   runner.addCommand(BuildCommand(target: Target.linux));
-  // runner.addCommand(BuildCommand(target: Target.windows));
+  runner.addCommand(BuildCommand(target: Target.windows));
   runner.addCommand(BuildCommand(target: Target.macos));
   runner.run(args);
 }
