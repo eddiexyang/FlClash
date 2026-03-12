@@ -1053,8 +1053,12 @@ extension CoreControllerExt on AppController {
         case AuthorizeCode.none:
           break;
         case AuthorizeCode.error:
+          _ref.read(realTunEnableProvider.notifier).value = false;
+          _ref.read(patchClashConfigProvider.notifier).update(
+            (state) => state.copyWith.tun(enable: false),
+          );
           enableTun = false;
-          break;
+          return Result.error('');
       }
     }
     _ref.read(realTunEnableProvider.notifier).value = enableTun;

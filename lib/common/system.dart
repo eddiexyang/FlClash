@@ -8,7 +8,6 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/input.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 
@@ -109,14 +108,14 @@ class System {
 
   Future<AuthorizeCode> _authorizeCoreForMacOS(String corePath) async {
     commonPrint.log(
-      "macOS authorize core start: use AppleScript administrator prompt directly",
+      "macOS authorize core start: sudo-only authorization",
     );
-    final result = await _runMacOSAppleScriptAuthorize(corePath);
-    if (result.exitCode == 0) {
+    final sudoResult = await _runMacOSSudo(corePath: corePath);
+    if (sudoResult.exitCode == 0) {
       return AuthorizeCode.success;
     }
     commonPrint.log(
-      "macOS authorize core failed: ${result.stderr}",
+      "macOS authorize core failed: ${sudoResult.stderr}",
       logLevel: LogLevel.warning,
     );
     return AuthorizeCode.error;
@@ -124,10 +123,8 @@ class System {
 
   Future<ProcessResult> _runMacOSSudo({
     required String corePath,
-    bool nonInteractive = false,
   }) async {
     final first = await Process.run('sudo', [
-      if (nonInteractive) '-n',
       'chown',
       'root:admin',
       corePath,
@@ -136,131 +133,10 @@ class System {
       return first;
     }
     return Process.run('sudo', [
-      if (nonInteractive) '-n',
       'chmod',
       '+sx',
       corePath,
     ]);
-  }
-
-  Future<AuthorizeCode> _runMacOSSudoWithPassword(String corePath) async {
-    final password = await globalState.showCommonDialog<String>(
-      child: InputDialog(
-        obscureText: true,
-        title: appLocalizations.pleaseInputAdminPassword,
-        value: '',
-      ),
-    );
-    if (password == null || password.isEmpty) {
-      return AuthorizeCode.error;
-    }
-    final first = await _runCommandWithStdin(
-      executable: 'sudo',
-      arguments: ['-S', 'chown', 'root:admin', corePath],
-      stdinText: '$password\n',
-    );
-    if (first.exitCode != 0) {
-      commonPrint.log(
-        'macOS sudo password authorization failed on chown: ${first.stderr}',
-        logLevel: LogLevel.warning,
-      );
-      return AuthorizeCode.error;
-    }
-    final second = await _runCommandWithStdin(
-      executable: 'sudo',
-      arguments: ['-S', 'chmod', '+sx', corePath],
-      stdinText: '$password\n',
-    );
-    if (second.exitCode != 0) {
-      commonPrint.log(
-        'macOS sudo password authorization failed on chmod: ${second.stderr}',
-        logLevel: LogLevel.warning,
-      );
-      return AuthorizeCode.error;
-    }
-    return AuthorizeCode.success;
-  }
-
-  bool _shouldFallbackToPassword(String stderr) {
-    final lower = stderr.toLowerCase();
-    return lower.contains('a terminal is required') ||
-        lower.contains('no tty present') ||
-        lower.contains('password is required') ||
-        lower.contains('sudo: a password is required');
-  }
-
-  Future<ProcessResult> _runMacOSAppleScriptAuthorize(String corePath) async {
-    final escapedCorePath = corePath.replaceAll('"', r'\"');
-    final shell = 'chown root:admin "$escapedCorePath"; chmod +sx "$escapedCorePath"';
-    final arguments = [
-      '-e',
-      'do shell script "$shell" with administrator privileges',
-    ];
-    return Process.run('osascript', arguments);
-  }
-
-  Future<ProcessResult> _runCommandWithStdin({
-    required String executable,
-    required List<String> arguments,
-    required String stdinText,
-  }) async {
-    final process = await Process.start(executable, arguments);
-    process.stdin.write(stdinText);
-    await process.stdin.flush();
-    await process.stdin.close();
-    final stdout = await process.stdout.transform(systemEncoding.decoder).join();
-    final stderr = await process.stderr.transform(systemEncoding.decoder).join();
-    final exitCode = await process.exitCode;
-    return ProcessResult(process.pid, exitCode, stdout, stderr);
-  }
-
-  Future<bool?> _showMacOSAuthorizationNotice({
-    required String corePath,
-    required bool? touchIdEnabled,
-  }) {
-    final touchIdText = switch (touchIdEnabled) {
-      true => 'detected',
-      false => 'not detected',
-      null => 'unknown',
-    };
-    return globalState.showMessage(
-      title: appLocalizations.tip,
-      confirmText: appLocalizations.go,
-      message: TextSpan(
-        text:
-            'FlClash needs administrator permission to enable TUN on macOS.\n\n'
-            'It will run:\n'
-            '1. sudo chown root:admin "$corePath"\n'
-            '2. sudo chmod +sx "$corePath"\n\n'
-            'Touch ID for sudo: $touchIdText\n'
-            '(This depends on your /etc/pam.d/sudo configuration.)',
-      ),
-    );
-  }
-
-  Future<bool?> _isMacOSSudoTouchIdEnabled() async {
-    if (!system.isMacOS) {
-      return null;
-    }
-    try {
-      final file = File('/etc/pam.d/sudo');
-      if (!await file.exists()) {
-        return null;
-      }
-      final lines = await file.readAsLines();
-      for (final line in lines) {
-        final trimmed = line.trim();
-        if (trimmed.startsWith('#')) {
-          continue;
-        }
-        if (trimmed.contains('pam_tid.so')) {
-          return true;
-        }
-      }
-      return false;
-    } catch (_) {
-      return null;
-    }
   }
 
   Future<void> back() async {
