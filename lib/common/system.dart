@@ -108,14 +108,25 @@ class System {
 
   Future<AuthorizeCode> _authorizeCoreForMacOS(String corePath) async {
     commonPrint.log(
-      "macOS authorize core start: sudo-only authorization",
+      "macOS authorize core start: sudo with osascript fallback",
     );
     final sudoResult = await _runMacOSSudo(corePath: corePath);
     if (sudoResult.exitCode == 0) {
       return AuthorizeCode.success;
     }
+    // sudo cannot prompt without a TTY unless pam_tid (Touch ID) handles
+    // auth, so fall back to the system administrator password dialog.
     commonPrint.log(
-      "macOS authorize core failed: ${sudoResult.stderr}",
+      "macOS sudo authorization failed, falling back to osascript: "
+      "${sudoResult.stderr}",
+      logLevel: LogLevel.warning,
+    );
+    final scriptResult = await _runMacOSAppleScriptAuthorize(corePath);
+    if (scriptResult.exitCode == 0) {
+      return AuthorizeCode.success;
+    }
+    commonPrint.log(
+      "macOS authorize core failed: ${scriptResult.stderr}",
       logLevel: LogLevel.warning,
     );
     return AuthorizeCode.error;
@@ -137,6 +148,15 @@ class System {
       '+sx',
       corePath,
     ]);
+  }
+
+  Future<ProcessResult> _runMacOSAppleScriptAuthorize(String corePath) async {
+    final shellPath = "'${corePath.replaceAll("'", r"'\''")}'";
+    final shell = 'chown root:admin $shellPath && chmod +sx $shellPath';
+    final script =
+        'do shell script "${shell.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}" '
+        'with administrator privileges';
+    return Process.run('osascript', ['-e', script]);
   }
 
   Future<void> back() async {
