@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/controller.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/list.dart';
@@ -26,52 +25,6 @@ class Contributor {
 
 class AboutView extends StatelessWidget {
   const AboutView({super.key});
-
-  Future<void> _checkUpdate(BuildContext context) async {
-    final data = await appController.safeRun<Map<String, dynamic>?>(
-      request.checkForUpdate,
-      title: appLocalizations.checkUpdate,
-    );
-    appController.checkUpdateResultHandle(data: data, isUser: true);
-  }
-
-  List<Widget> _buildMoreSection(BuildContext context) {
-    return generateSection(
-      separated: false,
-      title: appLocalizations.more,
-      items: [
-        ListItem(
-          title: Text(appLocalizations.checkUpdate),
-          onTap: () {
-            _checkUpdate(context);
-          },
-        ),
-        ListItem(
-          title: const Text('Telegram'),
-          onTap: () {
-            globalState.openUrl('https://t.me/FlClash');
-          },
-          trailing: const Icon(Icons.launch),
-        ),
-        ListItem(
-          title: Text(appLocalizations.project),
-          onTap: () {
-            globalState.openUrl('https://github.com/$repository');
-          },
-          trailing: const Icon(Icons.launch),
-        ),
-        ListItem(
-          title: Text(appLocalizations.core),
-          onTap: () {
-            globalState.openUrl(
-              'https://github.com/chen08209/Clash.Meta/tree/FlClash',
-            );
-          },
-          trailing: const Icon(Icons.launch),
-        ),
-      ],
-    );
-  }
 
   List<Widget> _buildContributorsSection() {
     const contributors = [
@@ -166,7 +119,6 @@ class AboutView extends StatelessWidget {
       ),
       const SizedBox(height: 12),
       ..._buildContributorsSection(),
-      ..._buildMoreSection(context),
     ];
     return BaseScaffold(
       title: appLocalizations.about,

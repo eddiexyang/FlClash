@@ -235,29 +235,6 @@ class CrashlyticsItem extends ConsumerWidget {
   }
 }
 
-class AutoCheckUpdateItem extends ConsumerWidget {
-  const AutoCheckUpdateItem({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final autoCheckUpdate = ref.watch(
-      appSettingProvider.select((state) => state.autoCheckUpdate),
-    );
-    return ListItem.switchItem(
-      title: Text(appLocalizations.autoCheckUpdate),
-      subtitle: Text(appLocalizations.autoCheckUpdateDesc),
-      delegate: SwitchDelegate(
-        value: autoCheckUpdate,
-        onChanged: (bool value) {
-          ref
-              .read(appSettingProvider.notifier)
-              .update((state) => state.copyWith(autoCheckUpdate: value));
-        },
-      ),
-    );
-  }
-}
-
 class ApplicationSettingView extends StatelessWidget {
   const ApplicationSettingView({super.key});
 
@@ -278,7 +255,6 @@ class ApplicationSettingView extends StatelessWidget {
       CloseConnectionsItem(),
       UsageItem(),
       if (system.isAndroid) CrashlyticsItem(),
-      AutoCheckUpdateItem(),
     ];
     return BaseScaffold(
       title: appLocalizations.application,
