@@ -29,7 +29,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
     super.initState();
     _logs = ref.read(logsProvider).list;
     _scrollController = ScrollController(initialScrollOffset: double.maxFinite);
-    _scrollController.addListener(_flushLogsWhenReachTop);
+    _scrollController.addListener(_resumeLiveWhenReachTop);
     _logsStateNotifier.value = _logsStateNotifier.value.copyWith(logs: _logs);
     ref.listenManual(logsProvider.select((state) => state.list), (prev, next) {
       if (prev != next) {
@@ -64,28 +64,23 @@ class _LogsViewState extends ConsumerState<LogsView> {
         valueListenable: _logsStateNotifier,
         builder: (_, state, _) {
           final selectedLevel = _parseSelectedLevel(state.keywords);
-          return PopupMenuButton<LogLevel?>(
+          return PopupMenuButton<LogLevel>(
             icon: Icon(
               selectedLevel == null ? Icons.tune : Icons.filter_alt_outlined,
             ),
             tooltip: appLocalizations.logLevel,
-            onSelected: _setLevelFilter,
+            onSelected: _toggleLevelFilter,
             itemBuilder: (context) {
-              return [
-                CheckedPopupMenuItem<LogLevel?>(
-                  value: null,
-                  checked: selectedLevel == null,
-                  child: const Text('all'),
-                ),
-                const PopupMenuDivider(),
-                ...LogLevel.values.map(
-                  (level) => CheckedPopupMenuItem<LogLevel?>(
-                    value: level,
-                    checked: selectedLevel == level,
-                    child: Text(level.name),
-                  ),
-                ),
-              ];
+              return LogLevel.values
+                  .where((level) => level != LogLevel.silent)
+                  .map(
+                    (level) => CheckedPopupMenuItem<LogLevel>(
+                      value: level,
+                      checked: selectedLevel == level,
+                      child: Text(level.name),
+                    ),
+                  )
+                  .toList();
             },
           );
         },
@@ -107,8 +102,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
     return (position.maxScrollExtent - position.pixels).abs() <= _topThreshold;
   }
 
-  bool get _shouldUpdateNow =>
-      _logsStateNotifier.value.autoScrollToEnd || _isAtTop;
+  bool get _shouldUpdateNow => _logsStateNotifier.value.autoScrollToEnd;
 
   LogLevel? _parseSelectedLevel(List<String> keywords) {
     if (keywords.isEmpty) {
@@ -123,9 +117,12 @@ class _LogsViewState extends ConsumerState<LogsView> {
     return null;
   }
 
-  void _setLevelFilter(LogLevel? level) {
+  void _toggleLevelFilter(LogLevel level) {
+    final selectedLevel = _parseSelectedLevel(
+      _logsStateNotifier.value.keywords,
+    );
     _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-      keywords: level == null ? [] : [level.name],
+      keywords: selectedLevel == level ? [] : [level.name],
     );
   }
 
@@ -134,7 +131,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
       autoScrollToEnd: enabled,
     );
     if (enabled) {
-      _flushLogsWhenReachTop();
+      _flushPendingLogs();
     }
   }
 
@@ -148,7 +145,19 @@ class _LogsViewState extends ConsumerState<LogsView> {
     _pendingLogs = List<Log>.from(next);
   }
 
-  void _flushLogsWhenReachTop() {
+  void _resumeLiveWhenReachTop() {
+    if (!_isAtTop) {
+      return;
+    }
+    if (!_logsStateNotifier.value.autoScrollToEnd) {
+      _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
+        autoScrollToEnd: true,
+      );
+    }
+    _flushPendingLogs();
+  }
+
+  void _flushPendingLogs() {
     if (_pendingLogs == null || !_shouldUpdateNow) {
       return;
     }
@@ -163,7 +172,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
 
   @override
   void dispose() {
-    _scrollController.removeListener(_flushLogsWhenReachTop);
+    _scrollController.removeListener(_resumeLiveWhenReachTop);
     _logsStateNotifier.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -276,23 +285,29 @@ class _LogsViewState extends ConsumerState<LogsView> {
                   alignment: Alignment.topCenter,
                   child: ScrollToEndBox(
                     onCancelToEnd: () {
-                      _logsStateNotifier.value = _logsStateNotifier.value
-                          .copyWith(autoScrollToEnd: false);
+                      if (_isAtTop) {
+                        _resumeLiveWhenReachTop();
+                      } else if (_logsStateNotifier.value.autoScrollToEnd) {
+                        _logsStateNotifier.value = _logsStateNotifier.value
+                            .copyWith(autoScrollToEnd: false);
+                      }
                     },
                     controller: _scrollController,
                     enable: state.autoScrollToEnd,
                     dataSource: logs,
-                    child: CommonScrollBar(
-                      controller: _scrollController,
-                      child: SuperListView.builder(
-                        physics: NextClampingScrollPhysics(),
-                        reverse: true,
-                        shrinkWrap: true,
+                    child: SelectionArea(
+                      child: CommonScrollBar(
                         controller: _scrollController,
-                        itemBuilder: (_, index) {
-                          return items[index];
-                        },
-                        itemCount: items.length,
+                        child: SuperListView.builder(
+                          physics: NextClampingScrollPhysics(),
+                          reverse: true,
+                          shrinkWrap: true,
+                          controller: _scrollController,
+                          itemBuilder: (_, index) {
+                            return items[index];
+                          },
+                          itemCount: items.length,
+                        ),
                       ),
                     ),
                   ),
@@ -356,7 +371,7 @@ class LogItem extends StatelessWidget {
         ),
       ),
     );
-    final payload = SelectableText(
+    final payload = Text(
       log.payload,
       style: context.textTheme.bodySmall?.copyWith(
         height: 1.3,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/controller.dart';
 import 'package:fl_clash/core/core.dart';
@@ -42,12 +44,11 @@ class _CoreContainerState extends ConsumerState<CoreManager>
         appController.updateConfigDebounce();
       }
     });
-    coreController.startLog();
   }
 
   @override
-  Future<void> dispose() async {
-    coreController.stopLog();
+  void dispose() {
+    unawaited(coreController.stopLog());
     coreEventManager.removeListener(this);
     super.dispose();
   }

@@ -221,16 +221,7 @@ class TrackerInfoDetailView extends StatelessWidget {
     return destinationIP;
   }
 
-  Widget _buildChains() {
-    final chains = Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.end,
-      children: [
-        for (final chain in trackerInfo.chains.reversed)
-          CommonChip(label: chain, onPressed: () {}),
-      ],
-    );
+  Widget _buildChains(BuildContext context) {
     return ListItem(
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -238,7 +229,16 @@ class TrackerInfoDetailView extends StatelessWidget {
         spacing: 20,
         children: [
           Text(appLocalizations.proxyChains),
-          Flexible(child: chains),
+          Flexible(
+            child: Text(
+              trackerInfo.chains.reversed.join(' → '),
+              textAlign: TextAlign.end,
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colorScheme.secondary,
+                fontFamily: FontFamily.jetBrainsMono.value,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -291,10 +291,10 @@ class TrackerInfoDetailView extends StatelessWidget {
         desc: trackerInfo.metadata.network,
       ),
       _buildItem(title: appLocalizations.rule, desc: _getRuleText()),
-      if (trackerInfo.metadata.host.isNotEmpty)
+      if (trackerInfo.metadata.domain.isNotEmpty)
         _buildItem(
           title: appLocalizations.host,
-          desc: trackerInfo.metadata.host,
+          desc: trackerInfo.metadata.domain,
         ),
       if (_getSourceText().isNotEmpty)
         _buildItem(title: appLocalizations.source, desc: _getSourceText()),
@@ -341,7 +341,7 @@ class TrackerInfoDetailView extends StatelessWidget {
           title: appLocalizations.remoteDestination,
           desc: trackerInfo.metadata.nextHop,
         ),
-      _buildChains(),
+      _buildChains(context),
     ];
     return SelectionArea(
       child: ListView.builder(

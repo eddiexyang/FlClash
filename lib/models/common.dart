@@ -74,6 +74,7 @@ abstract class Metadata with _$Metadata {
     @Default('') String destinationIP,
     @Default('') String destinationPort,
     @Default('') String host,
+    @Default('') String sniffHost,
     DnsMode? dnsMode,
     @Default('') String process,
     @Default('') String processPath,
@@ -91,6 +92,21 @@ abstract class Metadata with _$Metadata {
 }
 
 extension MetadataExt on Metadata {
+  String get domain {
+    if (host.isNotEmpty) {
+      return host;
+    }
+    return sniffHost;
+  }
+
+  String get displayHost {
+    final value = domain;
+    if (value.isNotEmpty) {
+      return value;
+    }
+    return destinationIP;
+  }
+
   String get nextHop {
     final value = remoteDestination.trim();
     if (value.isEmpty) {
@@ -120,8 +136,6 @@ abstract class TrackerInfo with _$TrackerInfo {
     required List<String> chains,
     required String rule,
     required String rulePayload,
-    int? downloadSpeed,
-    int? uploadSpeed,
   }) = _TrackerInfo;
 
   factory TrackerInfo.fromJson(Map<String, Object?> json) =>
@@ -132,9 +146,9 @@ extension TrackerInfoExt on TrackerInfo {
   String get desc {
     var text = '${metadata.network}://';
     final ips = [
-      metadata.host,
+      metadata.domain,
       metadata.destinationIP,
-    ].where((ip) => ip.isNotEmpty);
+    ].where((ip) => ip.isNotEmpty).toSet();
     text += ips.join('/');
     text += ':${metadata.destinationPort}';
     return text;
@@ -234,6 +248,7 @@ extension TrackerInfosStateExt on TrackerInfosState {
       final process = trackerInfo.metadata.process;
       final networkText = trackerInfo.metadata.network.toLowerCase();
       final hostText = trackerInfo.metadata.host.toLowerCase();
+      final sniffHostText = trackerInfo.metadata.sniffHost.toLowerCase();
       final destinationIPText = trackerInfo.metadata.destinationIP
           .toLowerCase();
       final processText = trackerInfo.metadata.process.toLowerCase();
@@ -241,6 +256,7 @@ extension TrackerInfosStateExt on TrackerInfosState {
       return {...chains, process}.containsAll(keywords) &&
           (networkText.contains(lowerQuery) ||
               hostText.contains(lowerQuery) ||
+              sniffHostText.contains(lowerQuery) ||
               destinationIPText.contains(lowQuery) ||
               processText.contains(lowerQuery) ||
               chainsText.contains(lowerQuery));

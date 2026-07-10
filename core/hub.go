@@ -436,8 +436,9 @@ func handleStartLog() {
 		logSubscriber = nil
 	}
 	logSubscriber = log.Subscribe()
+	subscriber := logSubscriber
 	go func() {
-		for logData := range logSubscriber {
+		for logData := range subscriber {
 			if logData.LogLevel < log.Level() {
 				continue
 			}

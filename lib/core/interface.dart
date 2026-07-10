@@ -58,9 +58,9 @@ mixin CoreInterface {
 
   FutureOr<void> resetTraffic();
 
-  FutureOr<void> startLog();
+  Future<bool> startLog();
 
-  FutureOr<void> stopLog();
+  Future<bool> stopLog();
 
   Future<bool> crash();
 
@@ -299,13 +299,13 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
-  startLog() {
-    _invoke(method: ActionMethod.startLog);
+  Future<bool> startLog() async {
+    return await _invoke<bool>(method: ActionMethod.startLog) ?? false;
   }
 
   @override
-  stopLog() {
-    _invoke<bool>(method: ActionMethod.stopLog);
+  Future<bool> stopLog() async {
+    return await _invoke<bool>(method: ActionMethod.stopLog) ?? false;
   }
 
   @override

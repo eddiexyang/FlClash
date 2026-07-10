@@ -248,12 +248,12 @@ class CoreController {
     _interface.resetTraffic();
   }
 
-  void startLog() {
-    _interface.startLog();
+  Future<bool> startLog() {
+    return _interface.startLog();
   }
 
-  void stopLog() {
-    _interface.stopLog();
+  Future<bool> stopLog() {
+    return _interface.stopLog();
   }
 
   Future<void> requestGc() async {

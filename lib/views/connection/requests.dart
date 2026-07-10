@@ -1,16 +1,12 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
-import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/views/connection/connections.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -46,9 +42,7 @@ enum RequestColumn {
       case RequestColumn.time:
         return b.start.compareTo(a.start);
       case RequestColumn.host:
-        final hostA = a.metadata.host.isEmpty ? a.metadata.destinationIP : a.metadata.host;
-        final hostB = b.metadata.host.isEmpty ? b.metadata.destinationIP : b.metadata.host;
-        return hostA.compareTo(hostB);
+        return a.metadata.displayHost.compareTo(b.metadata.displayHost);
       case RequestColumn.process:
         return a.metadata.process.compareTo(b.metadata.process);
       case RequestColumn.rule:
@@ -67,11 +61,12 @@ class RequestsView extends ConsumerStatefulWidget {
 }
 
 class _RequestsViewState extends ConsumerState<RequestsView> {
-  static const double _rowExtent = 40;
+  static const double _rowExtent = 32;
 
   // Data State
   List<TrackerInfo> _requests = [];
   List<TrackerInfo>? _cachedRequests;
+  bool _isLive = true;
 
   // Search
   final TextEditingController _searchController = TextEditingController();
@@ -92,21 +87,22 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
   @override
   void initState() {
     super.initState();
-    _columnWidths = {
-      for (var col in _columns) col: col.defaultWidth,
-    };
-    
+    _columnWidths = {for (var col in _columns) col: col.defaultWidth};
+
     // 初始化数据
     _requests = ref.read(requestsProvider).list;
-    _verticalScrollController.addListener(_flushCachedRequestsIfAtTop);
-    
+    _verticalScrollController.addListener(_syncLiveStateFromScroll);
+
     // 监听数据源变化
-    ref.listenManual(requestsProvider.select((state) => state.list), (prev, next) {
+    ref.listenManual(requestsProvider.select((state) => state.list), (
+      prev,
+      next,
+    ) {
       // 使用 throttler 避免过于频繁刷新导致表格重绘卡顿
       throttler.call(FunctionTag.requests, () {
         if (!mounted) return;
         if (trackerInfoListEquality.equals(_requests, next)) return;
-        if (_isAtTop) {
+        if (_isLive && _isAtTop) {
           _cachedRequests = null;
           setState(() {
             _requests = next;
@@ -126,19 +122,63 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
     return (position.pixels - position.minScrollExtent).abs() <= 1;
   }
 
-  void _flushCachedRequestsIfAtTop() {
-    if (!mounted || !_isAtTop || _cachedRequests == null) {
+  void _syncLiveStateFromScroll() {
+    if (!mounted) {
       return;
     }
-    final cachedRequests = _cachedRequests!;
-    if (trackerInfoListEquality.equals(_requests, cachedRequests)) {
+
+    if (!_isAtTop) {
+      if (_isLive) {
+        setState(() {
+          _isLive = false;
+        });
+      }
+      return;
+    }
+
+    _resumeLiveAtTop();
+  }
+
+  void _resumeLiveAtTop() {
+    if (!mounted) {
+      return;
+    }
+    final cachedRequests = _cachedRequests;
+    final hasNewRequests =
+        cachedRequests != null &&
+        !trackerInfoListEquality.equals(_requests, cachedRequests);
+    if (_isLive && !hasNewRequests) {
       _cachedRequests = null;
       return;
     }
     setState(() {
-      _requests = cachedRequests;
+      _isLive = true;
+      if (hasNewRequests) {
+        _requests = cachedRequests;
+      }
       _cachedRequests = null;
     });
+  }
+
+  void _pauseLive() {
+    if (!_isLive) {
+      return;
+    }
+    setState(() {
+      _isLive = false;
+    });
+  }
+
+  Future<void> _resumeLive() async {
+    if (_verticalScrollController.hasClients && !_isAtTop) {
+      final position = _verticalScrollController.position;
+      await _verticalScrollController.animateTo(
+        position.minScrollExtent,
+        duration: kThemeAnimationDuration,
+        curve: Curves.easeOut,
+      );
+    }
+    _resumeLiveAtTop();
   }
 
   void _handleSort(RequestColumn column) {
@@ -154,18 +194,18 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
 
   void _handleResize(int columnIndex, double delta) {
     if (columnIndex < 0 || columnIndex >= _columns.length - 1) return;
-    
+
     setState(() {
       final leftColumn = _columns[columnIndex];
       final rightColumn = _columns[columnIndex + 1];
-      
+
       final leftWidth = _columnWidths[leftColumn]!;
       final rightWidth = _columnWidths[rightColumn]!;
-      
+
       const minWidth = 40.0;
       var newLeftWidth = leftWidth + delta;
       var newRightWidth = rightWidth - delta;
-      
+
       if (newLeftWidth < minWidth) {
         newLeftWidth = minWidth;
         newRightWidth = leftWidth + rightWidth - minWidth;
@@ -174,7 +214,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
         newRightWidth = minWidth;
         newLeftWidth = leftWidth + rightWidth - minWidth;
       }
-      
+
       _columnWidths[leftColumn] = newLeftWidth;
       _columnWidths[rightColumn] = newRightWidth;
     });
@@ -182,27 +222,30 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
 
   List<TrackerInfo> _filterAndSortRequests(List<TrackerInfo> source) {
     var list = source;
-    
+
     // Search
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       list = list.where((info) {
-        final host = info.metadata.host.toLowerCase();
+        final host = info.metadata.displayHost.toLowerCase();
+        final sniffHost = info.metadata.sniffHost.toLowerCase();
         final ip = info.metadata.destinationIP.toLowerCase();
         final process = info.metadata.process.toLowerCase();
         final rule = info.rule.toLowerCase();
         final chains = info.chains.join(' ').toLowerCase();
-        final time =
-            DateFormat('yyyy-MM-dd HH:mm:ss').format(info.start.toLocal()).toLowerCase();
+        final time = DateFormat(
+          'yyyy-MM-dd HH:mm:ss',
+        ).format(info.start.toLocal()).toLowerCase();
         final port = info.metadata.destinationPort.toLowerCase();
         final hostOrIp = host.isEmpty ? ip : host;
         final hostWithPort = '$hostOrIp:$port';
-        
+
         return hostWithPort.contains(q) ||
-               process.contains(q) ||
-               rule.contains(q) ||
-               chains.contains(q) ||
-               time.contains(q);
+            sniffHost.contains(q) ||
+            process.contains(q) ||
+            rule.contains(q) ||
+            chains.contains(q) ||
+            time.contains(q);
       }).toList();
     }
 
@@ -212,7 +255,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
       final compare = _sortColumn.compare(a, b);
       return _sortAscending ? compare : -compare;
     });
-    
+
     return sortedList;
   }
 
@@ -244,7 +287,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
   @override
   void dispose() {
     _searchController.dispose();
-    _verticalScrollController.removeListener(_flushCachedRequestsIfAtTop);
+    _verticalScrollController.removeListener(_syncLiveStateFromScroll);
     _verticalScrollController.dispose();
     _horizontalScrollController.dispose();
     super.dispose();
@@ -294,6 +337,15 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
         ),
         const SizedBox(width: 8),
         IconButton(
+          tooltip: _isLive ? 'Pause live updates' : 'Resume live updates',
+          onPressed: _isLive ? _pauseLive : _resumeLive,
+          icon: Icon(
+            _isLive
+                ? Icons.pause_circle_outline_rounded
+                : Icons.play_circle_outline_rounded,
+          ),
+        ),
+        IconButton(
           tooltip: appLocalizations.clearData,
           onPressed: _clearRequests,
           icon: const Icon(Icons.delete_sweep_outlined),
@@ -304,8 +356,10 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final totalFixedWidth = _columns.fold<double>(
-                0, (sum, col) => sum + (_columnWidths[col] ?? col.defaultWidth));
-            
+              0,
+              (sum, col) => sum + (_columnWidths[col] ?? col.defaultWidth),
+            );
+
             double scaleRatio = 1.0;
             if (constraints.maxWidth > totalFixedWidth) {
               scaleRatio = constraints.maxWidth / totalFixedWidth;
@@ -313,7 +367,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
 
             final effectiveColumnWidths = {
               for (var col in _columns)
-                col: (_columnWidths[col] ?? col.defaultWidth) * scaleRatio
+                col: (_columnWidths[col] ?? col.defaultWidth) * scaleRatio,
             };
 
             final contentWidth = max(constraints.maxWidth, totalFixedWidth);
@@ -327,11 +381,14 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
                     child: Scrollbar(
                       controller: _horizontalScrollController,
                       thumbVisibility: true,
-                      notificationPredicate: (notification) => notification.depth == 1,
+                      notificationPredicate: (notification) =>
+                          notification.depth == 1,
                       child: SingleChildScrollView(
                         controller: _horizontalScrollController,
                         scrollDirection: Axis.horizontal,
-                        physics: scaleRatio > 1.0 ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
+                        physics: scaleRatio > 1.0
+                            ? const NeverScrollableScrollPhysics()
+                            : const ClampingScrollPhysics(),
                         child: SizedBox(
                           width: contentWidth,
                           child: Column(
@@ -349,7 +406,9 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
                               const Divider(height: 1),
                               Expanded(
                                 child: requests.isEmpty
-                                    ? Center(child: Text(appLocalizations.noData))
+                                    ? Center(
+                                        child: Text(appLocalizations.noData),
+                                      )
                                     : ListView.builder(
                                         controller: _verticalScrollController,
                                         itemCount: requests.length,
@@ -361,7 +420,8 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
                                             info: info,
                                             columns: _columns,
                                             columnWidths: effectiveColumnWidths,
-                                            onTap: () => _showRequestDetails(info),
+                                            onTap: () =>
+                                                _showRequestDetails(info),
                                           );
                                         },
                                       ),
@@ -402,7 +462,7 @@ class _ResizableHeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 40,
+      height: 34,
       color: Theme.of(context).colorScheme.surface,
       child: Row(
         children: columns.asMap().entries.map((entry) {
@@ -427,9 +487,7 @@ class _ResizableHeaderRow extends StatelessWidget {
                           Expanded(
                             child: Text(
                               col.label,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelMedium
+                              style: Theme.of(context).textTheme.labelMedium
                                   ?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: isSorted
@@ -455,11 +513,13 @@ class _ResizableHeaderRow extends StatelessWidget {
                 if (!isLast)
                   Positioned(
                     right: 0,
-                    top: 8,
-                    bottom: 8,
+                    top: 6,
+                    bottom: 6,
                     child: Container(
                       width: 1,
-                      color: Theme.of(context).dividerColor.withOpacity(0.5),
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.5),
                     ),
                   ),
                 if (!isLast)
@@ -477,9 +537,7 @@ class _ResizableHeaderRow extends StatelessWidget {
                             onResizeDelta(index, details.primaryDelta!);
                           }
                         },
-                        child: Container(
-                          color: Colors.transparent,
-                        ),
+                        child: Container(color: Colors.transparent),
                       ),
                     ),
                   ),
@@ -510,21 +568,9 @@ class _RequestRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final rowColor = WidgetStateProperty.resolveWith<Color?>((states) {
-      if (states.contains(WidgetState.hovered)) {
-        return colorScheme.surfaceContainerHighest.withOpacity(0.5);
-      }
-      return null;
-    });
-
-    return TextButton(
-      style: ButtonStyle(
-        padding: WidgetStateProperty.all(EdgeInsets.zero),
-        shape: WidgetStateProperty.all(const RoundedRectangleBorder()),
-        overlayColor: rowColor,
-        backgroundColor: rowColor,
-      ),
-      onPressed: onTap,
+    return SelectionTapRegion(
+      onTap: onTap,
+      hoverColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       child: Row(
         children: columns.map((col) {
           return SizedBox(
@@ -561,10 +607,10 @@ class _RequestRow extends StatelessWidget {
       case RequestColumn.process:
         return Text(info.metadata.process, style: style);
       case RequestColumn.host:
-        final host = info.metadata.host;
+        final host = info.metadata.displayHost;
         final ip = info.metadata.destinationIP;
         final port = info.metadata.destinationPort;
-        if (host.isNotEmpty) {
+        if (info.metadata.domain.isNotEmpty) {
           return Tooltip(
             message: '$host:$port ($ip)',
             waitDuration: const Duration(milliseconds: 500),
@@ -576,10 +622,10 @@ class _RequestRow extends StatelessWidget {
         return Text(info.rule, style: style);
       case RequestColumn.chains:
         return Tooltip(
-          message: info.chains.reversed.join(' -> '),
+          message: info.chains.reversed.join(' → '),
           waitDuration: const Duration(milliseconds: 500),
           child: Text(
-            info.chains.reversed.join(' -> '),
+            info.chains.reversed.join(' → '),
             style: style?.copyWith(color: colorScheme.secondary),
           ),
         );

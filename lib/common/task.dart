@@ -204,6 +204,30 @@ Future<Map<String, dynamic>> _makeRealProfileTask(
       rawConfig['dns']['nameserver'] = [...nameserver, systemDns];
     }
   }
+  final enhancedMode = rawConfig['dns']?['enhanced-mode']
+      ?.toString()
+      .toLowerCase();
+  if (enhancedMode == 'redir-host' && rawConfig['sniffer'] == null) {
+    rawConfig['sniffer'] = {
+      'enable': true,
+      'force-dns-mapping': false,
+      'parse-pure-ip': true,
+      'sniff': {
+        'HTTP': {
+          'ports': ['80', '8080-8880'],
+          'override-destination': false,
+        },
+        'TLS': {
+          'ports': ['443', '8443', '5223'],
+          'override-destination': false,
+        },
+        'QUIC': {
+          'ports': ['443', '8443'],
+          'override-destination': false,
+        },
+      },
+    };
+  }
   List<String> rules = [];
   if (rawConfig['rules'] != null) {
     rules = List<String>.from(rawConfig['rules']);
@@ -283,8 +307,8 @@ String? _resolveSshPrivateKeyPath(String path) {
   if (!sshKeyPathRegExp.hasMatch(trimmed)) {
     return null;
   }
-  final homeDir = Platform.environment['HOME'] ??
-      Platform.environment['USERPROFILE'];
+  final homeDir =
+      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
   if (homeDir == null || homeDir.isEmpty) {
     return null;
   }

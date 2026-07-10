@@ -30,6 +30,7 @@ _Metadata _$MetadataFromJson(Map<String, dynamic> json) => _Metadata(
   destinationIP: json['destinationIP'] as String? ?? '',
   destinationPort: json['destinationPort'] as String? ?? '',
   host: json['host'] as String? ?? '',
+  sniffHost: json['sniffHost'] as String? ?? '',
   dnsMode: $enumDecodeNullable(_$DnsModeEnumMap, json['dnsMode']),
   process: json['process'] as String? ?? '',
   processPath: json['processPath'] as String? ?? '',
@@ -58,6 +59,7 @@ Map<String, dynamic> _$MetadataToJson(_Metadata instance) => <String, dynamic>{
   'destinationIP': instance.destinationIP,
   'destinationPort': instance.destinationPort,
   'host': instance.host,
+  'sniffHost': instance.sniffHost,
   'dnsMode': _$DnsModeEnumMap[instance.dnsMode],
   'process': instance.process,
   'processPath': instance.processPath,
@@ -86,8 +88,6 @@ _TrackerInfo _$TrackerInfoFromJson(Map<String, dynamic> json) => _TrackerInfo(
   chains: (json['chains'] as List<dynamic>).map((e) => e as String).toList(),
   rule: json['rule'] as String,
   rulePayload: json['rulePayload'] as String,
-  downloadSpeed: (json['downloadSpeed'] as num?)?.toInt(),
-  uploadSpeed: (json['uploadSpeed'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$TrackerInfoToJson(_TrackerInfo instance) =>
@@ -100,8 +100,6 @@ Map<String, dynamic> _$TrackerInfoToJson(_TrackerInfo instance) =>
       'chains': instance.chains,
       'rule': instance.rule,
       'rulePayload': instance.rulePayload,
-      'downloadSpeed': instance.downloadSpeed,
-      'uploadSpeed': instance.uploadSpeed,
     };
 
 _Log _$LogFromJson(Map<String, dynamic> json) => _Log(

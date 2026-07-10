@@ -6,7 +6,6 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
-import 'package:fl_clash/widgets/dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -141,7 +140,6 @@ extension InitControllerExt on AppController {
       await applyProfile(force: true, allowTunAuthorization: false);
     }
   }
-
 }
 
 extension StateControllerExt on AppController {
@@ -822,7 +820,10 @@ extension SetupControllerExt on AppController {
         confirmText: appLocalizations.go,
       );
       if (shouldAuthorize != true) {
-        return _SetupConfigMessageResult(message: message, hasShownDialog: true);
+        return _SetupConfigMessageResult(
+          message: message,
+          hasShownDialog: true,
+        );
       }
       await system.openMacOSFileAuthorizationSettings();
       final retry = await globalState.showMessage(
@@ -835,7 +836,10 @@ extension SetupControllerExt on AppController {
         ),
       );
       if (retry != true) {
-        return _SetupConfigMessageResult(message: message, hasShownDialog: true);
+        return _SetupConfigMessageResult(
+          message: message,
+          hasShownDialog: true,
+        );
       }
       final retryMessage = await coreController.setupConfig(
         setupState: setupState,
@@ -871,10 +875,7 @@ extension SetupControllerExt on AppController {
       return _SetupConfigMessageResult(message: message, hasShownDialog: true);
     }
 
-    return _SetupConfigMessageResult(
-      message: message,
-      hasShownDialog: false,
-    );
+    return _SetupConfigMessageResult(message: message, hasShownDialog: false);
   }
 }
 
@@ -902,6 +903,13 @@ extension CoreControllerExt on AppController {
         _context.showNotifier(message);
       }
       return;
+    }
+    final isLogStarted = await coreController.startLog();
+    if (!isLogStarted) {
+      commonPrint.log(
+        'core_log_subscription_failed',
+        logLevel: LogLevel.warning,
+      );
     }
     _ref.read(coreStatusProvider.notifier).value = CoreStatus.connected;
   }
@@ -933,7 +941,9 @@ extension CoreControllerExt on AppController {
           await _initCore();
           await updateStatus(true, isInit: true);
           if (_ref.read(coreStatusProvider) == CoreStatus.connected) {
-            commonPrint.log('auto_recover_success recover_attempt_count=$attempt');
+            commonPrint.log(
+              'auto_recover_success recover_attempt_count=$attempt',
+            );
             return;
           }
           throw Exception('core status is disconnected after recover');
@@ -967,9 +977,9 @@ extension CoreControllerExt on AppController {
           break;
         case AuthorizeCode.error:
           _ref.read(realTunEnableProvider.notifier).value = false;
-          _ref.read(patchClashConfigProvider.notifier).update(
-            (state) => state.copyWith.tun(enable: false),
-          );
+          _ref
+              .read(patchClashConfigProvider.notifier)
+              .update((state) => state.copyWith.tun(enable: false));
           enableTun = false;
           return Result.error('');
       }

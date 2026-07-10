@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
@@ -13,8 +12,8 @@ enum ConnectionColumn {
   host,
   process,
   chains,
-  uploadSpeed,
-  downloadSpeed,
+  upload,
+  download,
   time,
   action;
 
@@ -23,8 +22,8 @@ enum ConnectionColumn {
       ConnectionColumn.host => 'Host',
       ConnectionColumn.process => 'Process',
       ConnectionColumn.chains => 'Chains',
-      ConnectionColumn.uploadSpeed => 'Up/s',
-      ConnectionColumn.downloadSpeed => 'Down/s',
+      ConnectionColumn.upload => 'Up',
+      ConnectionColumn.download => 'Down',
       ConnectionColumn.time => 'Duration',
       ConnectionColumn.action => '',
     };
@@ -36,8 +35,8 @@ enum ConnectionColumn {
       ConnectionColumn.host => 220,
       ConnectionColumn.process => 120,
       ConnectionColumn.chains => 240,
-      ConnectionColumn.uploadSpeed => 80,
-      ConnectionColumn.downloadSpeed => 80,
+      ConnectionColumn.upload => 80,
+      ConnectionColumn.download => 80,
       ConnectionColumn.time => 80,
       ConnectionColumn.action => 44,
     };
@@ -46,29 +45,33 @@ enum ConnectionColumn {
   int compare(TrackerInfo a, TrackerInfo b) {
     switch (this) {
       case ConnectionColumn.host:
-        final hostA = a.metadata.host.isEmpty
-            ? a.metadata.destinationIP
-            : a.metadata.host;
-        final hostB = b.metadata.host.isEmpty
-            ? b.metadata.destinationIP
-            : b.metadata.host;
-        return hostA.compareTo(hostB);
+        return a.metadata.displayHost.compareTo(b.metadata.displayHost);
       case ConnectionColumn.process:
         return a.metadata.process.compareTo(b.metadata.process);
       case ConnectionColumn.chains:
         final chainA = a.chains.isEmpty ? '' : a.chains.last;
         final chainB = b.chains.isEmpty ? '' : b.chains.last;
         return chainA.compareTo(chainB);
-      case ConnectionColumn.uploadSpeed:
-        return (a.uploadSpeed ?? 0).compareTo(b.uploadSpeed ?? 0);
-      case ConnectionColumn.downloadSpeed:
-        return (a.downloadSpeed ?? 0).compareTo(b.downloadSpeed ?? 0);
+      case ConnectionColumn.upload:
+        return a.upload.compareTo(b.upload);
+      case ConnectionColumn.download:
+        return a.download.compareTo(b.download);
       case ConnectionColumn.time:
         return b.start.compareTo(a.start);
       case ConnectionColumn.action:
         return 0;
     }
   }
+}
+
+String _formatConnectionDuration(Duration duration) {
+  String twoDigits(int value) => value.toString().padLeft(2, '0');
+  final hours = twoDigits(duration.inHours);
+  final minutes = twoDigits(duration.inMinutes.remainder(60));
+  final seconds = twoDigits(duration.inSeconds.remainder(60));
+  return duration.inHours > 0
+      ? '$hours:$minutes:$seconds'
+      : '$minutes:$seconds';
 }
 
 class ConnectionsView extends ConsumerStatefulWidget {
@@ -88,9 +91,6 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   int _connectionsGeneration = 0;
   String? _lastFetchError;
 
-  // 缓存上一次的连接信息，用于计算速度 Key为ID
-  Map<String, TrackerInfo> _lastConnectionStates = {};
-
   // Sorting
   ConnectionColumn _sortColumn = ConnectionColumn.time;
   bool _sortAscending = true;
@@ -105,8 +105,8 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
     ConnectionColumn.host,
     ConnectionColumn.process,
     ConnectionColumn.chains,
-    ConnectionColumn.uploadSpeed,
-    ConnectionColumn.downloadSpeed,
+    ConnectionColumn.upload,
+    ConnectionColumn.download,
     ConnectionColumn.time,
     ConnectionColumn.action,
   ];
@@ -146,34 +146,10 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
             continue;
           }
 
-          final List<TrackerInfo> calculatedConnections = [];
-          final Map<String, TrackerInfo> newStates = {};
-
-          for (final current in rawConnections) {
-            final last = _lastConnectionStates[current.id];
-
-            var upSpeed = 0;
-            var downSpeed = 0;
-
-            if (last != null) {
-              upSpeed = max(0, current.upload - last.upload);
-              downSpeed = max(0, current.download - last.download);
-            }
-
-            final connectionWithSpeed = current.copyWith(
-              uploadSpeed: upSpeed,
-              downloadSpeed: downSpeed,
-            );
-
-            calculatedConnections.add(connectionWithSpeed);
-            newStates[current.id] = current;
-          }
-
           _lastFetchError = null;
           if (mounted) {
             setState(() {
-              _connections = calculatedConnections;
-              _lastConnectionStates = newStates;
+              _connections = rawConnections;
             });
           }
         } catch (error, stackTrace) {
@@ -237,7 +213,8 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       list = list.where((info) {
-        final host = info.metadata.host.toLowerCase();
+        final host = info.metadata.displayHost.toLowerCase();
+        final sniffHost = info.metadata.sniffHost.toLowerCase();
         final ip = info.metadata.destinationIP.toLowerCase();
         final process = info.metadata.process.toLowerCase();
         final port = info.metadata.destinationPort.toLowerCase();
@@ -251,6 +228,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         final hostWithPort = '$hostOrIp:$port';
 
         return hostWithPort.contains(q) ||
+            sniffHost.contains(q) ||
             (remotePort.isNotEmpty && remotePort.contains(q)) ||
             process.contains(q) ||
             rule.contains(q) ||
@@ -446,7 +424,6 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                                           _connections.removeWhere(
                                             (item) => item.id == info.id,
                                           );
-                                          _lastConnectionStates.remove(info.id);
                                         });
                                       }
                                       await _fetchData();
@@ -473,12 +450,12 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                       ),
                       const Spacer(),
                       Text(
-                        'Download: ${_connections.fold<int>(0, (p, c) => p + (c.downloadSpeed ?? 0)).traffic.show}/s',
+                        'Down: ${_connections.fold<int>(0, (p, c) => p + c.download).traffic.show}',
                         style: context.textTheme.labelSmall,
                       ),
                       const SizedBox(width: 16),
                       Text(
-                        'Upload: ${_connections.fold<int>(0, (p, c) => p + (c.uploadSpeed ?? 0)).traffic.show}/s',
+                        'Up: ${_connections.fold<int>(0, (p, c) => p + c.upload).traffic.show}',
                         style: context.textTheme.labelSmall,
                       ),
                     ],
@@ -622,46 +599,40 @@ class _ConnectionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final rowColor = WidgetStateProperty.resolveWith<Color?>((states) {
-      if (states.contains(WidgetState.hovered)) {
-        return colorScheme.surfaceContainerHighest.withValues(alpha: 0.5);
-      }
-      return null;
-    });
+    final dataColumns = columns
+        .where((column) => column != ConnectionColumn.action)
+        .toList();
+    final actionColumns = columns
+        .where((column) => column == ConnectionColumn.action)
+        .toList();
 
-    return TextButton(
-      style: ButtonStyle(
-        padding: WidgetStateProperty.all(EdgeInsets.zero),
-        minimumSize: WidgetStateProperty.all(Size.zero),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-        shape: WidgetStateProperty.all(const RoundedRectangleBorder()),
-        overlayColor: rowColor,
-        backgroundColor: rowColor,
-      ),
-      onPressed: onTap,
-      child: Row(
-        children: columns.map((col) {
-          return SizedBox(
-            width: columnWidths[col],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              alignment: Alignment.centerLeft,
-              child: _buildCell(context, col, info, textTheme, colorScheme),
-            ),
-          );
-        }).toList(),
-      ),
+    Widget buildCell(ConnectionColumn column) {
+      return SizedBox(
+        width: columnWidths[column],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          alignment: Alignment.centerLeft,
+          child: _buildCell(context, column, info, textTheme, colorScheme),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        SelectionTapRegion(
+          onTap: onTap,
+          hoverColor: colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
+          child: Row(children: dataColumns.map(buildCell).toList()),
+        ),
+        ...actionColumns.map(buildCell),
+      ],
     );
   }
 
   String _formatDuration(Duration d) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = twoDigits(d.inHours);
-    final minutes = twoDigits(d.inMinutes.remainder(60));
-    final seconds = twoDigits(d.inSeconds.remainder(60));
-    if (d.inHours > 0) return '$hours:$minutes:$seconds';
-    return '$minutes:$seconds';
+    return _formatConnectionDuration(d);
   }
 
   Widget _buildCell(
@@ -680,28 +651,24 @@ class _ConnectionRow extends StatelessWidget {
       case ConnectionColumn.process:
         return Text(info.metadata.process, style: style);
       case ConnectionColumn.host:
-        final host = info.metadata.host;
-        final ip = info.metadata.destinationIP;
+        final host = info.metadata.displayHost;
         final port = info.metadata.destinationPort;
-        if (host.isNotEmpty) {
-          return Text('$host:$port', style: style);
-        }
-        return Text('$ip:$port', style: style);
+        return Text('$host:$port', style: style);
       case ConnectionColumn.chains:
         return Text(
           info.chains.reversed.join(' → '),
           style: style?.copyWith(color: colorScheme.secondary),
         );
-      case ConnectionColumn.uploadSpeed:
-        final speed = info.uploadSpeed ?? 0;
+      case ConnectionColumn.upload:
+        final total = info.upload;
         return Text(
-          speed == 0 ? '-' : '${speed.traffic.show}/s',
+          total == 0 ? '-' : total.traffic.show,
           style: style?.copyWith(color: Colors.grey),
         );
-      case ConnectionColumn.downloadSpeed:
-        final speed = info.downloadSpeed ?? 0;
+      case ConnectionColumn.download:
+        final total = info.download;
         return Text(
-          speed == 0 ? '-' : '${speed.traffic.show}/s',
+          total == 0 ? '-' : total.traffic.show,
           style: style?.copyWith(color: Colors.green),
         );
       case ConnectionColumn.time:
@@ -767,16 +734,7 @@ class TrackerInfoDetailView extends StatelessWidget {
     return destinationIP;
   }
 
-  Widget _buildChains() {
-    final chains = Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.end,
-      children: [
-        for (final chain in trackerInfo.chains.reversed)
-          CommonChip(label: chain, onPressed: () {}),
-      ],
-    );
+  Widget _buildChains(BuildContext context) {
     return ListItem(
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -784,7 +742,16 @@ class TrackerInfoDetailView extends StatelessWidget {
         spacing: 20,
         children: [
           Text(appLocalizations.proxyChains),
-          Flexible(child: chains),
+          Flexible(
+            child: Text(
+              trackerInfo.chains.reversed.join(' → '),
+              textAlign: TextAlign.end,
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colorScheme.secondary,
+                fontFamily: FontFamily.jetBrainsMono.value,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -837,10 +804,10 @@ class TrackerInfoDetailView extends StatelessWidget {
         desc: trackerInfo.metadata.network,
       ),
       _buildItem(title: appLocalizations.rule, desc: _getRuleText()),
-      if (trackerInfo.metadata.host.isNotEmpty)
+      if (trackerInfo.metadata.domain.isNotEmpty)
         _buildItem(
           title: appLocalizations.host,
-          desc: trackerInfo.metadata.host,
+          desc: trackerInfo.metadata.domain,
         ),
       if (_getSourceText().isNotEmpty)
         _buildItem(title: appLocalizations.source, desc: _getSourceText()),
@@ -887,7 +854,7 @@ class TrackerInfoDetailView extends StatelessWidget {
           title: appLocalizations.remoteDestination,
           desc: trackerInfo.metadata.nextHop,
         ),
-      _buildChains(),
+      _buildChains(context),
     ];
     return SelectionArea(
       child: ListView.builder(
