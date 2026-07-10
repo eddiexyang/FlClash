@@ -1,6 +1,7 @@
 name: build
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
@@ -96,6 +97,7 @@ jobs:
           overwrite: true
 
   release:
+    if: ${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, '-') }}
     permissions: write-all
     needs: [ build ]
     runs-on: ubuntu-latest
@@ -113,7 +115,6 @@ jobs:
           merge-multiple: true
 
       - name: Release
-        if: ${{ env.IS_STABLE == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           files: ./dist/*

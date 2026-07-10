@@ -1,5 +1,5 @@
-[submodule "core/Clash.Meta"]
-	path = core/Clash.Meta
+[submodule "core/mihomo"]
+	path = core/mihomo
 	url = https://github.com/eddiexyang/mihomo.git
 	branch = Alpha
 [submodule "plugins/flutter_distributor"]
