@@ -1,7 +1,7 @@
 [submodule "core/Clash.Meta"]
 	path = core/Clash.Meta
 	url = https://github.com/eddiexyang/mihomo.git
-	branch = FlClash
+	branch = Alpha
 [submodule "plugins/flutter_distributor"]
 	path = plugins/flutter_distributor
 	url = git@github.com:chen08209/flutter_distributor.git
@@ -10,4 +10,3 @@
 	path = plugins/tray_manager
 	url = git@github.com:chen08209/tray_manager.git
 	branch = main
-
