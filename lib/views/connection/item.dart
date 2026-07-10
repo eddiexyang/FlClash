@@ -227,7 +227,7 @@ class TrackerInfoDetailView extends StatelessWidget {
       runSpacing: 8,
       alignment: WrapAlignment.end,
       children: [
-        for (final chain in trackerInfo.chains)
+        for (final chain in trackerInfo.chains.reversed)
           CommonChip(label: chain, onPressed: () {}),
       ],
     );

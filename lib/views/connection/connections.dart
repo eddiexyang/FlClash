@@ -5,19 +5,13 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
-import 'package:fl_clash/plugins/app.dart';
-import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/widgets/widgets.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 enum ConnectionColumn {
   host,
   process,
-  rule,
   chains,
   uploadSpeed,
   downloadSpeed,
@@ -28,12 +22,11 @@ enum ConnectionColumn {
     return switch (this) {
       ConnectionColumn.host => 'Host',
       ConnectionColumn.process => 'Process',
-      ConnectionColumn.rule => 'Rule',
       ConnectionColumn.chains => 'Chains',
       ConnectionColumn.uploadSpeed => 'Up/s',
       ConnectionColumn.downloadSpeed => 'Down/s',
       ConnectionColumn.time => 'Duration',
-      ConnectionColumn.action => 'Action',
+      ConnectionColumn.action => '',
     };
   }
 
@@ -42,27 +35,30 @@ enum ConnectionColumn {
     return switch (this) {
       ConnectionColumn.host => 220,
       ConnectionColumn.process => 120,
-      ConnectionColumn.rule => 140,
-      ConnectionColumn.chains => 180,
-      ConnectionColumn.uploadSpeed => 100,
-      ConnectionColumn.downloadSpeed => 100,
-      ConnectionColumn.time => 100,
-      ConnectionColumn.action => 60,
+      ConnectionColumn.chains => 240,
+      ConnectionColumn.uploadSpeed => 80,
+      ConnectionColumn.downloadSpeed => 80,
+      ConnectionColumn.time => 80,
+      ConnectionColumn.action => 44,
     };
   }
 
   int compare(TrackerInfo a, TrackerInfo b) {
     switch (this) {
       case ConnectionColumn.host:
-        final hostA = a.metadata.host.isEmpty ? a.metadata.destinationIP : a.metadata.host;
-        final hostB = b.metadata.host.isEmpty ? b.metadata.destinationIP : b.metadata.host;
+        final hostA = a.metadata.host.isEmpty
+            ? a.metadata.destinationIP
+            : a.metadata.host;
+        final hostB = b.metadata.host.isEmpty
+            ? b.metadata.destinationIP
+            : b.metadata.host;
         return hostA.compareTo(hostB);
       case ConnectionColumn.process:
         return a.metadata.process.compareTo(b.metadata.process);
-      case ConnectionColumn.rule:
-        return a.rule.compareTo(b.rule);
       case ConnectionColumn.chains:
-        return a.chains.last.compareTo(b.chains.last);
+        final chainA = a.chains.isEmpty ? '' : a.chains.last;
+        final chainB = b.chains.isEmpty ? '' : b.chains.last;
+        return chainA.compareTo(chainB);
       case ConnectionColumn.uploadSpeed:
         return (a.uploadSpeed ?? 0).compareTo(b.uploadSpeed ?? 0);
       case ConnectionColumn.downloadSpeed:
@@ -108,7 +104,6 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   final List<ConnectionColumn> _columns = [
     ConnectionColumn.host,
     ConnectionColumn.process,
-    ConnectionColumn.rule,
     ConnectionColumn.chains,
     ConnectionColumn.uploadSpeed,
     ConnectionColumn.downloadSpeed,
@@ -122,9 +117,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   @override
   void initState() {
     super.initState();
-    _columnWidths = {
-      for (var col in _columns) col: col.defaultWidth,
-    };
+    _columnWidths = {for (var col in _columns) col: col.defaultWidth};
     _startTimer();
   }
 
@@ -213,18 +206,18 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
 
   void _handleResize(int columnIndex, double delta) {
     if (columnIndex < 0 || columnIndex >= _columns.length - 1) return;
-    
+
     setState(() {
       final leftColumn = _columns[columnIndex];
       final rightColumn = _columns[columnIndex + 1];
-      
+
       final leftWidth = _columnWidths[leftColumn]!;
       final rightWidth = _columnWidths[rightColumn]!;
-      
+
       const minWidth = 40.0;
       var newLeftWidth = leftWidth + delta;
       var newRightWidth = rightWidth - delta;
-      
+
       if (newLeftWidth < minWidth) {
         newLeftWidth = minWidth;
         newRightWidth = leftWidth + rightWidth - minWidth;
@@ -233,7 +226,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         newRightWidth = minWidth;
         newLeftWidth = leftWidth + rightWidth - minWidth;
       }
-      
+
       _columnWidths[leftColumn] = newLeftWidth;
       _columnWidths[rightColumn] = newRightWidth;
     });
@@ -248,19 +241,21 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         final ip = info.metadata.destinationIP.toLowerCase();
         final process = info.metadata.process.toLowerCase();
         final port = info.metadata.destinationPort.toLowerCase();
-        final remotePort = _extractRemotePort(info.metadata.nextHop).toLowerCase();
+        final remotePort = _extractRemotePort(
+          info.metadata.nextHop,
+        ).toLowerCase();
         final rule = info.rule.toLowerCase();
         final chains = info.chains.join(' ').toLowerCase();
         final time = info.start.toString().toLowerCase();
         final hostOrIp = host.isEmpty ? ip : host;
         final hostWithPort = '$hostOrIp:$port';
-        
+
         return hostWithPort.contains(q) ||
-               (remotePort.isNotEmpty && remotePort.contains(q)) ||
-               process.contains(q) ||
-               rule.contains(q) ||
-               chains.contains(q) ||
-               time.contains(q);
+            (remotePort.isNotEmpty && remotePort.contains(q)) ||
+            process.contains(q) ||
+            rule.contains(q) ||
+            chains.contains(q) ||
+            time.contains(q);
       }).toList();
     }
 
@@ -313,7 +308,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         return AdaptiveSheetScaffold(
           type: type,
           body: TrackerInfoDetailView(trackerInfo: info),
-          title:  appLocalizations.details(appLocalizations.connection),
+          title: appLocalizations.details(appLocalizations.connection),
         );
       },
     );
@@ -396,8 +391,10 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final totalFixedWidth = _columns.fold<double>(
-                0, (sum, col) => sum + (_columnWidths[col] ?? col.defaultWidth));
-            
+              0,
+              (sum, col) => sum + (_columnWidths[col] ?? col.defaultWidth),
+            );
+
             double scaleRatio = 1.0;
             if (totalFixedWidth > 0 && constraints.maxWidth > 0) {
               scaleRatio = constraints.maxWidth / totalFixedWidth;
@@ -405,7 +402,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
 
             final effectiveColumnWidths = {
               for (var col in _columns)
-                col: (_columnWidths[col] ?? col.defaultWidth) * scaleRatio
+                col: (_columnWidths[col] ?? col.defaultWidth) * scaleRatio,
             };
 
             return Column(
@@ -430,7 +427,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                             : ListView.builder(
                                 controller: _verticalScrollController,
                                 itemCount: connections.length,
-                                itemExtent: 40,
+                                itemExtent: 32,
                                 itemBuilder: (context, index) {
                                   final info = connections[index];
                                   return _ConnectionRow(
@@ -463,7 +460,10 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                 ),
                 // Footer
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   color: context.colorScheme.surfaceContainer,
                   child: Row(
                     children: [
@@ -513,7 +513,7 @@ class _ResizableHeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 40,
+      height: 34,
       color: Theme.of(context).colorScheme.surface,
       child: Row(
         children: columns.asMap().entries.map((entry) {
@@ -539,9 +539,7 @@ class _ResizableHeaderRow extends StatelessWidget {
                           Expanded(
                             child: Text(
                               col.label,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelMedium
+                              style: Theme.of(context).textTheme.labelMedium
                                   ?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: isSorted
@@ -567,11 +565,13 @@ class _ResizableHeaderRow extends StatelessWidget {
                 if (!isLast)
                   Positioned(
                     right: 0,
-                    top: 8,
-                    bottom: 8,
+                    top: 6,
+                    bottom: 6,
                     child: Container(
                       width: 1,
-                      color: Theme.of(context).dividerColor.withOpacity(0.5),
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.5),
                     ),
                   ),
                 if (!isLast)
@@ -589,9 +589,7 @@ class _ResizableHeaderRow extends StatelessWidget {
                             onResizeDelta(index, details.primaryDelta!);
                           }
                         },
-                        child: Container(
-                          color: Colors.transparent,
-                        ),
+                        child: Container(color: Colors.transparent),
                       ),
                     ),
                   ),
@@ -626,7 +624,7 @@ class _ConnectionRow extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final rowColor = WidgetStateProperty.resolveWith<Color?>((states) {
       if (states.contains(WidgetState.hovered)) {
-        return colorScheme.surfaceContainerHighest.withOpacity(0.5);
+        return colorScheme.surfaceContainerHighest.withValues(alpha: 0.5);
       }
       return null;
     });
@@ -634,6 +632,9 @@ class _ConnectionRow extends StatelessWidget {
     return TextButton(
       style: ButtonStyle(
         padding: WidgetStateProperty.all(EdgeInsets.zero),
+        minimumSize: WidgetStateProperty.all(Size.zero),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
         shape: WidgetStateProperty.all(const RoundedRectangleBorder()),
         overlayColor: rowColor,
         backgroundColor: rowColor,
@@ -686,11 +687,9 @@ class _ConnectionRow extends StatelessWidget {
           return Text('$host:$port', style: style);
         }
         return Text('$ip:$port', style: style);
-      case ConnectionColumn.rule:
-        return Text(info.rule, style: style);
       case ConnectionColumn.chains:
         return Text(
-          info.chains.reversed.join(' -> '),
+          info.chains.reversed.join(' → '),
           style: style?.copyWith(color: colorScheme.secondary),
         );
       case ConnectionColumn.uploadSpeed:
@@ -774,7 +773,7 @@ class TrackerInfoDetailView extends StatelessWidget {
       runSpacing: 8,
       alignment: WrapAlignment.end,
       children: [
-        for (final chain in trackerInfo.chains)
+        for (final chain in trackerInfo.chains.reversed)
           CommonChip(label: chain, onPressed: () {}),
       ],
     );

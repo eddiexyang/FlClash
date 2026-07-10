@@ -46,6 +46,23 @@ class _LogsViewState extends ConsumerState<LogsView> {
       ValueListenableBuilder<LogsState>(
         valueListenable: _logsStateNotifier,
         builder: (_, state, _) {
+          final autoScrollToEnd = state.autoScrollToEnd;
+          return IconButton(
+            tooltip: autoScrollToEnd
+                ? 'Pause live updates'
+                : 'Resume live updates',
+            onPressed: () => _setAutoScroll(!autoScrollToEnd),
+            icon: Icon(
+              autoScrollToEnd
+                  ? Icons.pause_circle_outline_rounded
+                  : Icons.play_circle_outline_rounded,
+            ),
+          );
+        },
+      ),
+      ValueListenableBuilder<LogsState>(
+        valueListenable: _logsStateNotifier,
+        builder: (_, state, _) {
           final selectedLevel = _parseSelectedLevel(state.keywords);
           return PopupMenuButton<LogLevel?>(
             icon: Icon(
@@ -90,7 +107,8 @@ class _LogsViewState extends ConsumerState<LogsView> {
     return (position.maxScrollExtent - position.pixels).abs() <= _topThreshold;
   }
 
-  bool get _shouldUpdateNow => _logsStateNotifier.value.autoScrollToEnd || _isAtTop;
+  bool get _shouldUpdateNow =>
+      _logsStateNotifier.value.autoScrollToEnd || _isAtTop;
 
   LogLevel? _parseSelectedLevel(List<String> keywords) {
     if (keywords.isEmpty) {
@@ -109,6 +127,15 @@ class _LogsViewState extends ConsumerState<LogsView> {
     _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
       keywords: level == null ? [] : [level.name],
     );
+  }
+
+  void _setAutoScroll(bool enabled) {
+    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
+      autoScrollToEnd: enabled,
+    );
+    if (enabled) {
+      _flushLogsWhenReachTop();
+    }
   }
 
   void _onLogsChanged(List<Log> next) {
@@ -185,47 +212,41 @@ class _LogsViewState extends ConsumerState<LogsView> {
       actions: _buildActions(),
       searchState: AppBarSearchState(onSearch: _onSearch),
       title: appLocalizations.logs,
-      floatingActionButton: ValueListenableBuilder(
-        valueListenable: _logsStateNotifier,
-        builder: (_, state, _) {
-          final autoScrollToEnd = state.autoScrollToEnd;
-          return FadeRotationScaleBox(
-            child: FloatingActionButton(
-              key: ValueKey(autoScrollToEnd),
-              onPressed: () {
-                final nextAutoScrollToEnd = !autoScrollToEnd;
-                _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-                  autoScrollToEnd: nextAutoScrollToEnd,
-                );
-                if (nextAutoScrollToEnd) {
-                  _flushLogsWhenReachTop();
-                }
-              },
-              child: autoScrollToEnd
-                  ? const Icon(Icons.block)
-                  : const Icon(Icons.vertical_align_top),
-            ),
-          );
-        },
-      ),
       body: ValueListenableBuilder<LogsState>(
         valueListenable: _logsStateNotifier,
         builder: (context, state, _) {
           final hint = isCoreLogFiltered
               ? Container(
                   width: double.infinity,
-                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: context.colorScheme.errorContainer.opacity80,
-                    borderRadius: BorderRadius.circular(12),
+                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
                   ),
-                  child: Text(
-                    '当前核心日志级别为 ${configLogLevel.name}，连接日志会被过滤。'
-                    '请在配置-通用-日志等级切换到 info 或 debug。',
-                    style: context.textTheme.bodyMedium?.copyWith(
-                      color: context.colorScheme.onErrorContainer,
+                  decoration: BoxDecoration(
+                    color: context.colorScheme.errorContainer.withValues(
+                      alpha: 0.5,
                     ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 16,
+                        color: context.colorScheme.onErrorContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '当前核心日志级别为 ${configLogLevel.name}，连接日志会被过滤。'
+                          '请在配置-通用-日志等级切换到 info 或 debug。',
+                          style: context.textTheme.labelMedium?.copyWith(
+                            color: context.colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 )
               : const SizedBox.shrink();
@@ -244,13 +265,8 @@ class _LogsViewState extends ConsumerState<LogsView> {
             );
           }
           final items = logs
-              .map<Widget>(
-                (log) => LogItem(
-                  key: ValueKey(log.id),
-                  log: log,
-                ),
-              )
-              .separated(const Divider(height: 0))
+              .map<Widget>((log) => LogItem(key: ValueKey(log.id), log: log))
+              .separated(const Divider(height: 1, thickness: 0.5, indent: 16))
               .toList();
           return Column(
             children: [
@@ -298,36 +314,84 @@ class LogItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListItem(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      onTap: () {},
-      title: SelectableText(
-        log.payload,
-        style: context.textTheme.bodyLarge?.copyWith(color: log.logLevel.color),
-      ),
-      subtitle: Column(
-        children: [
-          SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              CommonChip(
-                onPressed: () {
-                  if (onClick == null) return;
-                  onClick!(log.logLevel.name);
-                },
-                label: log.logLevel.name,
+    final levelColor = log.logLevel.color ?? context.colorScheme.primary;
+    final levelIndicator = GestureDetector(
+      onTap: onClick == null ? null : () => onClick!(log.logLevel.name),
+      child: SizedBox(
+        width: 92,
+        child: Row(
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: levelColor,
+                shape: BoxShape.circle,
               ),
-              Text(
-                log.dateTime,
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: context.colorScheme.onSurface.opacity80,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                log.logLevel.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.textTheme.labelSmall?.copyWith(
+                  color: context.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
+    );
+    final timestamp = SizedBox(
+      width: 146,
+      child: Text(
+        log.dateTime,
+        maxLines: 1,
+        style: context.textTheme.labelSmall?.copyWith(
+          color: context.colorScheme.onSurfaceVariant,
+          fontFamily: FontFamily.jetBrainsMono.value,
+        ),
+      ),
+    );
+    final payload = SelectableText(
+      log.payload,
+      style: context.textTheme.bodySmall?.copyWith(
+        height: 1.3,
+        fontFamily: FontFamily.jetBrainsMono.value,
+        color: context.colorScheme.onSurface,
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 640;
+        return Container(
+          constraints: const BoxConstraints(minHeight: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+          child: isCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [timestamp, const Spacer(), levelIndicator]),
+                    const SizedBox(height: 4),
+                    payload,
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    timestamp,
+                    const SizedBox(width: 8),
+                    levelIndicator,
+                    const SizedBox(width: 8),
+                    Expanded(child: payload),
+                  ],
+                ),
+        );
+      },
     );
   }
 }
