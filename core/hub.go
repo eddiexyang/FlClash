@@ -282,20 +282,19 @@ func handleGetConnections() string {
 }
 
 func handleCloseConnections() bool {
-	runLock.Lock()
-	defer runLock.Unlock()
-	closeConnections()
-	return true
+	return closeConnections()
 }
 
-func closeConnections() {
+func closeConnections() bool {
+	success := true
 	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
-		err := c.Close()
-		if err != nil {
-			return false
+		if err := c.Close(); err != nil {
+			success = false
+			log.Warnln("[APP] close connection %s failed: %v", c.ID(), err)
 		}
 		return true
 	})
+	return success
 }
 
 func handleResetConnections() bool {

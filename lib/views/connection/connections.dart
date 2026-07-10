@@ -7,7 +7,6 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/providers/config.dart';
-import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -87,6 +86,11 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   Timer? _timer;
   List<TrackerInfo> _connections = [];
   bool _isDisposed = false;
+  bool _isFetching = false;
+  bool _fetchPending = false;
+  bool _isClosingConnections = false;
+  int _connectionsGeneration = 0;
+  String? _lastFetchError;
 
   // 缓存上一次的连接信息，用于计算速度 Key为ID
   Map<String, TrackerInfo> _lastConnectionStates = {};
@@ -132,41 +136,67 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   }
 
   Future<void> _fetchData() async {
-    if (_isDisposed) return;
+    if (_isDisposed || _isClosingConnections) return;
+    if (_isFetching) {
+      _fetchPending = true;
+      return;
+    }
+
+    _isFetching = true;
     try {
-      final rawConnections = await coreController.getConnections();
-      if (_isDisposed) return;
+      do {
+        _fetchPending = false;
+        final generation = _connectionsGeneration;
+        try {
+          final rawConnections = await coreController.getConnections();
+          if (_isDisposed || generation != _connectionsGeneration) {
+            continue;
+          }
 
-      final List<TrackerInfo> calculatedConnections = [];
-      final Map<String, TrackerInfo> newStates = {};
+          final List<TrackerInfo> calculatedConnections = [];
+          final Map<String, TrackerInfo> newStates = {};
 
-      for (var current in rawConnections) {
-        final last = _lastConnectionStates[current.id];
-        
-        int upSpeed = 0;
-        int downSpeed = 0;
+          for (final current in rawConnections) {
+            final last = _lastConnectionStates[current.id];
 
-        if (last != null) {
-          upSpeed = max(0, current.upload - last.upload);
-          downSpeed = max(0, current.download - last.download);
+            var upSpeed = 0;
+            var downSpeed = 0;
+
+            if (last != null) {
+              upSpeed = max(0, current.upload - last.upload);
+              downSpeed = max(0, current.download - last.download);
+            }
+
+            final connectionWithSpeed = current.copyWith(
+              uploadSpeed: upSpeed,
+              downloadSpeed: downSpeed,
+            );
+
+            calculatedConnections.add(connectionWithSpeed);
+            newStates[current.id] = current;
+          }
+
+          _lastFetchError = null;
+          if (mounted) {
+            setState(() {
+              _connections = calculatedConnections;
+              _lastConnectionStates = newStates;
+            });
+          }
+        } catch (error, stackTrace) {
+          final errorMessage = error.toString();
+          if (_lastFetchError != errorMessage) {
+            commonPrint.log(
+              'get_connections_failed error=$error\n$stackTrace',
+              logLevel: LogLevel.warning,
+            );
+            _lastFetchError = errorMessage;
+          }
         }
-
-        final connectionWithSpeed = current.copyWith(
-          uploadSpeed: upSpeed,
-          downloadSpeed: downSpeed,
-        );
-
-        calculatedConnections.add(connectionWithSpeed);
-        newStates[current.id] = current;
-      }
-
-      if (mounted) {
-        setState(() {
-          _connections = calculatedConnections;
-          _lastConnectionStates = newStates;
-        });
-      }
-    } catch (_) {}
+      } while (_fetchPending && !_isDisposed && !_isClosingConnections);
+    } finally {
+      _isFetching = false;
+    }
   }
 
   void _handleSort(ConnectionColumn column) {
@@ -243,18 +273,36 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   }
 
   Future<void> _closeAllConnections() async {
-    final res = await globalState.showMessage(
-      title: appLocalizations.closeConnections,
-      message: TextSpan(text: appLocalizations.resetTip),
-      showCopyAction: false,
-    );
-    if (res == true) {
-      coreController.closeConnections();
-      setState(() {
-        _connections.clear();
-        _lastConnectionStates.clear();
-      });
-      _fetchData();
+    if (_isClosingConnections) return;
+    _connectionsGeneration++;
+    setState(() {
+      _isClosingConnections = true;
+    });
+    try {
+      final success = await coreController.closeConnections();
+      if (!success) {
+        commonPrint.log(
+          'close_all_connections completed with errors',
+          logLevel: LogLevel.warning,
+        );
+      }
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'close_all_connections_failed error=$error\n$stackTrace',
+        logLevel: LogLevel.error,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isClosingConnections = false;
+        });
+      } else {
+        _isClosingConnections = false;
+      }
+    }
+
+    if (mounted) {
+      await _fetchData();
     }
   }
 
@@ -334,8 +382,13 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
         const SizedBox(width: 8),
         IconButton(
           tooltip: appLocalizations.closeConnections,
-          onPressed: _closeAllConnections,
-          icon: const Icon(Icons.delete_sweep_outlined),
+          onPressed: _isClosingConnections ? null : _closeAllConnections,
+          icon: _isClosingConnections
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.delete_sweep_outlined),
         ),
         const SizedBox(width: 8),
       ],
@@ -386,13 +439,20 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                                     columns: _columns,
                                     columnWidths: effectiveColumnWidths,
                                     onTap: () => _showConnectionDetails(info),
-                                    onClose: () {
-                                      coreController.closeConnection(info.id);
-                                      setState(() {
-                                        _connections.removeWhere(
-                                            (e) => e.id == info.id);
-                                        _lastConnectionStates.remove(info.id);
-                                      });
+                                    onClose: () async {
+                                      _connectionsGeneration++;
+                                      final success = await coreController
+                                          .closeConnection(info.id);
+                                      if (!mounted) return;
+                                      if (success) {
+                                        setState(() {
+                                          _connections.removeWhere(
+                                            (item) => item.id == info.id,
+                                          );
+                                          _lastConnectionStates.remove(info.id);
+                                        });
+                                      }
+                                      await _fetchData();
                                     },
                                   );
                                 },

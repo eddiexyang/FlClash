@@ -443,9 +443,9 @@ extension ProxiesControllerExt on AppController {
       ChangeProxyParams(groupName: groupName, proxyName: proxyName),
     );
     if (_ref.read(appSettingProvider).closeConnections) {
-      coreController.closeConnections();
+      await coreController.closeConnections();
     } else {
-      coreController.resetConnections();
+      await coreController.resetConnections();
     }
     addCheckIp();
   }

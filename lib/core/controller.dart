@@ -130,16 +130,16 @@ class CoreController {
     return connectionsRaw.map((e) => TrackerInfo.fromJson(e)).toList();
   }
 
-  void closeConnection(String id) {
-    _interface.closeConnection(id);
+  Future<bool> closeConnection(String id) async {
+    return await _interface.closeConnection(id);
   }
 
-  void closeConnections() {
-    _interface.closeConnections();
+  Future<bool> closeConnections() async {
+    return await _interface.closeConnections();
   }
 
-  void resetConnections() {
-    _interface.resetConnections();
+  Future<bool> resetConnections() async {
+    return await _interface.resetConnections();
   }
 
   Future<List<ExternalProvider>> getExternalProviders() async {
