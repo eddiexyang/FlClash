@@ -95,6 +95,20 @@ class Build {
 
   static String get appName => 'FlClash';
 
+  static String get appVersion {
+    final pubspec = File(join(current, 'pubspec.yaml')).readAsStringSync();
+    final match = RegExp(
+      r'^version:\s*([^\s]+)\s*$',
+      multiLine: true,
+    ).firstMatch(pubspec);
+    if (match == null) {
+      throw 'Version not found in pubspec.yaml';
+    }
+    return match.group(1)!;
+  }
+
+  static String get appBuildName => appVersion.split('+').first;
+
   static String get coreName => 'FlClashCore';
 
   static String get libName => 'libclash';
@@ -428,6 +442,7 @@ class BuildCommand extends Command {
   Future<void> _buildDistributor({
     required Target target,
     required String targets,
+    required String artifactName,
     String args = '',
     required String env,
   }) async {
@@ -459,6 +474,8 @@ class BuildCommand extends Command {
         target.name,
         '--targets',
         targets,
+        '--artifact-name',
+        artifactName,
         '--flutter-build-args=$flutterBuildArgs',
         ...extraArgs,
       ],
@@ -479,6 +496,51 @@ class BuildCommand extends Command {
       return result.stdout.toString().trim();
     }
     return null;
+  }
+
+  Future<void> _buildAndroidArtifacts(List<Arch> arches) async {
+    final targets = {
+      Arch.arm: (platform: 'android-arm', abi: 'armeabi-v7a'),
+      Arch.arm64: (platform: 'android-arm64', abi: 'arm64-v8a'),
+      Arch.amd64: (platform: 'android-x64', abi: 'x86_64'),
+    };
+    final selectedTargets = arches.map((arch) => targets[arch]!).toList();
+    await Build.exec(
+      [
+        'flutter',
+        'build',
+        'apk',
+        '--release',
+        '--split-per-abi',
+        '--target-platform=${selectedTargets.map((item) => item.platform).join(',')}',
+        '--dart-define-from-file=env.json',
+      ],
+      name: 'android',
+    );
+    final outputDirectory = Directory(
+      join(Build.distPath, Build.appVersion),
+    );
+    await outputDirectory.create(recursive: true);
+    for (final target in selectedTargets) {
+      final source = File(
+        join(
+          current,
+          'build',
+          'app',
+          'outputs',
+          'flutter-apk',
+          'app-${target.abi}-release.apk',
+        ),
+      );
+      if (!await source.exists()) {
+        throw 'Android artifact not found: ${source.path}';
+      }
+      final destination = join(
+        outputDirectory.path,
+        '${Build.appName}-${Build.appBuildName}-android-${target.abi}.apk',
+      );
+      await source.copy(destination);
+    }
   }
 
   @override
@@ -520,7 +582,14 @@ class BuildCommand extends Command {
 
     switch (target) {
       case Target.windows:
-        await _buildDistributor(target: target, targets: 'exe,zip', env: env);
+        await _buildDistributor(
+          target: target,
+          targets: 'exe,zip',
+          artifactName:
+              '${Build.appName}-{{build_name}}-windows-$archName'
+              '{{#is_installer}}-setup{{/is_installer}}.{{ext}}',
+          env: env,
+        );
         return;
       case Target.linux:
         final targetMap = {Arch.arm64: 'linux-arm64', Arch.amd64: 'linux-x64'};
@@ -534,32 +603,28 @@ class BuildCommand extends Command {
         await _buildDistributor(
           target: target,
           targets: targets,
+          artifactName:
+              '${Build.appName}-{{build_name}}-linux-$archName.{{ext}}',
           args: ' --build-target-platform $defaultTarget',
           env: env,
         );
         return;
       case Target.android:
-        final targetMap = {
-          Arch.arm: 'android-arm',
-          Arch.arm64: 'android-arm64',
-          Arch.amd64: 'android-x64',
-        };
         final defaultArches = [Arch.arm, Arch.arm64, Arch.amd64];
-        final defaultTargets = defaultArches
+        final selectedArches = defaultArches
             .where((element) => arch == null ? true : element == arch)
-            .map((e) => targetMap[e])
             .toList();
-        await _buildDistributor(
-          target: target,
-          targets: 'apk',
-          args:
-              ",split-per-abi --build-target-platform ${defaultTargets.join(",")}",
-          env: env,
-        );
+        await _buildAndroidArtifacts(selectedArches);
         return;
       case Target.macos:
         await _getMacosDependencies();
-        await _buildDistributor(target: target, targets: 'dmg', env: env);
+        await _buildDistributor(
+          target: target,
+          targets: 'dmg',
+          artifactName:
+              '${Build.appName}-{{build_name}}-macos-$archName.{{ext}}',
+          env: env,
+        );
         return;
     }
   }
