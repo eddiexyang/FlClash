@@ -3,6 +3,7 @@ package com.follow.clash.service
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import androidx.core.content.ContextCompat
 import com.follow.clash.common.GlobalState
 import com.follow.clash.common.ServiceDelegate
 import com.follow.clash.common.chunkedForAidl
@@ -13,6 +14,7 @@ import com.follow.clash.service.State.intent
 import com.follow.clash.service.State.runLock
 import com.follow.clash.service.models.NotificationParams
 import com.follow.clash.service.models.VpnOptions
+import com.follow.clash.service.models.vpnRunning
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,6 +26,14 @@ import kotlin.coroutines.resume
 
 class RemoteService : Service(),
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default) {
+    override fun onCreate() {
+        super.onCreate()
+        if (applicationContext.vpnRunning) {
+            GlobalState.log("Restoring VPN service after remote process restart")
+            ContextCompat.startForegroundService(this, VpnService::class.intent)
+        }
+    }
+
     private fun handleStopService(result: IResultInterface) {
         launch {
             runLock.withLock {

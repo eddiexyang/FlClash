@@ -319,19 +319,8 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   Widget build(BuildContext context) {
     final connections = _filteredAndSortedConnections;
     final currentTraffic = ref.watch(
-      trafficsProvider.select(
-        (state) => state.list.safeLast(Traffic()),
-      ),
+      trafficsProvider.select((state) => state.list.safeLast(Traffic())),
     );
-    final totalDownload = _connections.fold<int>(
-      0,
-      (total, connection) => total + connection.download,
-    );
-    final totalUpload = _connections.fold<int>(
-      0,
-      (total, connection) => total + connection.upload,
-    );
-
     return CommonScaffold(
       title: appLocalizations.connections,
       actions: [
@@ -472,27 +461,6 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Down: ${totalDownload.traffic.show}',
-                                style: context.textTheme.labelSmall?.copyWith(
-                                  color: _connectionTrafficColor(
-                                    totalDownload,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Text(
-                                'Up: ${totalUpload.traffic.show}',
-                                style: context.textTheme.labelSmall?.copyWith(
-                                  color: _connectionTrafficColor(totalUpload),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
                           Text(
                             'Speed  ↓ ${currentTraffic.down.traffic.show}/s'
                             '   ↑ ${currentTraffic.up.traffic.show}/s',

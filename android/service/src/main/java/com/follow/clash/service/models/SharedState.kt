@@ -35,3 +35,18 @@ val Context.sharedState: SharedState
             Gson().fromJson(raw, SharedState::class.java) ?: SharedState()
         }.getOrDefault(SharedState())
     }
+
+private const val SERVICE_STATE_PREFERENCES = "serviceState"
+private const val VPN_RUNNING_KEY = "vpnRunning"
+
+var Context.vpnRunning: Boolean
+    get() = getSharedPreferences(
+        SERVICE_STATE_PREFERENCES,
+        Context.MODE_PRIVATE,
+    ).getBoolean(VPN_RUNNING_KEY, false)
+    set(value) {
+        getSharedPreferences(
+            SERVICE_STATE_PREFERENCES,
+            Context.MODE_PRIVATE,
+        ).edit().putBoolean(VPN_RUNNING_KEY, value).commit()
+    }

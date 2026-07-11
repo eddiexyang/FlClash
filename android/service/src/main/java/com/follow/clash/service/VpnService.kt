@@ -20,6 +20,7 @@ import com.follow.clash.service.models.getIpv4RouteAddress
 import com.follow.clash.service.models.getIpv6RouteAddress
 import com.follow.clash.service.models.sharedState
 import com.follow.clash.service.models.toCIDR
+import com.follow.clash.service.models.vpnRunning
 import com.follow.clash.service.modules.NetworkObserveModule
 import com.follow.clash.service.modules.NotificationModule
 import com.follow.clash.service.modules.SuspendModule
@@ -88,6 +89,7 @@ class VpnService : SystemVpnService(), IBaseService,
 
     override fun onRevoke() {
         GlobalState.log("VpnService revoked")
+        applicationContext.vpnRunning = false
         stop()
     }
 
@@ -344,6 +346,7 @@ class VpnService : SystemVpnService(), IBaseService,
         return try {
             loader.load()
             handleStart(options)
+            applicationContext.vpnRunning = true
             true
         } catch (exception: Exception) {
             GlobalState.log("VpnService start failed: $exception")
@@ -353,6 +356,7 @@ class VpnService : SystemVpnService(), IBaseService,
     }
 
     override fun stop() {
+        applicationContext.vpnRunning = false
         cleanup()
         State.runTime = 0L
         stopSelf()
