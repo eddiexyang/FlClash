@@ -16,6 +16,10 @@ object State {
     val runLock = Mutex()
     var runTime: Long = 0L
 
+    var alwaysOn: Boolean = false
+
+    var vpnService: VpnService? = null
+
     var delegate: ServiceDelegate<IBaseService>? = null
 
     var intent: Intent? = null

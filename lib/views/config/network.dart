@@ -1,5 +1,6 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +26,21 @@ class VPNItem extends ConsumerWidget {
               .update((state) => state.copyWith(enable: value));
         },
       ),
+    );
+  }
+}
+
+class AlwaysOnVPNItem extends StatelessWidget {
+  const AlwaysOnVPNItem({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem(
+      onTap: app?.openVpnSettings,
+      leading: const Icon(Icons.vpn_lock_outlined),
+      title: Text(appLocalizations.alwaysOnVpn),
+      subtitle: Text(appLocalizations.alwaysOnVpnDesc),
+      trailing: const Icon(Icons.open_in_new),
     );
   }
 }
@@ -322,6 +338,7 @@ final networkItems = [
     ...generateSection(
       title: 'VPN',
       items: [
+        const AlwaysOnVPNItem(),
         const VpnSystemProxyItem(),
         const BypassDomainItem(),
         const AllowBypassItem(),

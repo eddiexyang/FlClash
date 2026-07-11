@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/app.dart';
+import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +22,10 @@ class AppController {
   bool _expectedRunning = false;
   bool _isRecoveringCore = false;
   int _recoverSession = 0;
+  int _trafficPollFailures = 0;
+  int _coreHealthFailures = 0;
+  bool _healthRecoveryRequested = false;
+  DateTime? _lastCoreHealthCheck;
 
   static AppController? _instance;
 
@@ -83,7 +88,6 @@ extension InitControllerExt on AppController {
       window?.hide();
     }
     await _handleFailedPreference();
-    await _showCrashlyticsTip();
     await _connectCore();
     await _initCore();
     await _initStatus();
@@ -103,23 +107,6 @@ extension InitControllerExt on AppController {
       await file.safeDelete();
     }
     await handleExit();
-  }
-
-  Future<void> _showCrashlyticsTip() async {
-    if (!system.isAndroid) {
-      return;
-    }
-    if (_ref.read(appSettingProvider.select((state) => state.crashlyticsTip))) {
-      return;
-    }
-    await globalState.showMessage(
-      title: appLocalizations.dataCollectionTip,
-      cancelable: false,
-      message: TextSpan(text: appLocalizations.dataCollectionContent),
-    );
-    _ref
-        .read(appSettingProvider.notifier)
-        .update((state) => state.copyWith(crashlyticsTip: true));
   }
 
   Future<void> _initStatus() async {
@@ -488,6 +475,7 @@ extension SetupControllerExt on AppController {
     _expectedRunning = value;
     if (!value) {
       _recoverSession++;
+      _resetCoreHealthState();
     }
   }
 
@@ -522,14 +510,20 @@ extension SetupControllerExt on AppController {
         if (!_ref.read(initProvider)) {
           return;
         }
-        await globalState.handleStart([updateRunTime, updateTraffic]);
+        await globalState.handleStart(
+          tasks: [updateTraffic, updateCoreHealth],
+          onTick: updateRunTime,
+        );
         applyProfileDebounce(force: true, silence: true);
       } else {
         globalState.needInitStatus = false;
         await applyProfile(
           force: true,
           preloadInvoke: () async {
-            await globalState.handleStart([updateRunTime, updateTraffic]);
+            await globalState.handleStart(
+              tasks: [updateTraffic, updateCoreHealth],
+              onTick: updateRunTime,
+            );
           },
         );
       }
@@ -720,7 +714,7 @@ extension SetupControllerExt on AppController {
     globalState.lastSetupState = setupState;
     if (system.isAndroid) {
       globalState.lastVpnState = _ref.read(vpnStateProvider);
-      preferences.saveShareState(this.sharedState);
+      await preferences.saveShareState(this.sharedState);
     }
     final config = await getProfile(
       setupState: setupState,
@@ -912,10 +906,13 @@ extension CoreControllerExt on AppController {
       );
     }
     _ref.read(coreStatusProvider.notifier).value = CoreStatus.connected;
+    _resetCoreHealthState();
   }
 
   bool _shouldAutoRecoverCore() {
-    return system.isDesktop && _expectedRunning && _ref.read(initProvider);
+    return (system.isDesktop || system.isAndroid) &&
+        _expectedRunning &&
+        _ref.read(initProvider);
   }
 
   Future<void> _recoverCoreAfterCrash() async {
@@ -989,12 +986,13 @@ extension CoreControllerExt on AppController {
   }
 
   Future<void> restartCore([bool start = false]) async {
+    final shouldStart = start || _expectedRunning || _ref.read(isStartProvider);
     _recoverSession++;
     _ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
     await coreController.shutdown(true);
     await _connectCore();
     await _initCore();
-    if (start || _ref.read(isStartProvider)) {
+    if (shouldStart) {
       await updateStatus(true, isInit: true);
     } else {
       await applyProfile(force: true);
@@ -1031,8 +1029,37 @@ extension CoreControllerExt on AppController {
     if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
       _context.showNotifier(message);
     }
+    if (system.isAndroid) {
+      await _stopAndroidRuntimeForRecovery();
+    }
     await coreController.shutdown(false);
     unawaited(_recoverCoreAfterCrash());
+  }
+
+  Future<void> _stopAndroidRuntimeForRecovery() async {
+    final androidService = service;
+    if (androidService == null) return;
+    try {
+      await androidService.stop();
+      for (var attempt = 0; attempt < 20; attempt++) {
+        await Future.delayed(const Duration(milliseconds: 250));
+        final runTime = await androidService.getRunTime().timeout(
+          const Duration(seconds: 1),
+        );
+        if (runTime == null) {
+          return;
+        }
+      }
+      commonPrint.log(
+        'android_runtime_stop_timeout',
+        logLevel: LogLevel.warning,
+      );
+    } catch (error, stackTrace) {
+      commonPrint.log(
+        'android_runtime_stop_failed error=$error stack=$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 }
 
@@ -1325,14 +1352,100 @@ extension CommonControllerExt on AppController {
     }
   }
 
+  void _resetCoreHealthState() {
+    _trafficPollFailures = 0;
+    _coreHealthFailures = 0;
+    _lastCoreHealthCheck = null;
+  }
+
+  void _requestCoreHealthRecovery(String source, Object error) {
+    if (_healthRecoveryRequested || !_expectedRunning) return;
+    _healthRecoveryRequested = true;
+    commonPrint.log(
+      'core_health_recovery_requested source=$source error=$error',
+      logLevel: LogLevel.warning,
+    );
+    unawaited(
+      handleCoreCrash('Core health check failed ($source)').whenComplete(() {
+        _healthRecoveryRequested = false;
+      }),
+    );
+  }
+
   Future<void> updateTraffic() async {
     final onlyStatisticsProxy = _ref.read(
       appSettingProvider.select((state) => state.onlyStatisticsProxy),
     );
-    final traffic = await coreController.getTraffic(onlyStatisticsProxy);
-    _ref.read(trafficsProvider.notifier).addTraffic(traffic);
-    _ref.read(totalTrafficProvider.notifier).value = await coreController
-        .getTotalTraffic(onlyStatisticsProxy);
+    try {
+      final values = await Future.wait([
+        coreController.getTraffic(onlyStatisticsProxy),
+        coreController.getTotalTraffic(onlyStatisticsProxy),
+      ]).timeout(const Duration(seconds: 10));
+      _ref.read(trafficsProvider.notifier).addTraffic(values[0]);
+      _ref.read(totalTrafficProvider.notifier).value = values[1];
+      _trafficPollFailures = 0;
+    } catch (error, stackTrace) {
+      _trafficPollFailures++;
+      if (_trafficPollFailures >= 3) {
+        _requestCoreHealthRecovery('traffic', error);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<void> updateCoreHealth() async {
+    final now = DateTime.now();
+    final startTime = globalState.startTime;
+    if (startTime != null) {
+      final runningFor = now.difference(startTime);
+      if (!runningFor.isNegative && runningFor < const Duration(seconds: 30)) {
+        return;
+      }
+    }
+    final lastCheck = _lastCoreHealthCheck;
+    if (lastCheck != null &&
+        now.difference(lastCheck) < const Duration(seconds: 10)) {
+      return;
+    }
+    _lastCoreHealthCheck = now;
+    try {
+      if (system.isAndroid) {
+        final androidService = service;
+        if (androidService == null) {
+          throw StateError('Android service is unavailable');
+        }
+        final runTime = await androidService.getRunTime().timeout(
+          const Duration(seconds: 3),
+        );
+        if (runTime == null) {
+          throw StateError('Android VPN service is not running');
+        }
+      } else if (system.isDesktop) {
+        final port = _ref.read(
+          patchClashConfigProvider.select((state) => state.mixedPort),
+        );
+        if (port > 0) {
+          final socket = await Socket.connect(
+            InternetAddress.loopbackIPv4,
+            port,
+            timeout: const Duration(seconds: 2),
+          );
+          socket.destroy();
+        }
+      }
+      _coreHealthFailures = 0;
+    } catch (error, stackTrace) {
+      _coreHealthFailures++;
+      commonPrint.log(
+        'core_health_check_failed count=$_coreHealthFailures error=$error '
+        'stack=$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+      if (_coreHealthFailures >= 2) {
+        _requestCoreHealthRecovery('runtime', error);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<T?> loadingRun<T>(

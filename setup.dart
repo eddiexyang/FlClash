@@ -166,29 +166,15 @@ class Build {
       }
     } else {
       if (exitCode != 0) {
-        final errorPattern = RegExp(
-          r'(error:|fatal|exception|failed|build failed|✗)',
-          caseSensitive: false,
-        );
-        final matched = [
+        final combined = [
           ...stdout.split('\n'),
           ...stderr.split('\n'),
-        ].where((line) => errorPattern.hasMatch(line.trim())).toList();
-        if (matched.isNotEmpty) {
-          for (final line in matched) {
-            print(line);
-          }
-        } else {
-          final combined = [
-            ...stdout.split('\n'),
-            ...stderr.split('\n'),
-          ].where((line) => line.trim().isNotEmpty).toList();
-          final tail = combined.length > 120
-              ? combined.sublist(combined.length - 120)
-              : combined;
-          for (final line in tail) {
-            print(line);
-          }
+        ].where((line) => line.trim().isNotEmpty).toList();
+        final tail = combined.length > 200
+            ? combined.sublist(combined.length - 200)
+            : combined;
+        for (final line in tail) {
+          print(line);
         }
       }
     }
@@ -391,38 +377,9 @@ class BuildCommand extends Command {
       .map((e) => e.arch!)
       .toList();
 
-  Future<String> _resolveAppTag() async {
-    final environment = Platform.environment;
-    final tag = environment['TAG'] ?? environment['GITHUB_REF_NAME'];
-    if (tag != null && tag.trim().isNotEmpty) {
-      return tag.trim();
-    }
-    final githubRef = environment['GITHUB_REF'];
-    if (githubRef != null && githubRef.startsWith('refs/tags/')) {
-      return githubRef.substring('refs/tags/'.length).trim();
-    }
-    try {
-      final result = await Process.run(
-        'git',
-        ['describe', '--tags', '--exact-match'],
-        workingDirectory: current,
-        runInShell: true,
-      );
-      if (result.exitCode == 0) {
-        final gitTag = result.stdout.toString().trim();
-        if (gitTag.isNotEmpty) {
-          return gitTag;
-        }
-      }
-    } catch (_) {}
-    return '';
-  }
-
   Future<void> _buildEnvFile(String env, {String? coreSha256}) async {
-    final appTag = await _resolveAppTag();
     final data = {
       'APP_ENV': env,
-      if (appTag.isNotEmpty) 'APP_TAG': appTag,
       if (coreSha256 != null) 'CORE_SHA256': coreSha256,
     };
     final envFile = File(join(current, 'env.json'))..create();
@@ -459,6 +416,12 @@ class BuildCommand extends Command {
   }
 
   Future<void> _getMacosDependencies() async {
+    try {
+      final result = await Process.run('appdmg', ['--version']);
+      if (result.exitCode == 0) {
+        return;
+      }
+    } catch (_) {}
     await Build.exec(Build.getExecutable('npm install -g appdmg'));
   }
 
@@ -550,9 +513,14 @@ class BuildCommand extends Command {
       return;
     }
 
+    final distDirectory = Directory(Build.distPath);
+    if (await distDirectory.exists()) {
+      await distDirectory.delete(recursive: true);
+    }
+
     switch (target) {
       case Target.windows:
-        _buildDistributor(target: target, targets: 'exe,zip', env: env);
+        await _buildDistributor(target: target, targets: 'exe,zip', env: env);
         return;
       case Target.linux:
         final targetMap = {Arch.arm64: 'linux-arm64', Arch.amd64: 'linux-x64'};
@@ -563,7 +531,7 @@ class BuildCommand extends Command {
         ].join(',');
         final defaultTarget = targetMap[arch];
         await _getLinuxDependencies(arch!);
-        _buildDistributor(
+        await _buildDistributor(
           target: target,
           targets: targets,
           args: ' --build-target-platform $defaultTarget',
@@ -581,7 +549,7 @@ class BuildCommand extends Command {
             .where((element) => arch == null ? true : element == arch)
             .map((e) => targetMap[e])
             .toList();
-        _buildDistributor(
+        await _buildDistributor(
           target: target,
           targets: 'apk',
           args:
@@ -591,7 +559,7 @@ class BuildCommand extends Command {
         return;
       case Target.macos:
         await _getMacosDependencies();
-        _buildDistributor(target: target, targets: 'dmg', env: env);
+        await _buildDistributor(target: target, targets: 'dmg', env: env);
         return;
     }
   }
@@ -603,5 +571,5 @@ Future<void> main(Iterable<String> args) async {
   runner.addCommand(BuildCommand(target: Target.linux));
   runner.addCommand(BuildCommand(target: Target.windows));
   runner.addCommand(BuildCommand(target: Target.macos));
-  runner.run(args);
+  await runner.run(args);
 }

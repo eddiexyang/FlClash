@@ -5,7 +5,7 @@ import com.follow.clash.Service
 import com.follow.clash.State
 import com.follow.clash.common.Components
 import com.follow.clash.invokeMethodOnMainThread
-import com.follow.clash.models.SharedState
+import com.follow.clash.service.models.SharedState
 import com.google.gson.Gson
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -81,13 +81,11 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
     }
 
     private fun handleStart(result: MethodChannel.Result) {
-        State.handleStartService()
-        result.success(true)
+        State.handleStartService(result::success)
     }
 
     private fun handleStop(result: MethodChannel.Result) {
-        State.handleStopService()
-        result.success(true)
+        State.handleStopService(result::success)
     }
 
     val semaphore = Semaphore(10)

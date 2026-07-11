@@ -14,16 +14,27 @@ import com.follow.clash.common.AccessControlMode
 import com.follow.clash.common.GlobalState
 import com.follow.clash.core.Core
 import com.follow.clash.service.models.VpnOptions
+import com.follow.clash.service.models.NotificationParams
+import com.follow.clash.service.models.SharedState
 import com.follow.clash.service.models.getIpv4RouteAddress
 import com.follow.clash.service.models.getIpv6RouteAddress
+import com.follow.clash.service.models.sharedState
 import com.follow.clash.service.models.toCIDR
 import com.follow.clash.service.modules.NetworkObserveModule
 import com.follow.clash.service.modules.NotificationModule
 import com.follow.clash.service.modules.SuspendModule
 import com.follow.clash.service.modules.moduleLoader
+import com.follow.clash.service.modules.startInitialForeground
+import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicBoolean
 import android.net.VpnService as SystemVpnService
 
 class VpnService : SystemVpnService(), IBaseService,
@@ -38,14 +49,46 @@ class VpnService : SystemVpnService(), IBaseService,
         install(SuspendModule(self))
     }
 
+    private val started = AtomicBoolean(false)
+    private val restoreLock = Mutex()
+    private var restoreJob: Job? = null
+
     override fun onCreate() {
         super.onCreate()
-        handleCreate()
+        State.alwaysOn = false
+        State.vpnService = this
+        GlobalState.log("VpnService create")
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val persistedState = applicationContext.sharedState
+        State.alwaysOn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            isAlwaysOn
+        } else {
+            false
+        }
+        val notificationParams = persistedState.notificationParams
+        State.notificationParamsFlow.tryEmit(notificationParams)
+        startInitialForeground(notificationParams, persistedState.startTip)
+        restoreAlwaysOn(persistedState)
+        return START_STICKY
     }
 
     override fun onDestroy() {
-        handleDestroy()
+        restoreJob?.cancel()
+        restoreJob = null
+        cleanup()
+        State.runTime = 0L
+        if (State.vpnService === this) {
+            State.vpnService = null
+        }
+        GlobalState.log("VpnService destroy")
         super.onDestroy()
+    }
+
+    override fun onRevoke() {
+        GlobalState.log("VpnService revoked")
+        stop()
     }
 
     private val connectivity by lazy {
@@ -122,8 +165,68 @@ class VpnService : SystemVpnService(), IBaseService,
         }
     }
 
-    override fun onBind(intent: Intent): IBinder {
-        return binder
+    override fun onBind(intent: Intent): IBinder? {
+        return if (intent.action == SERVICE_INTERFACE) {
+            super.onBind(intent)
+        } else {
+            binder
+        }
+    }
+
+    private val SharedState.notificationParams: NotificationParams
+        get() = NotificationParams(
+            title = currentProfileName,
+            stopText = stopText,
+            onlyStatisticsProxy = onlyStatisticsProxy,
+        )
+
+    private fun restoreAlwaysOn(persistedState: SharedState) {
+        if (restoreJob?.isActive == true) {
+            return
+        }
+        restoreJob = launch {
+            restoreLock.withLock {
+                if (started.get()) {
+                    return@withLock
+                }
+                val options = persistedState.vpnOptions
+                val setupParams = persistedState.setupParams
+                if (options == null || setupParams == null) {
+                    GlobalState.log("Always-on restore skipped: configuration is missing")
+                    return@withLock
+                }
+                State.options = options.copy(enable = true)
+                val initParams = mapOf(
+                    "home-dir" to filesDir.path,
+                    "version" to Build.VERSION.SDK_INT,
+                )
+                val gson = Gson()
+                val message = withTimeoutOrNull(15_000) {
+                    Core.quickSetupAwait(
+                        gson.toJson(initParams),
+                        gson.toJson(setupParams),
+                    )
+                }
+                when {
+                    message == null -> {
+                        GlobalState.log("Always-on restore failed: core setup timed out")
+                        return@withLock
+                    }
+
+                    message.isNotEmpty() -> {
+                        GlobalState.log("Always-on restore failed: $message")
+                        return@withLock
+                    }
+                }
+                State.runTime = System.currentTimeMillis()
+                if (!start()) {
+                    State.runTime = 0L
+                    GlobalState.log("Always-on restore failed: VPN could not start")
+                    return@withLock
+                }
+                GlobalState.log("Always-on VPN restored")
+            }
+        }
     }
 
     private fun handleStart(options: VpnOptions) {
@@ -233,21 +336,33 @@ class VpnService : SystemVpnService(), IBaseService,
         )
     }
 
-    override fun start() {
-        try {
+    override fun start(): Boolean {
+        val options = State.options ?: return false
+        if (!started.compareAndSet(false, true)) {
+            return true
+        }
+        return try {
             loader.load()
-            State.options?.let {
-                handleStart(it)
-            }
-        } catch (_: Exception) {
+            handleStart(options)
+            true
+        } catch (exception: Exception) {
+            GlobalState.log("VpnService start failed: $exception")
             stop()
+            false
         }
     }
 
     override fun stop() {
-        loader.cancel()
-        Core.stopTun()
+        cleanup()
+        State.runTime = 0L
         stopSelf()
+    }
+
+    private fun cleanup() {
+        if (started.compareAndSet(true, false)) {
+            loader.cancel()
+            Core.stopTun()
+        }
     }
 
     companion object {

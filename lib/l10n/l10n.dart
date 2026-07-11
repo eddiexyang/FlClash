@@ -229,11 +229,6 @@ class AppLocalizations {
     return Intl.message('Other', name: 'other', desc: '', args: []);
   }
 
-  /// `About`
-  String get about {
-    return Intl.message('About', name: 'about', desc: '', args: []);
-  }
-
   /// `English`
   String get en {
     return Intl.message('English', name: 'en', desc: '', args: []);
@@ -399,26 +394,6 @@ class AppLocalizations {
     return Intl.message(
       'Disabling will hide the log entry',
       name: 'logcatDesc',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Auto check updates`
-  String get autoCheckUpdate {
-    return Intl.message(
-      'Auto check updates',
-      name: 'autoCheckUpdate',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Auto check for updates when the app starts`
-  String get autoCheckUpdateDesc {
-    return Intl.message(
-      'Auto check for updates when the app starts',
-      name: 'autoCheckUpdateDesc',
       desc: '',
       args: [],
     );
@@ -909,11 +884,6 @@ class AppLocalizations {
     );
   }
 
-  /// `Project`
-  String get project {
-    return Intl.message('Project', name: 'project', desc: '', args: []);
-  }
-
   /// `Core`
   String get core {
     return Intl.message('Core', name: 'core', desc: '', args: []);
@@ -924,16 +894,6 @@ class AppLocalizations {
     return Intl.message(
       'Tab animation',
       name: 'tabAnimation',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `A multi-platform proxy client based on ClashMeta, simple and easy to use, open-source and ad-free.`
-  String get desc {
-    return Intl.message(
-      'A multi-platform proxy client based on ClashMeta, simple and easy to use, open-source and ad-free.',
-      name: 'desc',
       desc: '',
       args: [],
     );
@@ -952,16 +912,6 @@ class AppLocalizations {
   /// `Stopping VPN...`
   String get stopVpn {
     return Intl.message('Stopping VPN...', name: 'stopVpn', desc: '', args: []);
-  }
-
-  /// `Discovery a new version`
-  String get discovery {
-    return Intl.message(
-      'Discovery a new version',
-      name: 'discovery',
-      desc: '',
-      args: [],
-    );
   }
 
   /// `Compatibility mode`
@@ -1009,46 +959,6 @@ class AppLocalizations {
     return Intl.message(
       'Backup success',
       name: 'backupSuccess',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Check for updates`
-  String get checkUpdate {
-    return Intl.message(
-      'Check for updates',
-      name: 'checkUpdate',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Discover the new version`
-  String get discoverNewVersion {
-    return Intl.message(
-      'Discover the new version',
-      name: 'discoverNewVersion',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `The current application is already the latest version`
-  String get checkUpdateError {
-    return Intl.message(
-      'The current application is already the latest version',
-      name: 'checkUpdateError',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Go to download`
-  String get goDownload {
-    return Intl.message(
-      'Go to download',
-      name: 'goDownload',
       desc: '',
       args: [],
     );
@@ -1464,16 +1374,6 @@ class AppLocalizations {
     );
   }
 
-  /// `Other contributors`
-  String get otherContributors {
-    return Intl.message(
-      'Other contributors',
-      name: 'otherContributors',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Auto close connections`
   String get autoCloseConnections {
     return Intl.message(
@@ -1734,6 +1634,26 @@ class AppLocalizations {
     return Intl.message(
       'Auto routes all system traffic through VpnService',
       name: 'vpnEnableDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Always-on VPN`
+  String get alwaysOnVpn {
+    return Intl.message(
+      'Always-on VPN',
+      name: 'alwaysOnVpn',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Configure in Android settings. FlClash reconnects automatically; leave ‘Block connections without VPN’ off unless you need a kill switch.`
+  String get alwaysOnVpnDesc {
+    return Intl.message(
+      'Configure in Android settings. FlClash reconnects automatically; leave ‘Block connections without VPN’ off unless you need a kill switch.',
+      name: 'alwaysOnVpnDesc',
       desc: '',
       args: [],
     );
@@ -2042,26 +1962,6 @@ class AppLocalizations {
   /// `TUN`
   String get action_tun {
     return Intl.message('TUN', name: 'action_tun', desc: '', args: []);
-  }
-
-  /// `Disclaimer`
-  String get disclaimer {
-    return Intl.message('Disclaimer', name: 'disclaimer', desc: '', args: []);
-  }
-
-  /// `This software is only used for non-commercial purposes such as learning exchanges and scientific research. It is strictly prohibited to use this software for commercial purposes. Any commercial activity, if any, has nothing to do with this software.`
-  String get disclaimerDesc {
-    return Intl.message(
-      'This software is only used for non-commercial purposes such as learning exchanges and scientific research. It is strictly prohibited to use this software for commercial purposes. Any commercial activity, if any, has nothing to do with this software.',
-      name: 'disclaimerDesc',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Agree`
-  String get agree {
-    return Intl.message('Agree', name: 'agree', desc: '', args: []);
   }
 
   /// `Hotkey Management`
@@ -3189,46 +3089,6 @@ class AppLocalizations {
     return Intl.message('Core status', name: 'coreStatus', desc: '', args: []);
   }
 
-  /// `Data Collection Notice`
-  String get dataCollectionTip {
-    return Intl.message(
-      'Data Collection Notice',
-      name: 'dataCollectionTip',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `This app uses Firebase Crashlytics to collect crash information to improve app stability.\nThe collected data includes device information and crash details, but does not contain personal sensitive data.\nYou can disable this feature in settings.`
-  String get dataCollectionContent {
-    return Intl.message(
-      'This app uses Firebase Crashlytics to collect crash information to improve app stability.\nThe collected data includes device information and crash details, but does not contain personal sensitive data.\nYou can disable this feature in settings.',
-      name: 'dataCollectionContent',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Crash Analysis`
-  String get crashlytics {
-    return Intl.message(
-      'Crash Analysis',
-      name: 'crashlytics',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `When enabled, automatically uploads crash logs without sensitive information when the app crashes`
-  String get crashlyticsTip {
-    return Intl.message(
-      'When enabled, automatically uploads crash logs without sensitive information when the app crashes',
-      name: 'crashlyticsTip',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Append System DNS`
   String get appendSystemDns {
     return Intl.message(
@@ -3432,16 +3292,6 @@ class AppLocalizations {
   /// `Just now`
   String get justNow {
     return Intl.message('Just now', name: 'justNow', desc: '', args: []);
-  }
-
-  /// `Don't remind again`
-  String get noLongerRemind {
-    return Intl.message(
-      'Don\'t remind again',
-      name: 'noLongerRemind',
-      desc: '',
-      args: [],
-    );
   }
 
   /// `Access Control Settings`

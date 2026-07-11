@@ -14,8 +14,8 @@ jobs:
     strategy:
       matrix:
         include:
-#          - platform: android
-#            os: ubuntu-latest
+          - platform: android
+            os: ubuntu-latest
           - platform: windows
             os: Windows-2022
             arch: amd64
@@ -49,15 +49,6 @@ jobs:
         with:
           submodules: recursive
 
-#      - name: Setup Android Signing
-#        if: startsWith(matrix.platform,'android')
-#        run: |
-#          echo "${{ secrets.KEYSTORE }}" | base64 --decode > android/app/keystore.jks
-#          echo "${{ secrets.SERVICE_JSON }}" | base64 --decode > android/app/google-services.json
-#          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/local.properties
-#          echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/local.properties
-#          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/local.properties
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -81,10 +72,54 @@ jobs:
           flutter-version: 3.35.7
           cache: true
 
+      - name: Setup Java
+        if: startsWith(matrix.platform, 'android')
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android
+        if: startsWith(matrix.platform, 'android')
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Android SDK
+        if: startsWith(matrix.platform, 'android')
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.0.13004108" \
+            "cmake;3.22.1"
+          echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/28.0.13004108" >> "$GITHUB_ENV"
+
       - name: Get Flutter Dependency
         run: |
           flutter --version
           flutter pub get
+
+      - name: Verify
+        if: startsWith(matrix.platform, 'android')
+        shell: bash
+        run: |
+          flutter analyze --no-pub
+          flutter test --no-pub
+          (cd core && CGO_ENABLED=0 go test -tags=with_gvisor ./...)
+
+      - name: Setup Android Signing
+        if: startsWith(matrix.platform, 'android')
+        shell: bash
+        env:
+          KEYSTORE: ${{ secrets.KEYSTORE }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE" | base64 --decode > android/app/keystore.jks
+          printf 'keyAlias=%s\n' "$KEY_ALIAS" >> android/local.properties
+          printf 'storePassword=%s\n' "$STORE_PASSWORD" >> android/local.properties
+          printf 'keyPassword=%s\n' "$KEY_PASSWORD" >> android/local.properties
 
       - name: Build
         run: dart setup.dart ${{ matrix.platform }} ${{ matrix.arch && format('--arch {0}', matrix.arch) }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }}

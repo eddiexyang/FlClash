@@ -4,7 +4,6 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
-import 'package:fl_clash/views/about.dart';
 import 'package:fl_clash/views/access.dart';
 import 'package:fl_clash/views/application_setting.dart';
 import 'package:fl_clash/views/backup_and_restore.dart';
@@ -55,7 +54,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
   List<Widget> _getOtherList(bool enableDeveloperMode) {
     return generateSection(
       title: context.appLocalizations.other,
-      items: [if (enableDeveloperMode) _DeveloperItem(), _InfoItem()],
+      items: [if (enableDeveloperMode) _DeveloperItem()],
     );
   }
 
@@ -260,19 +259,6 @@ class _SettingItem extends StatelessWidget {
       title: Text(context.appLocalizations.application),
       subtitle: Text(context.appLocalizations.applicationDesc),
       delegate: OpenDelegate(widget: const ApplicationSettingView()),
-    );
-  }
-}
-
-class _InfoItem extends StatelessWidget {
-  const _InfoItem();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListItem.open(
-      leading: const Icon(Icons.info),
-      title: Text(context.appLocalizations.about),
-      delegate: OpenDelegate(widget: const AboutView()),
     );
   }
 }

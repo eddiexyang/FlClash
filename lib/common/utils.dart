@@ -75,29 +75,20 @@ class Utils {
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
   }
 
-  String getTimeDifference(DateTime dateTime) {
-    var currentDateTime = DateTime.now();
-    var difference = currentDateTime.difference(dateTime);
-    var inHours = difference.inHours;
-    var inMinutes = difference.inMinutes;
-    var inSeconds = difference.inSeconds;
-
-    return '${getDateStringLast2(inHours)}:${getDateStringLast2(inMinutes)}:${getDateStringLast2(inSeconds)}';
-  }
-
   String getTimeText(int? timeStamp) {
     if (timeStamp == null) {
       return '00:00:00';
     }
-    final diff = timeStamp / 1000;
-    final inHours = (diff / 3600).floor();
-    if (inHours > 99) {
-      return '99:59:59';
-    }
-    final inMinutes = (diff / 60 % 60).floor();
-    final inSeconds = (diff % 60).floor();
-
-    return '${getDateStringLast2(inHours)}:${getDateStringLast2(inMinutes)}:${getDateStringLast2(inSeconds)}';
+    final duration = Duration(milliseconds: max(0, timeStamp));
+    final days = duration.inDays;
+    final hours = days == 0
+        ? duration.inHours
+        : duration.inHours.remainder(Duration.hoursPerDay);
+    final minutes = duration.inMinutes.remainder(Duration.minutesPerHour);
+    final seconds = duration.inSeconds.remainder(Duration.secondsPerMinute);
+    final clock =
+        '${getDateStringLast2(hours)}:${getDateStringLast2(minutes)}:${getDateStringLast2(seconds)}';
+    return days == 0 ? clock : '${days}d $clock';
   }
 
   Locale? getLocaleForString(String? localString) {
@@ -156,29 +147,6 @@ class Utils {
     return 'assets/images/icon/status_2.$suffix';
   }
 
-  int compareVersions(String version1, String version2) {
-    List<String> v1 = version1.split('+')[0].split('.');
-    List<String> v2 = version2.split('+')[0].split('.');
-    int major1 = int.parse(v1[0]);
-    int major2 = int.parse(v2[0]);
-    if (major1 != major2) {
-      return major1.compareTo(major2);
-    }
-    int minor1 = v1.length > 1 ? int.parse(v1[1]) : 0;
-    int minor2 = v2.length > 1 ? int.parse(v2[1]) : 0;
-    if (minor1 != minor2) {
-      return minor1.compareTo(minor2);
-    }
-    int patch1 = v1.length > 2 ? int.parse(v1[2]) : 0;
-    int patch2 = v2.length > 2 ? int.parse(v2[2]) : 0;
-    if (patch1 != patch2) {
-      return patch1.compareTo(patch2);
-    }
-    int build1 = version1.contains('+') ? int.parse(version1.split('+')[1]) : 0;
-    int build2 = version2.contains('+') ? int.parse(version2.split('+')[1]) : 0;
-    return build1.compareTo(build2);
-  }
-
   // String getPinyin(String value) {
   //   return value.isNotEmpty
   //       ? PinyinHelper.getFirstWordPinyin(value.substring(0, 1))
@@ -209,17 +177,6 @@ class Utils {
 
   FlutterView getScreen() {
     return WidgetsBinding.instance.platformDispatcher.views.first;
-  }
-
-  List<String> parseReleaseBody(String? body) {
-    if (body == null) return [];
-    const pattern = r'- \s*(.*)';
-    final regex = RegExp(pattern);
-    return regex
-        .allMatches(body)
-        .map((match) => match.group(1) ?? '')
-        .where((item) => item.isNotEmpty)
-        .toList();
   }
 
   ViewMode getViewMode(double viewWidth) {

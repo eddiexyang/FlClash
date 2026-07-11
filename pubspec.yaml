@@ -1,7 +1,7 @@
 name: fl_clash
 description: A multi-platform proxy client based on mihomo, simple and easy to use, open-source and ad-free.
 publish_to: 'none'
-version: 0.8.92+2026020201
+version: 1.0.0+0
 environment:
   sdk: '>=3.8.0 <4.0.0'
 
@@ -26,7 +26,8 @@ dependencies:
   mobile_scanner: ^7.0.1
   app_links: ^6.4.0
   win32_registry: ^2.0.0
-  tray_manager: 0.5.2
+  tray_manager:
+    path: third_party/tray_manager
   collection: ^1.19.1
   animations: ^2.1.1
   package_info_plus: ^9.0.0
@@ -80,7 +81,6 @@ flutter:
     - assets/data/
     - assets/fonts/
     - assets/images/
-    - assets/images/avatar/
     - assets/images/empty/
     - assets/images/icon/
   fonts:

@@ -81,56 +81,53 @@ class _StartButtonState extends ConsumerState<StartButton>
               sizeConstraints: BoxConstraints(minWidth: 56, maxWidth: 200),
             ),
       ),
-      child: AnimatedBuilder(
-        animation: _controller!.view,
-        builder: (_, child) {
+      child: Consumer(
+        builder: (_, ref, _) {
+          final runTime = ref.watch(runTimeProvider);
+          final text = utils.getTimeText(runTime);
+          final textStyle = Theme.of(context).textTheme.titleMedium?.toSoftBold
+              .copyWith(color: context.colorScheme.onPrimaryContainer);
           final textWidth =
               globalState.measure
-                  .computeTextSize(
-                    Text(
-                      utils.getTimeDifference(DateTime.now()),
-                      style: context.textTheme.titleMedium?.toSoftBold,
-                    ),
-                  )
+                  .computeTextSize(Text(text, style: textStyle))
                   .width +
               16;
-          return FloatingActionButton(
-            clipBehavior: Clip.antiAlias,
-            materialTapTargetSize: MaterialTapTargetSize.padded,
-            heroTag: null,
-            onPressed: () {
-              handleSwitchStart();
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  height: 56,
-                  width: 56,
-                  alignment: Alignment.center,
-                  child: AnimatedIcon(
-                    icon: AnimatedIcons.play_pause,
-                    progress: _animation,
-                  ),
-                ),
-                SizedBox(width: textWidth * _animation.value, child: child!),
-              ],
-            ),
-          );
-        },
-        child: Consumer(
-          builder: (_, ref, _) {
-            final runTime = ref.watch(runTimeProvider);
-            final text = utils.getTimeText(runTime);
-            return Text(
+          return AnimatedBuilder(
+            animation: _controller!.view,
+            child: Text(
               text,
               maxLines: 1,
-              overflow: TextOverflow.visible,
-              style: Theme.of(context).textTheme.titleMedium?.toSoftBold
-                  .copyWith(color: context.colorScheme.onPrimaryContainer),
-            );
-          },
-        ),
+              overflow: TextOverflow.ellipsis,
+              style: textStyle,
+            ),
+            builder: (_, child) {
+              return FloatingActionButton(
+                clipBehavior: Clip.antiAlias,
+                materialTapTargetSize: MaterialTapTargetSize.padded,
+                heroTag: null,
+                onPressed: handleSwitchStart,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      height: 56,
+                      width: 56,
+                      alignment: Alignment.center,
+                      child: AnimatedIcon(
+                        icon: AnimatedIcons.play_pause,
+                        progress: _animation,
+                      ),
+                    ),
+                    SizedBox(
+                      width: textWidth.clamp(0, 144) * _animation.value,
+                      child: child!,
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

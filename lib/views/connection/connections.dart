@@ -74,6 +74,10 @@ String _formatConnectionDuration(Duration duration) {
       : '$minutes:$seconds';
 }
 
+Color _connectionTrafficColor(int bytes) {
+  return bytes >= 1024 * 1024 ? Colors.green : Colors.grey;
+}
+
 class ConnectionsView extends ConsumerStatefulWidget {
   const ConnectionsView({super.key});
 
@@ -313,6 +317,14 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   @override
   Widget build(BuildContext context) {
     final connections = _filteredAndSortedConnections;
+    final totalDownload = _connections.fold<int>(
+      0,
+      (total, connection) => total + connection.download,
+    );
+    final totalUpload = _connections.fold<int>(
+      0,
+      (total, connection) => total + connection.upload,
+    );
 
     return CommonScaffold(
       title: appLocalizations.connections,
@@ -450,13 +462,17 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                       ),
                       const Spacer(),
                       Text(
-                        'Down: ${_connections.fold<int>(0, (p, c) => p + c.download).traffic.show}',
-                        style: context.textTheme.labelSmall,
+                        'Down: ${totalDownload.traffic.show}',
+                        style: context.textTheme.labelSmall?.copyWith(
+                          color: _connectionTrafficColor(totalDownload),
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Text(
-                        'Up: ${_connections.fold<int>(0, (p, c) => p + c.upload).traffic.show}',
-                        style: context.textTheme.labelSmall,
+                        'Up: ${totalUpload.traffic.show}',
+                        style: context.textTheme.labelSmall?.copyWith(
+                          color: _connectionTrafficColor(totalUpload),
+                        ),
                       ),
                     ],
                   ),
@@ -663,13 +679,13 @@ class _ConnectionRow extends StatelessWidget {
         final total = info.upload;
         return Text(
           total == 0 ? '-' : total.traffic.show,
-          style: style?.copyWith(color: Colors.grey),
+          style: style?.copyWith(color: _connectionTrafficColor(total)),
         );
       case ConnectionColumn.download:
         final total = info.download;
         return Text(
           total == 0 ? '-' : total.traffic.show,
-          style: style?.copyWith(color: Colors.green),
+          style: style?.copyWith(color: _connectionTrafficColor(total)),
         );
       case ConnectionColumn.time:
         final duration = DateTime.now().difference(info.start);

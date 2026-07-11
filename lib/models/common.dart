@@ -276,17 +276,6 @@ extension FileInfoExt on FileInfo {
 }
 
 @freezed
-abstract class VersionInfo with _$VersionInfo {
-  const factory VersionInfo({
-    @Default('') String clashName,
-    @Default('') String version,
-  }) = _VersionInfo;
-
-  factory VersionInfo.fromJson(Map<String, Object?> json) =>
-      _$VersionInfoFromJson(json);
-}
-
-@freezed
 abstract class Traffic with _$Traffic {
   const factory Traffic({@Default(0) num up, @Default(0) num down}) = _Traffic;
 

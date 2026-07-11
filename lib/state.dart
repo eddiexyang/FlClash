@@ -7,6 +7,7 @@ import 'package:animations/animations.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:fl_clash/common/theme.dart';
 import 'package:fl_clash/core/core.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -32,6 +33,9 @@ class GlobalState {
   static GlobalState? _instance;
   final navigatorKey = GlobalKey<NavigatorState>();
   Timer? timer;
+  Timer? runTimeTimer;
+  int _updateSession = 0;
+  int? _executingUpdateSession;
   bool isPre = true;
   late final String coreSHA256;
   late final PackageInfo packageInfo;
@@ -112,29 +116,63 @@ class GlobalState {
   }
 
   Future<void> startUpdateTasks([UpdateTasks? tasks]) async {
-    if (timer != null && timer!.isActive == true) return;
     if (tasks != null) {
       this.tasks = tasks;
     }
-    if (this.tasks.isEmpty) {
+    if (this.tasks.isEmpty || startTime == null) {
       return;
     }
-    await executorUpdateTask();
-    timer = Timer(const Duration(seconds: 1), () async {
-      startUpdateTasks();
+    if (timer?.isActive == true) return;
+    final session = _updateSession;
+    if (_executingUpdateSession == session) return;
+    timer = null;
+    _executingUpdateSession = session;
+    try {
+      await executorUpdateTask(session);
+    } finally {
+      if (_executingUpdateSession == session) {
+        _executingUpdateSession = null;
+      }
+      if (session == _updateSession &&
+          startTime != null &&
+          this.tasks.isNotEmpty) {
+        timer = Timer(const Duration(seconds: 1), () {
+          unawaited(startUpdateTasks());
+        });
+      }
+    }
+  }
+
+  Future<void> executorUpdateTask(int session) async {
+    for (var index = 0; index < tasks.length; index++) {
+      if (session != _updateSession) return;
+      try {
+        await tasks[index]();
+      } catch (error, stackTrace) {
+        commonPrint.log(
+          'periodic_update_failed task=$index error=$error stack=$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      }
+    }
+  }
+
+  void startRunTimeTask(VoidCallback task) {
+    runTimeTimer?.cancel();
+    task();
+    runTimeTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (startTime != null) {
+        task();
+      }
     });
   }
 
-  Future<void> executorUpdateTask() async {
-    for (final task in tasks) {
-      await task();
-    }
-    timer = null;
-  }
-
   void stopUpdateTasks() {
+    _updateSession++;
     timer?.cancel();
     timer = null;
+    runTimeTimer?.cancel();
+    runTimeTimer = null;
   }
 
   void stopRunningState() {
@@ -142,11 +180,23 @@ class GlobalState {
     stopUpdateTasks();
   }
 
-  Future<void> handleStart([UpdateTasks? tasks]) async {
+  Future<void> handleStart({UpdateTasks? tasks, VoidCallback? onTick}) async {
     startTime ??= DateTime.now();
-    await coreController.startListener();
-    await service?.start();
-    startUpdateTasks(tasks);
+    try {
+      await coreController.startListener();
+      final didStart = await service?.start();
+      if (didStart == false) {
+        throw StateError('Android VPN service failed to start');
+      }
+    } catch (_) {
+      startTime = null;
+      await coreController.stopListener();
+      rethrow;
+    }
+    if (onTick != null) {
+      startRunTimeTask(onTick);
+    }
+    unawaited(startUpdateTasks(tasks));
   }
 
   Future updateStartTime() async {
@@ -154,9 +204,13 @@ class GlobalState {
   }
 
   Future handleStop() async {
-    stopRunningState();
     await coreController.stopListener();
-    await service?.stop();
+    final didStop = await service?.stop();
+    if (didStop == false) {
+      await coreController.startListener();
+      throw StateError('Android VPN service failed to stop');
+    }
+    stopRunningState();
   }
 
   Future<bool?> showMessage({
@@ -193,10 +247,7 @@ class GlobalState {
             ],
             child: Container(
               constraints: BoxConstraints(
-                maxHeight: min(
-                  MediaQuery.sizeOf(context).height - 180,
-                  420,
-                ),
+                maxHeight: min(MediaQuery.sizeOf(context).height - 180, 420),
               ),
               child: Scrollbar(
                 child: SingleChildScrollView(

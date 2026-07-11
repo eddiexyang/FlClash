@@ -2,10 +2,12 @@ package com.follow.clash
 
 import android.net.VpnService
 import com.follow.clash.common.GlobalState
-import com.follow.clash.models.SharedState
 import com.follow.clash.plugins.AppPlugin
 import com.follow.clash.plugins.TilePlugin
 import com.follow.clash.service.models.NotificationParams
+import com.follow.clash.service.models.SharedState
+import com.follow.clash.service.models.VpnOptions
+import com.follow.clash.service.models.sharedState
 import com.google.gson.Gson
 import io.flutter.embedding.engine.FlutterEngine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,15 +94,15 @@ object State {
         }
     }
 
-    fun handleStartService() {
+    fun handleStartService(onResult: (Boolean) -> Unit = {}) {
         val appPlugin = flutterEngine?.plugin<AppPlugin>()
         if (appPlugin != null) {
             appPlugin.requestNotificationsPermission {
-                startService()
+                startService(onResult)
             }
             return
         }
-        startService()
+        startService(onResult)
     }
 
     private fun startServiceWithPref() {
@@ -116,7 +118,6 @@ object State {
     }
 
     suspend fun syncState() {
-        GlobalState.setCrashlytics(sharedState.crashlytics)
         Service.updateNotificationParams(
             NotificationParams(
                 title = sharedState.currentProfileName,
@@ -124,7 +125,6 @@ object State {
                 onlyStatisticsProxy = sharedState.onlyStatisticsProxy
             )
         )
-        Service.setCrashlytics(sharedState.crashlytics)
     }
 
     private suspend fun setupAndStart() {
@@ -150,56 +150,84 @@ object State {
         )
     }
 
-    private fun startService() {
+    private fun startService(onResult: (Boolean) -> Unit = {}) {
         GlobalState.launch {
-            runLock.withLock {
+            val options = runLock.withLock {
                 if (runStateFlow.value != RunState.STOP) {
+                    onResult(runStateFlow.value == RunState.START)
                     return@launch
                 }
-                try {
-                    runStateFlow.tryEmit(RunState.PENDING)
-                    val options = sharedState.vpnOptions ?: return@launch
-                    appPlugin?.let {
-                        it.prepare(options.enable) {
-                            runTime = Service.startService(options, runTime)
-                            runStateFlow.tryEmit(RunState.START)
-                        }
-                    } ?: run {
-                        val intent = VpnService.prepare(GlobalState.application)
-                        if (intent != null) {
-                            return@launch
-                        }
-                        runTime = Service.startService(options, runTime)
-                        runStateFlow.tryEmit(RunState.START)
-                    }
-                } finally {
-                    if (runStateFlow.value == RunState.PENDING) {
-                        runStateFlow.tryEmit(RunState.STOP)
-                    }
+                val nextOptions = sharedState.vpnOptions
+                if (nextOptions == null) {
+                    onResult(false)
+                    return@launch
                 }
+                runStateFlow.tryEmit(RunState.PENDING)
+                nextOptions
+            }
+            appPlugin?.let {
+                it.prepare(
+                    needPrepare = options.enable,
+                    callBack = { completeStartService(options, onResult) },
+                    rejectCallback = { rejectStartService(onResult) },
+                )
+            } ?: run {
+                val intent = VpnService.prepare(GlobalState.application)
+                if (intent != null) {
+                    rejectStartService(onResult)
+                    return@launch
+                }
+                completeStartService(options, onResult)
             }
         }
     }
 
-    fun handleStopService() {
+    private suspend fun completeStartService(
+        options: VpnOptions,
+        onResult: (Boolean) -> Unit,
+    ) {
+        runLock.withLock {
+            if (runStateFlow.value != RunState.PENDING) {
+                onResult(runStateFlow.value == RunState.START)
+                return@withLock
+            }
+            runTime = Service.startService(options, runTime)
+            val didStart = runTime != 0L
+            runStateFlow.tryEmit(if (didStart) RunState.START else RunState.STOP)
+            onResult(didStart)
+        }
+    }
+
+    private suspend fun rejectStartService(onResult: (Boolean) -> Unit) {
+        runLock.withLock {
+            if (runStateFlow.value == RunState.PENDING) {
+                runTime = 0L
+                runStateFlow.tryEmit(RunState.STOP)
+            }
+            onResult(false)
+        }
+    }
+
+    fun handleStopService(onResult: (Boolean) -> Unit = {}) {
         GlobalState.launch {
             runLock.withLock {
                 if (runStateFlow.value != RunState.START) {
+                    onResult(runStateFlow.value == RunState.STOP)
                     return@launch
                 }
                 try {
                     runStateFlow.tryEmit(RunState.PENDING)
                     runTime = Service.stopService()
-                    runStateFlow.tryEmit(RunState.STOP)
+                    val didStop = runTime == 0L
+                    runStateFlow.tryEmit(if (didStop) RunState.STOP else RunState.START)
+                    onResult(didStop)
                 } finally {
                     if (runStateFlow.value == RunState.PENDING) {
                         runStateFlow.tryEmit(RunState.START)
+                        onResult(false)
                     }
                 }
             }
         }
     }
 }
-
-
-

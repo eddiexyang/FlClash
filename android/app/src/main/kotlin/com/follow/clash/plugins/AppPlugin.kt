@@ -9,6 +9,7 @@ import android.content.pm.ComponentInfo
 import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.getSystemService
@@ -55,6 +56,8 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     private lateinit var scope: CoroutineScope
 
     private var vpnPrepareCallback: (suspend () -> Unit)? = null
+
+    private var vpnRejectCallback: (suspend () -> Unit)? = null
 
     private var requestNotificationCallback: (() -> Unit)? = null
 
@@ -157,6 +160,10 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 result.success(true)
             }
 
+            "openVpnSettings" -> {
+                result.success(openVpnSettings())
+            }
+
             else -> {
                 result.notImplemented()
             }
@@ -194,6 +201,25 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     private fun tip(message: String?) {
         GlobalState.application.showToast(message)
+    }
+
+    private fun openVpnSettings(): Boolean {
+        val actions = listOf(
+            Settings.ACTION_VPN_SETTINGS,
+            Settings.ACTION_WIRELESS_SETTINGS,
+        )
+        for (action in actions) {
+            val opened = runCatching {
+                GlobalState.application.startActivity(
+                    Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                true
+            }.getOrDefault(false)
+            if (opened) {
+                return true
+            }
+        }
+        return false
     }
 
     @Suppress("DEPRECATION")
@@ -263,7 +289,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                     arrayOf(Manifest.permission.POST_NOTIFICATIONS),
                     NOTIFICATION_PERMISSION_REQUEST_CODE
                 )
-            }
+            } ?: invokeRequestNotificationCallback()
             return
         } else {
             invokeRequestNotificationCallback()
@@ -276,24 +302,45 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
         requestNotificationCallback = null
     }
 
-    fun prepare(needPrepare: Boolean, callBack: (suspend () -> Unit)) {
+    fun prepare(
+        needPrepare: Boolean,
+        callBack: suspend () -> Unit,
+        rejectCallback: suspend () -> Unit = {},
+    ) {
         vpnPrepareCallback = callBack
+        vpnRejectCallback = rejectCallback
         if (!needPrepare) {
             invokeVpnPrepareCallback()
             return
         }
         val intent = VpnService.prepare(GlobalState.application)
         if (intent != null) {
-            activityRef?.get()?.startActivityForResult(intent, VPN_PERMISSION_REQUEST_CODE)
+            val activity = activityRef?.get()
+            if (activity == null) {
+                invokeVpnRejectCallback()
+                return
+            }
+            activity.startActivityForResult(intent, VPN_PERMISSION_REQUEST_CODE)
             return
         }
         invokeVpnPrepareCallback()
     }
 
     fun invokeVpnPrepareCallback() {
+        val callback = vpnPrepareCallback
+        vpnPrepareCallback = null
+        vpnRejectCallback = null
         GlobalState.launch {
-            vpnPrepareCallback?.invoke()
-            vpnPrepareCallback = null
+            callback?.invoke()
+        }
+    }
+
+    private fun invokeVpnRejectCallback() {
+        val callback = vpnRejectCallback
+        vpnPrepareCallback = null
+        vpnRejectCallback = null
+        GlobalState.launch {
+            callback?.invoke()
         }
     }
 
@@ -333,9 +380,6 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             packageInfo.applicationInfo?.publicSourceDir?.let {
                 ZipFile(File(it)).use {
                     for (packageEntry in it.entries()) {
-                        if (packageEntry.name.startsWith("firebase-")) return false
-                    }
-                    for (packageEntry in it.entries()) {
                         if (!(packageEntry.name.startsWith("classes") && packageEntry.name.endsWith(
                                 ".dex"
                             ))
@@ -374,6 +418,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        invokeVpnRejectCallback()
         channel.setMethodCallHandler(null)
         scope.cancel()
     }
@@ -390,18 +435,24 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activityRef = WeakReference(binding.activity)
+        binding.addActivityResultListener(::onActivityResult)
+        binding.addRequestPermissionsResultListener(::onRequestPermissionsResultListener)
     }
 
     override fun onDetachedFromActivity() {
+        invokeVpnRejectCallback()
         channel.invokeMethod("exit", null)
         activityRef = null
     }
 
     private fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-        if (requestCode == VPN_PERMISSION_REQUEST_CODE) {
-            if (resultCode == FlutterActivity.RESULT_OK) {
-                invokeVpnPrepareCallback()
-            }
+        if (requestCode != VPN_PERMISSION_REQUEST_CODE) {
+            return false
+        }
+        if (resultCode == FlutterActivity.RESULT_OK) {
+            invokeVpnPrepareCallback()
+        } else {
+            invokeVpnRejectCallback()
         }
         return true
     }
@@ -409,9 +460,10 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     private fun onRequestPermissionsResultListener(
         requestCode: Int, permissions: Array<String>, grantResults: IntArray
     ): Boolean {
-        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
-            isBlockNotification = true
+        if (requestCode != NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            return false
         }
+        isBlockNotification = true
         invokeRequestNotificationCallback()
         return true
     }

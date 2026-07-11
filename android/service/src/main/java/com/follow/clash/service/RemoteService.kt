@@ -27,10 +27,16 @@ class RemoteService : Service(),
     private fun handleStopService(result: IResultInterface) {
         launch {
             runLock.withLock {
-                delegate?.useService { service ->
+                val currentDelegate = delegate
+                val stoppedThroughDelegate = currentDelegate?.useService { service ->
                     service.stop()
-                    delegate?.unbind()
+                }?.isSuccess == true
+                currentDelegate?.unbind()
+                if (!stoppedThroughDelegate) {
+                    State.vpnService?.stop()
                 }
+                intent = null
+                delegate = null
                 State.runTime = 0
                 result.onResult(0)
             }
@@ -62,8 +68,20 @@ class RemoteService : Service(),
                     intent = nextIntent
                     delegate?.bind()
                 }
-                delegate?.useService { service ->
+                val currentDelegate = delegate
+                val didStart = currentDelegate?.useService { service ->
                     service.start()
+                }?.getOrNull() == true
+                if (!didStart) {
+                    GlobalState.log("Background service failed to start")
+                    currentDelegate?.unbind()
+                    if (delegate === currentDelegate) {
+                        intent = null
+                        delegate = null
+                    }
+                    State.runTime = 0L
+                    result.onResult(0L)
+                    return@withLock
                 }
                 State.runTime = when (runTime != 0L) {
                     true -> runTime
@@ -104,27 +122,33 @@ class RemoteService : Service(),
             callback: ICallbackInterface,
             onStarted: IVoidInterface
         ) {
-            Core.quickSetup(initParamsString, setupParamsString) {
-                launch {
-                    runCatching {
-                        val chunks = it?.chunkedForAidl() ?: listOf()
-                        for ((index, chunk) in chunks.withIndex()) {
-                            suspendCancellableCoroutine { cont ->
-                                callback.onResult(
-                                    chunk,
-                                    index == chunks.lastIndex,
-                                    object : IAckInterface.Stub() {
-                                        override fun onAck() {
-                                            cont.resume(Unit)
-                                        }
-                                    },
-                                )
-                            }
+            launch {
+                val message = Core.quickSetupAwait(
+                    initParamsString,
+                    setupParamsString,
+                )
+                runCatching {
+                    val chunks = message.chunkedForAidl().ifEmpty {
+                        listOf(byteArrayOf())
+                    }
+                    for ((index, chunk) in chunks.withIndex()) {
+                        suspendCancellableCoroutine { cont ->
+                            callback.onResult(
+                                chunk,
+                                index == chunks.lastIndex,
+                                object : IAckInterface.Stub() {
+                                    override fun onAck() {
+                                        cont.resume(Unit)
+                                    }
+                                },
+                            )
                         }
                     }
                 }
+                if (message.isEmpty()) {
+                    onStarted()
+                }
             }
-            onStarted()
         }
 
         override fun updateNotificationParams(params: NotificationParams?) {
@@ -174,10 +198,6 @@ class RemoteService : Service(),
 
                 false -> Core.callSetEventListener(null)
             }
-        }
-
-        override fun setCrashlytics(enable: Boolean) {
-            GlobalState.setCrashlytics(enable)
         }
 
         override fun getRunTime(): Long {

@@ -43,6 +43,31 @@ val NotificationParams.extended: ExtendedNotificationParams
         title, stopText, onlyStatisticsProxy, Core.getSpeedTrafficText(onlyStatisticsProxy)
     )
 
+fun Service.startInitialForeground(
+    params: NotificationParams = NotificationParams(),
+    contentText: String = "Starting VPN…",
+) {
+    val intent = Intent().setComponent(Components.MAIN_ACTIVITY)
+    val notification = NotificationCompat.Builder(
+        this,
+        GlobalState.NOTIFICATION_CHANNEL,
+    ).apply {
+        setSmallIcon(R.drawable.ic)
+        setContentTitle(params.title)
+        setContentText(contentText)
+        setContentIntent(intent.toPendingIntent)
+        setPriority(NotificationCompat.PRIORITY_HIGH)
+        setCategory(NotificationCompat.CATEGORY_SERVICE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            foregroundServiceBehavior = FOREGROUND_SERVICE_IMMEDIATE
+        }
+        setOngoing(true)
+        setShowWhen(true)
+        setOnlyAlertOnce(true)
+    }.build()
+    startForeground(notification)
+}
+
 class NotificationModule(private val service: Service) : Module() {
     private val scope = CoroutineScope(Dispatchers.Default)
 
@@ -110,9 +135,14 @@ class NotificationModule(private val service: Service) : Module() {
                 setContentTitle(params.title)
                 setContentText(params.contentText)
                 clearActions()
-                addAction(
-                    0, params.stopText, QuickAction.STOP.quickIntent.toPendingIntent
-                ).build()
+                if (!State.alwaysOn) {
+                    addAction(
+                        0,
+                        params.stopText,
+                        QuickAction.STOP.quickIntent.toPendingIntent,
+                    )
+                }
+                build()
             })
     }
 

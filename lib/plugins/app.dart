@@ -91,6 +91,10 @@ class App {
       'value': value,
     });
   }
+
+  Future<bool> openVpnSettings() async {
+    return await methodChannel.invokeMethod<bool>('openVpnSettings') ?? false;
+  }
 }
 
 final app = system.isAndroid ? App() : null;
