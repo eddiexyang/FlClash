@@ -174,7 +174,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify tag belongs to main
+        id: main
+        shell: bash
+        run: |
+          git fetch origin main
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo 'eligible=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'eligible=false' >> "$GITHUB_OUTPUT"
+            echo 'Tag commit is not reachable from main; skipping release.'
+          fi
+
       - name: Download
+        if: steps.main.outputs.eligible == 'true'
         uses: actions/download-artifact@v4
         with:
           path: ./dist/
@@ -182,6 +195,7 @@ jobs:
           merge-multiple: true
 
       - name: Release
+        if: steps.main.outputs.eligible == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: ./dist/**/*
