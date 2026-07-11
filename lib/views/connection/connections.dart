@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -317,6 +318,11 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
   @override
   Widget build(BuildContext context) {
     final connections = _filteredAndSortedConnections;
+    final currentTraffic = ref.watch(
+      trafficsProvider.select(
+        (state) => state.list.safeLast(Traffic()),
+      ),
+    );
     final totalDownload = _connections.fold<int>(
       0,
       (total, connection) => total + connection.download,
@@ -455,24 +461,46 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
                   ),
                   color: context.colorScheme.surfaceContainer,
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
                         'Total: ${_connections.length}',
                         style: context.textTheme.labelMedium,
                       ),
                       const Spacer(),
-                      Text(
-                        'Down: ${totalDownload.traffic.show}',
-                        style: context.textTheme.labelSmall?.copyWith(
-                          color: _connectionTrafficColor(totalDownload),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        'Up: ${totalUpload.traffic.show}',
-                        style: context.textTheme.labelSmall?.copyWith(
-                          color: _connectionTrafficColor(totalUpload),
-                        ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Down: ${totalDownload.traffic.show}',
+                                style: context.textTheme.labelSmall?.copyWith(
+                                  color: _connectionTrafficColor(
+                                    totalDownload,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Text(
+                                'Up: ${totalUpload.traffic.show}',
+                                style: context.textTheme.labelSmall?.copyWith(
+                                  color: _connectionTrafficColor(totalUpload),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Speed  ↓ ${currentTraffic.down.traffic.show}/s'
+                            '   ↑ ${currentTraffic.up.traffic.show}/s',
+                            style: context.textTheme.labelSmall?.copyWith(
+                              color: context.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
