@@ -48,7 +48,9 @@ enum RequestColumn {
       case RequestColumn.rule:
         return a.rule.compareTo(b.rule);
       case RequestColumn.chains:
-        return a.chains.last.compareTo(b.chains.last);
+        final chainA = a.chains.isEmpty ? '' : a.chains.last;
+        final chainB = b.chains.isEmpty ? '' : b.chains.last;
+        return chainA.compareTo(chainB);
     }
   }
 }

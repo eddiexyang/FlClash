@@ -107,9 +107,7 @@ class System {
   }
 
   Future<AuthorizeCode> _authorizeCoreForMacOS(String corePath) async {
-    commonPrint.log(
-      "macOS authorize core start: sudo with osascript fallback",
-    );
+    commonPrint.log('macOS authorize core start: sudo with osascript fallback');
     final sudoResult = await _runMacOSSudo(corePath: corePath);
     if (sudoResult.exitCode == 0) {
       return AuthorizeCode.success;
@@ -117,8 +115,8 @@ class System {
     // sudo cannot prompt without a TTY unless pam_tid (Touch ID) handles
     // auth, so fall back to the system administrator password dialog.
     commonPrint.log(
-      "macOS sudo authorization failed, falling back to osascript: "
-      "${sudoResult.stderr}",
+      'macOS sudo authorization failed, falling back to osascript: '
+      '${sudoResult.stderr}',
       logLevel: LogLevel.warning,
     );
     final scriptResult = await _runMacOSAppleScriptAuthorize(corePath);
@@ -126,28 +124,18 @@ class System {
       return AuthorizeCode.success;
     }
     commonPrint.log(
-      "macOS authorize core failed: ${scriptResult.stderr}",
+      'macOS authorize core failed: ${scriptResult.stderr}',
       logLevel: LogLevel.warning,
     );
     return AuthorizeCode.error;
   }
 
-  Future<ProcessResult> _runMacOSSudo({
-    required String corePath,
-  }) async {
-    final first = await Process.run('sudo', [
-      'chown',
-      'root:admin',
-      corePath,
-    ]);
+  Future<ProcessResult> _runMacOSSudo({required String corePath}) async {
+    final first = await Process.run('sudo', ['chown', 'root:admin', corePath]);
     if (first.exitCode != 0) {
       return first;
     }
-    return Process.run('sudo', [
-      'chmod',
-      '+sx',
-      corePath,
-    ]);
+    return Process.run('sudo', ['chmod', '+sx', corePath]);
   }
 
   Future<ProcessResult> _runMacOSAppleScriptAuthorize(String corePath) async {
