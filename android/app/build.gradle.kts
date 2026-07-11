@@ -76,11 +76,11 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            applicationIdSuffix = ".dev"
             if (isRelease) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
                 signingConfig = signingConfigs.getByName("debug")
-                applicationIdSuffix = ".dev"
             }
 
             proguardFiles(

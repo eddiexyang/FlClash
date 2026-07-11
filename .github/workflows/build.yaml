@@ -141,6 +141,9 @@ jobs:
         run: |
           APK="$(find dist -type f -name '*-android-arm64-v8a.apk' -print -quit)"
           test -n "$APK"
+          APPLICATION_ID="$("$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer" \
+            manifest application-id "$APK")"
+          test "$APPLICATION_ID" = "com.follow.clash.dev"
           EXPECTED="$(keytool -list -v \
             -keystore android/app/keystore.jks \
             -storepass "$STORE_PASSWORD" \
