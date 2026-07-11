@@ -179,9 +179,10 @@ class Build {
             print(line);
           }
         } else {
-          final combined = [...stdout.split('\n'), ...stderr.split('\n')]
-              .where((line) => line.trim().isNotEmpty)
-              .toList();
+          final combined = [
+            ...stdout.split('\n'),
+            ...stderr.split('\n'),
+          ].where((line) => line.trim().isNotEmpty).toList();
           final tail = combined.length > 120
               ? combined.sublist(combined.length - 120)
               : combined;
@@ -325,28 +326,14 @@ class Build {
   }
 
   static Future<void> getDistributor() async {
-    final distributorDir = join(
-      current,
-      'plugins',
+    await exec(name: 'get distributor', [
+      Platform.resolvedExecutable,
+      'pub',
+      'global',
+      'activate',
       'flutter_distributor',
-      'packages',
-      'flutter_distributor',
-    );
-
-    await exec(
-      name: 'clean distributor',
-      Build.getExecutable('flutter clean'),
-      workingDirectory: distributorDir,
-    );
-    await exec(
-      name: 'upgrade distributor',
-      Build.getExecutable('flutter pub upgrade'),
-      workingDirectory: distributorDir,
-    );
-    await exec(
-      name: 'get distributor',
-      Build.getExecutable('dart pub global activate -s path $distributorDir'),
-    );
+      '0.3.7',
+    ]);
   }
 
   static void copyFile(String sourceFilePath, String destinationFilePath) {
@@ -482,11 +469,42 @@ class BuildCommand extends Command {
     required String env,
   }) async {
     await Build.getDistributor();
+    final extraArgs = args.trim().isEmpty
+        ? <String>[]
+        : args.trim().split(RegExp(r'\s+'));
+    var flutterBuildArgs = 'dart-define-from-file=env.json';
+    if (extraArgs.isNotEmpty && extraArgs.first.startsWith(',')) {
+      flutterBuildArgs += extraArgs.removeAt(0);
+    }
+    final flutterBin = File(
+      Platform.resolvedExecutable,
+    ).parent.parent.parent.parent.path;
+    final pathSeparator = Platform.isWindows ? ';' : ':';
+    final currentPath = Platform.environment['PATH'] ?? '';
     await Build.exec(
       name: name,
-      Build.getExecutable(
-        'flutter_distributor package --skip-clean --platform ${target.name} --targets $targets --flutter-build-args=dart-define-from-file=env.json$args',
-      ),
+      [
+        Platform.resolvedExecutable,
+        'pub',
+        'global',
+        'run',
+        'flutter_distributor:main',
+        '--no-version-check',
+        'package',
+        '--skip-clean',
+        '--platform',
+        target.name,
+        '--targets',
+        targets,
+        '--flutter-build-args=$flutterBuildArgs',
+        ...extraArgs,
+      ],
+      environment: {
+        'PATH': [
+          flutterBin,
+          currentPath,
+        ].where((path) => path.isNotEmpty).join(pathSeparator),
+      },
     );
   }
 
@@ -534,12 +552,7 @@ class BuildCommand extends Command {
 
     switch (target) {
       case Target.windows:
-        _buildDistributor(
-          target: target,
-          targets: 'exe,zip',
-          args: ' --description $archName',
-          env: env,
-        );
+        _buildDistributor(target: target, targets: 'exe,zip', env: env);
         return;
       case Target.linux:
         final targetMap = {Arch.arm64: 'linux-arm64', Arch.amd64: 'linux-x64'};
@@ -553,8 +566,7 @@ class BuildCommand extends Command {
         _buildDistributor(
           target: target,
           targets: targets,
-          args:
-              ' --description $archName --build-target-platform $defaultTarget',
+          args: ' --build-target-platform $defaultTarget',
           env: env,
         );
         return;
@@ -579,12 +591,7 @@ class BuildCommand extends Command {
         return;
       case Target.macos:
         await _getMacosDependencies();
-        _buildDistributor(
-          target: target,
-          targets: 'dmg',
-          args: ' --description $archName',
-          env: env,
-        );
+        _buildDistributor(target: target, targets: 'dmg', env: env);
         return;
     }
   }

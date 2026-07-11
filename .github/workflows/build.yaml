@@ -47,7 +47,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Checkout mihomo
+        shell: bash
+        env:
+          MIHOMO_DEPLOY_KEY: ${{ secrets.MIHOMO_DEPLOY_KEY }}
+        run: |
+          if [[ -z "$MIHOMO_DEPLOY_KEY" ]]; then
+            echo "::error::MIHOMO_DEPLOY_KEY is not configured"
+            exit 1
+          fi
+          key_file="$RUNNER_TEMP/mihomo_deploy_key"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s\n' "$MIHOMO_DEPLOY_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          export GIT_SSH_COMMAND="ssh -i $key_file -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          git submodule update --init --force --depth=1 core/mihomo
 
 #      - name: Setup Android Signing
 #        if: startsWith(matrix.platform,'android')
