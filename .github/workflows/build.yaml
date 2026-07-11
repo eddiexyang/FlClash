@@ -127,6 +127,11 @@ jobs:
             -storepass "$STORE_PASSWORD" \
             -alias "$KEY_ALIAS" > /dev/null
 
+      - name: Reset SwiftPM Cache
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: rm -rf "$HOME/Library/Caches/org.swift.swiftpm"
+
       - name: Build
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
