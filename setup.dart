@@ -88,9 +88,7 @@ class Build {
     BuildItem(target: Target.linux, arch: Arch.amd64),
     BuildItem(target: Target.windows, arch: Arch.amd64),
     BuildItem(target: Target.windows, arch: Arch.arm64),
-    BuildItem(target: Target.android, arch: Arch.arm, archName: 'armeabi-v7a'),
     BuildItem(target: Target.android, arch: Arch.arm64, archName: 'arm64-v8a'),
-    BuildItem(target: Target.android, arch: Arch.amd64, archName: 'x86_64'),
   ];
 
   static String get appName => 'FlClash';
@@ -500,9 +498,7 @@ class BuildCommand extends Command {
 
   Future<void> _buildAndroidArtifacts(List<Arch> arches) async {
     final targets = {
-      Arch.arm: (platform: 'android-arm', abi: 'armeabi-v7a'),
       Arch.arm64: (platform: 'android-arm64', abi: 'arm64-v8a'),
-      Arch.amd64: (platform: 'android-x64', abi: 'x86_64'),
     };
     final selectedTargets = arches.map((arch) => targets[arch]!).toList();
     await Build.exec(
@@ -610,7 +606,7 @@ class BuildCommand extends Command {
         );
         return;
       case Target.android:
-        final defaultArches = [Arch.arm, Arch.arm64, Arch.amd64];
+        final defaultArches = [Arch.arm64];
         final selectedArches = defaultArches
             .where((element) => arch == null ? true : element == arch)
             .toList();
