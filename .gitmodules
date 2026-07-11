@@ -1,4 +1,4 @@
 [submodule "core/mihomo"]
 	path = core/mihomo
-	url = git@github.com:eddiexyang/mihomo.git
+	url = https://github.com/eddiexyang/mihomo.git
 	branch = Alpha
