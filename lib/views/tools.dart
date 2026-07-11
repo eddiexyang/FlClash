@@ -55,10 +55,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
   List<Widget> _getOtherList(bool enableDeveloperMode) {
     return generateSection(
       title: context.appLocalizations.other,
-      items: [
-        if (enableDeveloperMode) _DeveloperItem(),
-        _InfoItem(),
-      ],
+      items: [if (enableDeveloperMode) _DeveloperItem(), _InfoItem()],
     );
   }
 
@@ -170,7 +167,7 @@ class _BackupItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const Icon(Icons.cloud_sync),
+      leading: const Icon(Icons.settings_backup_restore),
       title: Text(context.appLocalizations.backupAndRestore),
       subtitle: Text(context.appLocalizations.backupAndRestoreDesc),
       delegate: OpenDelegate(widget: const BackupAndRestore()),

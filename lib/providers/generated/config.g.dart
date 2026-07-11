@@ -326,59 +326,6 @@ abstract class _$CurrentProfileId extends $Notifier<int?> {
   }
 }
 
-@ProviderFor(DavSetting)
-const davSettingProvider = DavSettingProvider._();
-
-final class DavSettingProvider
-    extends $NotifierProvider<DavSetting, DAVProps?> {
-  const DavSettingProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'davSettingProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$davSettingHash();
-
-  @$internal
-  @override
-  DavSetting create() => DavSetting();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(DAVProps? value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<DAVProps?>(value),
-    );
-  }
-}
-
-String _$davSettingHash() => r'5c85725b0d988c8f44ef6ba373953e551e09e857';
-
-abstract class _$DavSetting extends $Notifier<DAVProps?> {
-  DAVProps? build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final created = build();
-    final ref = this.ref as $Ref<DAVProps?, DAVProps?>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<DAVProps?, DAVProps?>,
-              DAVProps?,
-              Object?,
-              Object?
-            >;
-    element.handleValue(ref, created);
-  }
-}
-
 @ProviderFor(OverrideDns)
 const overrideDnsProvider = OverrideDnsProvider._();
 
@@ -629,4 +576,4 @@ final class _ConfigProvider extends $FunctionalProvider<Config, Config, Config>
   }
 }
 
-String _$_configHash() => r'17dad8563f5727690a7fd484815e7344e6a46ffa';
+String _$_configHash() => r'4b8deaf6627dc5e04c541608babee5364c78ddb3';

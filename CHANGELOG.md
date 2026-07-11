@@ -857,8 +857,6 @@
 
 ## v0.8.4
 
-- add WebDAV
-
 - add Auto check updates
 
 - Optimize more details

@@ -97,7 +97,7 @@ final class NavigationItemsStateProvider
 }
 
 String _$navigationItemsStateHash() =>
-    r'1fc37c14d129f9725b0e62fd53f6b25382f51102';
+    r'ebfe5a275addd268e5b7c992685f474c48d38c16';
 
 @ProviderFor(currentNavigationItemsState)
 const currentNavigationItemsStateProvider =
@@ -228,7 +228,7 @@ final class ProxyStateProvider
   }
 }
 
-String _$proxyStateHash() => r'3df11daa70bd06de32da43e9b3e09a74389264b2';
+String _$proxyStateHash() => r'cfd5ba054d8c182c370f42f403b711b4cc471efe';
 
 @ProviderFor(trayState)
 const trayStateProvider = TrayStateProvider._();
@@ -269,7 +269,7 @@ final class TrayStateProvider
   }
 }
 
-String _$trayStateHash() => r'b03770ae2eb7fe1a73372f1128af3b38fdebb818';
+String _$trayStateHash() => r'7e50cfd4f2fe1315c5dd77d8bbde83c90a9e30c0';
 
 @ProviderFor(trayTitleState)
 const trayTitleStateProvider = TrayTitleStateProvider._();
@@ -769,7 +769,7 @@ final class IsStartProvider extends $FunctionalProvider<bool, bool, bool>
   }
 }
 
-String _$isStartHash() => r'f8bcefa8515c44fbe14876a5fc6676110508e9b2';
+String _$isStartHash() => r'912dcd8bb05802e7776a750dd2f5d81015672997';
 
 @ProviderFor(proxiesTabControllerState)
 const proxiesTabControllerStateProvider = ProxiesTabControllerStateProvider._();
@@ -2087,7 +2087,7 @@ final class AutoSetSystemDnsStateProvider
 }
 
 String _$autoSetSystemDnsStateHash() =>
-    r'a8805965efe78241613bfde55f4ea8fa12a6ea32';
+    r'47236af36a30641a52dd47d612a6b7d036fb10c6';
 
 @ProviderFor(needUpdateGroups)
 const needUpdateGroupsProvider = NeedUpdateGroupsProvider._();

@@ -72,7 +72,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "accessControlSettings": MessageLookupByLibrary.simpleMessage(
       "Настройки контроля доступа",
     ),
-    "account": MessageLookupByLibrary.simpleMessage("Аккаунт"),
     "action": MessageLookupByLibrary.simpleMessage("Действие"),
     "action_mode": MessageLookupByLibrary.simpleMessage("Переключить режим"),
     "action_proxy": MessageLookupByLibrary.simpleMessage("Системный прокси"),
@@ -86,11 +85,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Добавить к оригинальным правилам",
     ),
     "addedRules": MessageLookupByLibrary.simpleMessage("Добавленные правила"),
-    "address": MessageLookupByLibrary.simpleMessage("Адрес"),
-    "addressHelp": MessageLookupByLibrary.simpleMessage("Адрес сервера WebDAV"),
-    "addressTip": MessageLookupByLibrary.simpleMessage(
-      "Пожалуйста, введите действительный адрес WebDAV",
-    ),
     "adminAutoLaunch": MessageLookupByLibrary.simpleMessage(
       "Автозапуск с правами администратора",
     ),
@@ -166,7 +160,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Резервное копирование и восстановление",
     ),
     "backupAndRestoreDesc": MessageLookupByLibrary.simpleMessage(
-      "Синхронизация данных через WebDAV или файлы",
+      "Резервное копирование и восстановление данных с помощью локальных файлов",
     ),
     "backupSuccess": MessageLookupByLibrary.simpleMessage(
       "Резервное копирование успешно",
@@ -175,7 +169,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "basicConfigDesc": MessageLookupByLibrary.simpleMessage(
       "Глобальное изменение базовых настроек",
     ),
-    "bind": MessageLookupByLibrary.simpleMessage("Привязать"),
     "blacklistMode": MessageLookupByLibrary.simpleMessage(
       "Режим черного списка",
     ),
@@ -206,6 +199,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "clipboardImport": MessageLookupByLibrary.simpleMessage(
       "Импорт из буфера обмена",
     ),
+    "closeConnection": MessageLookupByLibrary.simpleMessage(
+      "Закрыть соединение",
+    ),
+    "closeConnections": MessageLookupByLibrary.simpleMessage(
+      "Закрыть все соединения",
+    ),
     "color": MessageLookupByLibrary.simpleMessage("Цвет"),
     "colorSchemes": MessageLookupByLibrary.simpleMessage("Цветовые схемы"),
     "columns": MessageLookupByLibrary.simpleMessage("Столбцы"),
@@ -227,7 +226,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "connectionsDesc": MessageLookupByLibrary.simpleMessage(
       "Просмотр текущих данных о соединениях",
     ),
-    "connectivity": MessageLookupByLibrary.simpleMessage("Связь："),
     "contactMe": MessageLookupByLibrary.simpleMessage("Свяжитесь со мной"),
     "content": MessageLookupByLibrary.simpleMessage("Содержание"),
     "contentScheme": MessageLookupByLibrary.simpleMessage("Контентная тема"),
@@ -470,7 +468,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "listen": MessageLookupByLibrary.simpleMessage("Слушать"),
     "loadTest": MessageLookupByLibrary.simpleMessage("Тест загрузки"),
     "loading": MessageLookupByLibrary.simpleMessage("Загрузка..."),
-    "local": MessageLookupByLibrary.simpleMessage("Локальный"),
     "localBackupDesc": MessageLookupByLibrary.simpleMessage(
       "Резервное копирование локальных данных на локальный диск",
     ),
@@ -541,7 +538,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "noData": MessageLookupByLibrary.simpleMessage("Нет данных"),
     "noHotKey": MessageLookupByLibrary.simpleMessage("Нет горячей клавиши"),
     "noIcon": MessageLookupByLibrary.simpleMessage("Нет иконки"),
-    "noInfo": MessageLookupByLibrary.simpleMessage("Нет информации"),
     "noLongerRemind": MessageLookupByLibrary.simpleMessage(
       "Больше не напоминать",
     ),
@@ -610,11 +606,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Пользовательский режим, полная настройка групп прокси и правил",
     ),
     "palette": MessageLookupByLibrary.simpleMessage("Палитра"),
-    "password": MessageLookupByLibrary.simpleMessage("Пароль"),
     "paste": MessageLookupByLibrary.simpleMessage("Вставить"),
-    "pleaseBindWebDAV": MessageLookupByLibrary.simpleMessage(
-      "Пожалуйста, привяжите WebDAV",
-    ),
     "pleaseEnterScriptName": MessageLookupByLibrary.simpleMessage(
       "Пожалуйста, введите название скрипта",
     ),
@@ -694,11 +686,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "redo": MessageLookupByLibrary.simpleMessage("Повторить"),
     "regExp": MessageLookupByLibrary.simpleMessage("Регулярное выражение"),
     "reload": MessageLookupByLibrary.simpleMessage("Перезагрузить"),
-    "remote": MessageLookupByLibrary.simpleMessage("Удаленный"),
-    "remoteBackupDesc": MessageLookupByLibrary.simpleMessage(
-      "Резервное копирование локальных данных на WebDAV",
+    "remoteDestination": MessageLookupByLibrary.simpleMessage(
+      "Удалённое назначение",
     ),
-    "remoteDestination": MessageLookupByLibrary.simpleMessage("Next hop"),
     "remove": MessageLookupByLibrary.simpleMessage("Удалить"),
     "rename": MessageLookupByLibrary.simpleMessage("Переименовать"),
     "request": MessageLookupByLibrary.simpleMessage("Запрос"),
@@ -734,9 +724,6 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "restoreFromFileDesc": MessageLookupByLibrary.simpleMessage(
       "Восстановить данные из файла",
-    ),
-    "restoreFromWebDAVDesc": MessageLookupByLibrary.simpleMessage(
-      "Восстановить данные через WebDAV",
     ),
     "restoreOnlyConfig": MessageLookupByLibrary.simpleMessage(
       "Восстановить только файлы конфигурации",
@@ -902,9 +889,6 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "vpnTip": MessageLookupByLibrary.simpleMessage(
       "Изменения вступят в силу после перезапуска VPN",
-    ),
-    "webDAVConfiguration": MessageLookupByLibrary.simpleMessage(
-      "Конфигурация WebDAV",
     ),
     "whitelistMode": MessageLookupByLibrary.simpleMessage(
       "Режим белого списка",

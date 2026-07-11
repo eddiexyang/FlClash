@@ -73,7 +73,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "accessControlSettings": MessageLookupByLibrary.simpleMessage(
       "Access Control Settings",
     ),
-    "account": MessageLookupByLibrary.simpleMessage("Account"),
     "action": MessageLookupByLibrary.simpleMessage("Action"),
     "action_mode": MessageLookupByLibrary.simpleMessage("Switch mode"),
     "action_proxy": MessageLookupByLibrary.simpleMessage("System proxy"),
@@ -87,13 +86,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Attach on the original rules",
     ),
     "addedRules": MessageLookupByLibrary.simpleMessage("Added rules"),
-    "address": MessageLookupByLibrary.simpleMessage("Address"),
-    "addressHelp": MessageLookupByLibrary.simpleMessage(
-      "WebDAV server address",
-    ),
-    "addressTip": MessageLookupByLibrary.simpleMessage(
-      "Please enter a valid WebDAV address",
-    ),
     "adminAutoLaunch": MessageLookupByLibrary.simpleMessage(
       "Admin auto launch",
     ),
@@ -169,14 +161,13 @@ class MessageLookup extends MessageLookupByLibrary {
       "Backup and Restore",
     ),
     "backupAndRestoreDesc": MessageLookupByLibrary.simpleMessage(
-      "Sync data via WebDAV or files",
+      "Back up and restore data using local files",
     ),
     "backupSuccess": MessageLookupByLibrary.simpleMessage("Backup success"),
     "basicConfig": MessageLookupByLibrary.simpleMessage("Basic configuration"),
     "basicConfigDesc": MessageLookupByLibrary.simpleMessage(
       "Modify the basic configuration globally",
     ),
-    "bind": MessageLookupByLibrary.simpleMessage("Bind"),
     "blacklistMode": MessageLookupByLibrary.simpleMessage("Blacklist mode"),
     "bypassDomain": MessageLookupByLibrary.simpleMessage("Bypass domain"),
     "bypassDomainDesc": MessageLookupByLibrary.simpleMessage(
@@ -202,7 +193,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "clipboardExport": MessageLookupByLibrary.simpleMessage("Export clipboard"),
     "clipboardImport": MessageLookupByLibrary.simpleMessage("Clipboard import"),
     "closeConnection": MessageLookupByLibrary.simpleMessage("Close Connection"),
-    "closeConnections": MessageLookupByLibrary.simpleMessage("Close Connections"),
+    "closeConnections": MessageLookupByLibrary.simpleMessage(
+      "Close Connections",
+    ),
     "color": MessageLookupByLibrary.simpleMessage("Color"),
     "colorSchemes": MessageLookupByLibrary.simpleMessage("Color schemes"),
     "columns": MessageLookupByLibrary.simpleMessage("Columns"),
@@ -224,7 +217,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "connectionsDesc": MessageLookupByLibrary.simpleMessage(
       "View current connections data",
     ),
-    "connectivity": MessageLookupByLibrary.simpleMessage("Connectivity："),
     "contactMe": MessageLookupByLibrary.simpleMessage("Contact me"),
     "content": MessageLookupByLibrary.simpleMessage("Content"),
     "contentScheme": MessageLookupByLibrary.simpleMessage("Content"),
@@ -453,7 +445,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "listen": MessageLookupByLibrary.simpleMessage("Listen"),
     "loadTest": MessageLookupByLibrary.simpleMessage("Load test"),
     "loading": MessageLookupByLibrary.simpleMessage("Loading..."),
-    "local": MessageLookupByLibrary.simpleMessage("Local"),
     "localBackupDesc": MessageLookupByLibrary.simpleMessage(
       "Backup local data to local",
     ),
@@ -520,7 +511,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "noData": MessageLookupByLibrary.simpleMessage("No data"),
     "noHotKey": MessageLookupByLibrary.simpleMessage("No HotKey"),
     "noIcon": MessageLookupByLibrary.simpleMessage("None"),
-    "noInfo": MessageLookupByLibrary.simpleMessage("No info"),
     "noLongerRemind": MessageLookupByLibrary.simpleMessage(
       "Don\'t remind again",
     ),
@@ -579,11 +569,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Custom mode, fully customize proxy groups and rules",
     ),
     "palette": MessageLookupByLibrary.simpleMessage("Palette"),
-    "password": MessageLookupByLibrary.simpleMessage("Password"),
     "paste": MessageLookupByLibrary.simpleMessage("Paste"),
-    "pleaseBindWebDAV": MessageLookupByLibrary.simpleMessage(
-      "Please bind WebDAV",
-    ),
     "pleaseEnterScriptName": MessageLookupByLibrary.simpleMessage(
       "Please enter a script name",
     ),
@@ -661,11 +647,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "redo": MessageLookupByLibrary.simpleMessage("redo"),
     "regExp": MessageLookupByLibrary.simpleMessage("RegExp"),
     "reload": MessageLookupByLibrary.simpleMessage("Reload"),
-    "remote": MessageLookupByLibrary.simpleMessage("Remote"),
-    "remoteBackupDesc": MessageLookupByLibrary.simpleMessage(
-      "Backup local data to WebDAV",
+    "remoteDestination": MessageLookupByLibrary.simpleMessage(
+      "Remote destination",
     ),
-    "remoteDestination": MessageLookupByLibrary.simpleMessage("Next hop"),
     "remove": MessageLookupByLibrary.simpleMessage("Remove"),
     "rename": MessageLookupByLibrary.simpleMessage("Rename"),
     "request": MessageLookupByLibrary.simpleMessage("Request"),
@@ -697,9 +681,6 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "restoreFromFileDesc": MessageLookupByLibrary.simpleMessage(
       "Restore data via file",
-    ),
-    "restoreFromWebDAVDesc": MessageLookupByLibrary.simpleMessage(
-      "Restore data via WebDAV",
     ),
     "restoreOnlyConfig": MessageLookupByLibrary.simpleMessage(
       "Restore configuration files only",
@@ -853,9 +834,6 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "vpnTip": MessageLookupByLibrary.simpleMessage(
       "Changes take effect after restarting the VPN",
-    ),
-    "webDAVConfiguration": MessageLookupByLibrary.simpleMessage(
-      "WebDAV configuration",
     ),
     "whitelistMode": MessageLookupByLibrary.simpleMessage("Whitelist mode"),
     "years": MessageLookupByLibrary.simpleMessage("Years"),

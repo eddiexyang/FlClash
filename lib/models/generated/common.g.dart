@@ -124,20 +124,6 @@ const _$LogLevelEnumMap = {
   LogLevel.silent: 'silent',
 };
 
-_DAVProps _$DAVPropsFromJson(Map<String, dynamic> json) => _DAVProps(
-  uri: json['uri'] as String,
-  user: json['user'] as String,
-  password: json['password'] as String,
-  fileName: json['fileName'] as String? ?? defaultDavFileName,
-);
-
-Map<String, dynamic> _$DAVPropsToJson(_DAVProps instance) => <String, dynamic>{
-  'uri': instance.uri,
-  'user': instance.user,
-  'password': instance.password,
-  'fileName': instance.fileName,
-};
-
 _VersionInfo _$VersionInfoFromJson(Map<String, dynamic> json) => _VersionInfo(
   clashName: json['clashName'] as String? ?? '',
   version: json['version'] as String? ?? '',

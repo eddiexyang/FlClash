@@ -264,21 +264,6 @@ extension TrackerInfosStateExt on TrackerInfosState {
   }
 }
 
-const defaultDavFileName = 'backup.zip';
-
-@freezed
-abstract class DAVProps with _$DAVProps {
-  const factory DAVProps({
-    required String uri,
-    required String user,
-    required String password,
-    @Default(defaultDavFileName) String fileName,
-  }) = _DAVProps;
-
-  factory DAVProps.fromJson(Map<String, Object?> json) =>
-      _$DAVPropsFromJson(json);
-}
-
 @freezed
 abstract class FileInfo with _$FileInfo {
   const factory FileInfo({required int size, required DateTime lastModified}) =

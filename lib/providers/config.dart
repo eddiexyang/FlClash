@@ -56,14 +56,6 @@ class CurrentProfileId extends _$CurrentProfileId
 }
 
 @riverpod
-class DavSetting extends _$DavSetting with AutoDisposeNotifierMixin {
-  @override
-  DAVProps? build() {
-    return null;
-  }
-}
-
-@riverpod
 class OverrideDns extends _$OverrideDns with AutoDisposeNotifierMixin {
   @override
   bool build() {
@@ -105,7 +97,6 @@ Config _config(Ref ref) {
   final networkProps = ref.watch(networkSettingProvider);
   final themeProps = ref.watch(themeSettingProvider);
   final currentProfileId = ref.watch(currentProfileIdProvider);
-  final davProps = ref.watch(davSettingProvider);
   final overrideDns = ref.watch(overrideDnsProvider);
   final hotKeyActions = ref.watch(hotKeyActionsProvider);
   final proxiesStyleProps = ref.watch(proxiesStyleSettingProvider);
@@ -117,7 +108,6 @@ Config _config(Ref ref) {
     networkProps: networkProps,
     themeProps: themeProps,
     currentProfileId: currentProfileId,
-    davProps: davProps,
     overrideDns: overrideDns,
     hotKeyActions: hotKeyActions,
     proxiesStyleProps: proxiesStyleProps,
@@ -135,7 +125,6 @@ List<Override> buildConfigOverrides(Config config) {
     currentProfileIdProvider.overrideWithBuild(
       (_, _) => config.currentProfileId,
     ),
-    davSettingProvider.overrideWithBuild((_, _) => config.davProps),
     overrideDnsProvider.overrideWithBuild((_, _) => config.overrideDns),
     hotKeyActionsProvider.overrideWithBuild((_, _) => config.hotKeyActions),
     proxiesStyleSettingProvider.overrideWithBuild(

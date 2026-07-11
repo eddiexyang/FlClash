@@ -405,7 +405,6 @@ Future<MigrationData> _oldToNowTask(
     final vpnPropsRaw = configMap['vpnProps'] as Map;
     vpnPropsRaw['accessControlProps'] = vpnPropsRaw['accessControl'];
   }
-  configMap['davProps'] = configMap['dav'];
   final appSettingProps = configMap['appSetting'] as Map? ?? {};
   appSettingProps['restoreStrategy'] = appSettingProps['recoveryStrategy'];
   configMap['appSettingProps'] = appSettingProps;

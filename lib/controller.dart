@@ -1238,7 +1238,6 @@ extension BackupControllerExt on AppController {
       _ref.read(appSettingProvider.notifier).value = config.appSettingProps;
       _ref.read(currentProfileIdProvider.notifier).value =
           config.currentProfileId;
-      _ref.read(davSettingProvider.notifier).value = config.davProps;
       _ref.read(themeSettingProvider.notifier).value = config.themeProps;
       _ref.read(windowSettingProvider.notifier).value = config.windowProps;
       _ref.read(vpnSettingProvider.notifier).value = config.vpnProps;

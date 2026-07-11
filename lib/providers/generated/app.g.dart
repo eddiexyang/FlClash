@@ -93,7 +93,7 @@ final class LogsProvider extends $NotifierProvider<Logs, FixedList<Log>> {
   }
 }
 
-String _$logsHash() => r'f327fa8d05527172a647adf07771c797fb436bfd';
+String _$logsHash() => r'8d8f9b5c6cfca49e882db18db069ae1afc8b345c';
 
 abstract class _$Logs extends $Notifier<FixedList<Log>> {
   FixedList<Log> build();

@@ -999,11 +999,6 @@ class AppLocalizations {
     return Intl.message('tip', name: 'tip', desc: '', args: []);
   }
 
-  /// `Account`
-  String get account {
-    return Intl.message('Account', name: 'account', desc: '', args: []);
-  }
-
   /// `Backup`
   String get backup {
     return Intl.message('Backup', name: 'backup', desc: '', args: []);
@@ -1017,76 +1012,6 @@ class AppLocalizations {
       desc: '',
       args: [],
     );
-  }
-
-  /// `No info`
-  String get noInfo {
-    return Intl.message('No info', name: 'noInfo', desc: '', args: []);
-  }
-
-  /// `Please bind WebDAV`
-  String get pleaseBindWebDAV {
-    return Intl.message(
-      'Please bind WebDAV',
-      name: 'pleaseBindWebDAV',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Bind`
-  String get bind {
-    return Intl.message('Bind', name: 'bind', desc: '', args: []);
-  }
-
-  /// `Connectivity：`
-  String get connectivity {
-    return Intl.message(
-      'Connectivity：',
-      name: 'connectivity',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `WebDAV configuration`
-  String get webDAVConfiguration {
-    return Intl.message(
-      'WebDAV configuration',
-      name: 'webDAVConfiguration',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Address`
-  String get address {
-    return Intl.message('Address', name: 'address', desc: '', args: []);
-  }
-
-  /// `WebDAV server address`
-  String get addressHelp {
-    return Intl.message(
-      'WebDAV server address',
-      name: 'addressHelp',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Please enter a valid WebDAV address`
-  String get addressTip {
-    return Intl.message(
-      'Please enter a valid WebDAV address',
-      name: 'addressTip',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Password`
-  String get password {
-    return Intl.message('Password', name: 'password', desc: '', args: []);
   }
 
   /// `Check for updates`
@@ -1614,26 +1539,6 @@ class AppLocalizations {
     return Intl.message(' entries', name: 'entries', desc: '', args: []);
   }
 
-  /// `Local`
-  String get local {
-    return Intl.message('Local', name: 'local', desc: '', args: []);
-  }
-
-  /// `Remote`
-  String get remote {
-    return Intl.message('Remote', name: 'remote', desc: '', args: []);
-  }
-
-  /// `Backup local data to WebDAV`
-  String get remoteBackupDesc {
-    return Intl.message(
-      'Backup local data to WebDAV',
-      name: 'remoteBackupDesc',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Backup local data to local`
   String get localBackupDesc {
     return Intl.message(
@@ -1711,12 +1616,22 @@ class AppLocalizations {
 
   /// `Close Connection`
   String get closeConnection {
-    return Intl.message('Close Connection', name: 'closeConnection', desc: '', args: []);
+    return Intl.message(
+      'Close Connection',
+      name: 'closeConnection',
+      desc: '',
+      args: [],
+    );
   }
 
   /// `Close Connections`
   String get closeConnections {
-    return Intl.message('Close Connections', name: 'closeConnections', desc: '', args: []);
+    return Intl.message(
+      'Close Connections',
+      name: 'closeConnections',
+      desc: '',
+      args: [],
+    );
   }
 
   /// `Layout`
@@ -3169,10 +3084,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Next hop`
+  /// `Remote destination`
   String get remoteDestination {
     return Intl.message(
-      'Next hop',
+      'Remote destination',
       name: 'remoteDestination',
       desc: '',
       args: [],
@@ -3684,10 +3599,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Sync data via WebDAV or files`
+  /// `Back up and restore data using local files`
   String get backupAndRestoreDesc {
     return Intl.message(
-      'Sync data via WebDAV or files',
+      'Back up and restore data using local files',
       name: 'backupAndRestoreDesc',
       desc: '',
       args: [],
@@ -3704,16 +3619,6 @@ class AppLocalizations {
     return Intl.message(
       'Restore success',
       name: 'restoreSuccess',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Restore data via WebDAV`
-  String get restoreFromWebDAVDesc {
-    return Intl.message(
-      'Restore data via WebDAV',
-      name: 'restoreFromWebDAVDesc',
       desc: '',
       args: [],
     );
