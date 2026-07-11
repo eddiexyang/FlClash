@@ -108,8 +108,9 @@ class _ToolViewState extends ConsumerState<ToolsView> {
       ..._getOtherList(vm2.b),
       if (_gitCommit.isNotEmpty)
         Padding(
-          padding: const EdgeInsets.only(top: 24, bottom: 8),
-          child: Center(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
             child: Text(
               _gitCommit,
               style: context.textTheme.labelSmall?.copyWith(
