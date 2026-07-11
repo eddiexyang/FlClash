@@ -390,8 +390,24 @@ class BuildCommand extends Command {
       .toList();
 
   Future<void> _buildEnvFile(String env, {String? coreSha256}) async {
+    final githubSha = Platform.environment['GITHUB_SHA'];
+    var gitCommit = githubSha?.trim() ?? '';
+    if (gitCommit.isEmpty) {
+      final result = await Process.run('git', [
+        'rev-parse',
+        '--short=7',
+        'HEAD',
+      ]);
+      if (result.exitCode == 0) {
+        gitCommit = result.stdout.toString().trim();
+      }
+    }
+    if (gitCommit.length > 7) {
+      gitCommit = gitCommit.substring(0, 7);
+    }
     final data = {
       'APP_ENV': env,
+      'GIT_COMMIT': gitCommit,
       if (coreSha256 != null) 'CORE_SHA256': coreSha256,
     };
     final envFile = File(join(current, 'env.json'))..create();

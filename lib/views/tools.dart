@@ -16,8 +16,11 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' show dirname, join;
 
 import 'config/advanced.dart';
+import 'config/network.dart';
 import 'developer.dart';
 import 'theme.dart';
+
+const _gitCommit = String.fromEnvironment('GIT_COMMIT');
 
 class ToolsView extends ConsumerStatefulWidget {
   const ToolsView({super.key});
@@ -52,9 +55,12 @@ class _ToolViewState extends ConsumerState<ToolsView> {
   }
 
   List<Widget> _getOtherList(bool enableDeveloperMode) {
+    if (!enableDeveloperMode) {
+      return [];
+    }
     return generateSection(
       title: context.appLocalizations.other,
-      items: [if (enableDeveloperMode) _DeveloperItem()],
+      items: [const _DeveloperItem()],
     );
   }
 
@@ -64,6 +70,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
       items: [
         const _LocaleItem(),
         const _ThemeItem(),
+        if (system.isAndroid) const AlwaysOnVPNItem(),
         const _BackupItem(),
         if (system.isDesktop) const _HotkeyItem(),
         if (system.isWindows) const _LoopbackItem(),
@@ -99,6 +106,18 @@ class _ToolViewState extends ConsumerState<ToolsView> {
       ),
       ..._getSettingList(),
       ..._getOtherList(vm2.b),
+      if (_gitCommit.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 24, bottom: 8),
+          child: Center(
+            child: Text(
+              _gitCommit,
+              style: context.textTheme.labelSmall?.copyWith(
+                color: Colors.grey,
+              ),
+            ),
+          ),
+        ),
     ];
     return CommonScaffold(
       title: context.appLocalizations.tools,
