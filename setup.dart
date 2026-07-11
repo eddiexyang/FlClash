@@ -509,6 +509,7 @@ class BuildCommand extends Command {
         '--release',
         '--split-per-abi',
         '--target-platform=${selectedTargets.map((item) => item.platform).join(',')}',
+        '--build-number=2026071101',
         '--dart-define-from-file=env.json',
       ],
       name: 'android',
