@@ -14,12 +14,19 @@ val localProperties = Properties().apply {
     }
 }
 
-val mStoreFile: File = file("keystore.jks")
-val mStorePassword: String? = localProperties.getProperty("storePassword")
-val mKeyAlias: String? = localProperties.getProperty("keyAlias")
-val mKeyPassword: String? = localProperties.getProperty("keyPassword")
+val mStoreFile: File = System.getenv("KEYSTORE_PATH")?.let { file(it) } ?: file("keystore.jks")
+val mStorePassword: String? =
+    System.getenv("STORE_PASSWORD") ?: localProperties.getProperty("storePassword")
+val mKeyAlias: String? =
+    System.getenv("KEY_ALIAS") ?: localProperties.getProperty("keyAlias")
+val mKeyPassword: String? =
+    System.getenv("KEY_PASSWORD") ?: localProperties.getProperty("keyPassword")
 val isRelease =
     mStoreFile.exists() && mStorePassword != null && mKeyAlias != null && mKeyPassword != null
+
+if (System.getenv("CI") == "true" && !isRelease) {
+    throw GradleException("Android release signing configuration is missing")
+}
 
 
 android {

@@ -118,12 +118,37 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           printf '%s' "$KEYSTORE" | base64 --decode > android/app/keystore.jks
-          printf 'keyAlias=%s\n' "$KEY_ALIAS" >> android/local.properties
-          printf 'storePassword=%s\n' "$STORE_PASSWORD" >> android/local.properties
-          printf 'keyPassword=%s\n' "$KEY_PASSWORD" >> android/local.properties
+          test -s android/app/keystore.jks
+          keytool -list \
+            -keystore android/app/keystore.jks \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" > /dev/null
 
       - name: Build
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: dart setup.dart ${{ matrix.platform }} ${{ matrix.arch && format('--arch {0}', matrix.arch) }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }}
+
+      - name: Verify Android Signature
+        if: startsWith(matrix.platform, 'android')
+        shell: bash
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: |
+          APK="$(find dist -type f -name '*-android-arm64-v8a.apk' -print -quit)"
+          test -n "$APK"
+          EXPECTED="$(keytool -list -v \
+            -keystore android/app/keystore.jks \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" | sed -n 's/^[[:space:]]*SHA256: //p' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          ACTUAL="$("$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
+            verify --print-certs "$APK" | sed -n 's/^.*certificate SHA-256 digest: //p' | head -n 1 | tr -d '[:space:]')"
+          test -n "$EXPECTED"
+          test "$ACTUAL" = "$EXPECTED"
 
       - name: Upload
         uses: actions/upload-artifact@v4
