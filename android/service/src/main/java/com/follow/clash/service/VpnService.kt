@@ -62,6 +62,11 @@ class VpnService : SystemVpnService(), IBaseService,
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        restoreService()
+        return START_STICKY
+    }
+
+    private fun restoreService() {
         val persistedState = applicationContext.sharedState
         State.alwaysOn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             isAlwaysOn
@@ -72,7 +77,6 @@ class VpnService : SystemVpnService(), IBaseService,
         State.notificationParamsFlow.tryEmit(notificationParams)
         startInitialForeground(notificationParams, persistedState.startTip)
         restoreAlwaysOn(persistedState)
-        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -169,6 +173,8 @@ class VpnService : SystemVpnService(), IBaseService,
 
     override fun onBind(intent: Intent): IBinder? {
         return if (intent.action == SERVICE_INTERFACE) {
+            GlobalState.log("VpnService system bind")
+            restoreService()
             super.onBind(intent)
         } else {
             binder
