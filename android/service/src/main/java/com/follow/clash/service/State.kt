@@ -14,6 +14,9 @@ object State {
     )
 
     val runLock = Mutex()
+    val setupLock = Mutex()
+    var coreConfigured: Boolean = false
+    var configuredSetupParams: String? = null
     var runTime: Long = 0L
 
     var alwaysOn: Boolean = false

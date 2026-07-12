@@ -194,53 +194,71 @@ class VpnService : SystemVpnService(), IBaseService,
         }
         restoreJob = launch {
             restoreLock.withLock {
-                if (started.get()) {
-                    return@withLock
-                }
-                val options = persistedState.vpnOptions
-                val setupParams = persistedState.setupParams
-                if (options == null || setupParams == null) {
-                    GlobalState.logError(
-                        "VpnService Always-on restore skipped: configuration is missing"
-                    )
-                    return@withLock
-                }
-                State.options = options.copy(enable = true)
-                val initParams = mapOf(
-                    "home-dir" to filesDir.path,
-                    "version" to Build.VERSION.SDK_INT,
-                )
-                val gson = Gson()
-                val message = withTimeoutOrNull(15_000) {
-                    Core.quickSetupAwait(
-                        gson.toJson(initParams),
-                        gson.toJson(setupParams),
-                    )
-                }
-                when {
-                    message == null -> {
-                        GlobalState.logError(
-                            "VpnService Always-on restore failed: core setup timed out"
-                        )
-                        return@withLock
+                State.runLock.withLock runLock@{
+                    if (started.get() || State.runTime != 0L) {
+                        return@runLock
                     }
+                    val options = persistedState.vpnOptions
+                    val setupParams = persistedState.setupParams
+                    if (options == null || setupParams == null) {
+                        GlobalState.logError(
+                            "VpnService Always-on restore skipped: configuration is missing"
+                        )
+                        return@runLock
+                    }
+                    State.options = options.copy(enable = true)
+                    if (!State.coreConfigured) {
+                        val initParams = mapOf(
+                            "home-dir" to filesDir.path,
+                            "version" to Build.VERSION.SDK_INT,
+                        )
+                        val gson = Gson()
+                        val setupParamsString = gson.toJson(setupParams)
+                        val message = withTimeoutOrNull(15_000) {
+                            State.setupLock.withLock {
+                                if (
+                                    State.coreConfigured &&
+                                    State.configuredSetupParams == setupParamsString
+                                ) {
+                                    return@withLock ""
+                                }
+                                Core.quickSetupAwait(
+                                    gson.toJson(initParams),
+                                    setupParamsString,
+                                ).also {
+                                    if (it.isEmpty()) {
+                                        State.coreConfigured = true
+                                        State.configuredSetupParams = setupParamsString
+                                    }
+                                }
+                            }
+                        }
+                        when {
+                            message == null -> {
+                                GlobalState.logError(
+                                    "VpnService Always-on restore failed: core setup timed out"
+                                )
+                                return@runLock
+                            }
 
-                    message.isNotEmpty() -> {
-                        GlobalState.logError(
-                            "VpnService Always-on restore failed: $message"
-                        )
-                        return@withLock
+                            message.isNotEmpty() -> {
+                                GlobalState.logError(
+                                    "VpnService Always-on restore failed: $message"
+                                )
+                                return@runLock
+                            }
+                        }
                     }
+                    State.runTime = System.currentTimeMillis()
+                    if (!start()) {
+                        State.runTime = 0L
+                        GlobalState.logError(
+                            "VpnService Always-on restore failed: VPN could not start"
+                        )
+                        return@runLock
+                    }
+                    GlobalState.log("Always-on VPN restored")
                 }
-                State.runTime = System.currentTimeMillis()
-                if (!start()) {
-                    State.runTime = 0L
-                    GlobalState.logError(
-                        "VpnService Always-on restore failed: VPN could not start"
-                    )
-                    return@withLock
-                }
-                GlobalState.log("Always-on VPN restored")
             }
         }
     }

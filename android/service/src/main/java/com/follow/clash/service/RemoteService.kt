@@ -123,10 +123,23 @@ class RemoteService : Service(),
             onStarted: IVoidInterface
         ) {
             launch {
-                val message = Core.quickSetupAwait(
-                    initParamsString,
-                    setupParamsString,
-                )
+                val message = State.setupLock.withLock {
+                    if (
+                        State.coreConfigured &&
+                        State.configuredSetupParams == setupParamsString
+                    ) {
+                        return@withLock ""
+                    }
+                    Core.quickSetupAwait(
+                        initParamsString,
+                        setupParamsString,
+                    ).also {
+                        if (it.isEmpty()) {
+                            State.coreConfigured = true
+                            State.configuredSetupParams = setupParamsString
+                        }
+                    }
+                }
                 runCatching {
                     val chunks = message.chunkedForAidl().ifEmpty {
                         listOf(byteArrayOf())
