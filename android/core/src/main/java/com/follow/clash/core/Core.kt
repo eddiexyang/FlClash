@@ -16,6 +16,8 @@ data object Core {
     external fun forceGC(
     )
 
+    external fun logError(message: String)
+
     external fun updateDNS(
         dns: String,
     )

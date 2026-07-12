@@ -232,6 +232,11 @@ func setEventListener(listener unsafe.Pointer) {
 	eventListener = listener
 }
 
+//export appLogError
+func appLogError(messageChar *C.char) {
+	log.Errorln("[APP] %s", takeCString(messageChar))
+}
+
 //export getTotalTraffic
 func getTotalTraffic(onlyStatisticsProxy bool) *C.char {
 	data := C.CString(handleGetTotalTraffic(onlyStatisticsProxy))

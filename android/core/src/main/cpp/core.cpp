@@ -28,6 +28,12 @@ Java_com_follow_clash_core_Core_forceGC(JNIEnv *env, jobject thiz) {
 
 extern "C"
 JNIEXPORT void JNICALL
+Java_com_follow_clash_core_Core_logError(JNIEnv *env, jobject thiz, jstring message) {
+    appLogError(get_string(message));
+}
+
+extern "C"
+JNIEXPORT void JNICALL
 Java_com_follow_clash_core_Core_updateDNS(JNIEnv *env, jobject thiz, jstring dns) {
     updateDns(get_string(dns));
 }
@@ -172,6 +178,11 @@ Java_com_follow_clash_core_Core_invokeAction(JNIEnv *env, jobject thiz, jstring 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_follow_clash_core_Core_forceGC(JNIEnv *env, jobject thiz) {
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_follow_clash_core_Core_logError(JNIEnv *env, jobject thiz, jstring message) {
 }
 
 extern "C"
