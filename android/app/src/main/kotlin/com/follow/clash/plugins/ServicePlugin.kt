@@ -50,6 +50,10 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
             handleGetRunTime(result)
         }
 
+        "getNativeLogs" -> {
+            result.success(GlobalState.drainErrorLogs())
+        }
+
         "syncState" -> {
             handleSyncState(call, result)
         }
@@ -115,10 +119,6 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
 
 
     fun handleInit(result: MethodChannel.Result) {
-        val nativeLogs = GlobalState.drainErrorLogs()
-        if (nativeLogs.isNotEmpty()) {
-            flutterMethodChannel.invokeMethodOnMainThread<Any>("nativeLogs", nativeLogs)
-        }
         Service.bind()
         launch {
             Service.setEventListener {

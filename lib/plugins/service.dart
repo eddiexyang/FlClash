@@ -11,8 +11,6 @@ abstract mixin class ServiceListener {
   void onServiceEvent(CoreEvent event) {}
 
   void onServiceCrash(String message) {}
-
-  void onNativeLog(String message) {}
 }
 
 class Service {
@@ -22,7 +20,6 @@ class Service {
 
   final ObserverList<ServiceListener> _listeners =
       ObserverList<ServiceListener>();
-  final List<String> _pendingNativeLogs = [];
 
   factory Service() {
     _instance ??= Service._internal();
@@ -44,20 +41,6 @@ class Service {
           final message = call.arguments as String? ?? '';
           for (final listener in _listeners) {
             listener.onServiceCrash(message);
-          }
-          break;
-        case 'nativeLogs':
-          final messages = (call.arguments as List<dynamic>? ?? const [])
-              .map((message) => message.toString())
-              .toList();
-          if (_listeners.isEmpty) {
-            _pendingNativeLogs.addAll(messages);
-          } else {
-            for (final message in messages) {
-              for (final listener in _listeners) {
-                listener.onNativeLog(message);
-              }
-            }
           }
           break;
         default:
@@ -110,18 +93,19 @@ class Service {
     return DateTime.fromMillisecondsSinceEpoch(ms);
   }
 
+  Future<List<String>> getNativeLogs() async {
+    final logs = await methodChannel.invokeMethod<List<dynamic>>(
+      'getNativeLogs',
+    );
+    return (logs ?? const []).map((log) => log.toString()).toList();
+  }
+
   bool get hasListeners {
     return _listeners.isNotEmpty;
   }
 
   void addListener(ServiceListener listener) {
     _listeners.add(listener);
-    if (_pendingNativeLogs.isNotEmpty) {
-      for (final message in List<String>.from(_pendingNativeLogs)) {
-        listener.onNativeLog(message);
-      }
-      _pendingNativeLogs.clear();
-    }
   }
 
   void removeListener(ServiceListener listener) {

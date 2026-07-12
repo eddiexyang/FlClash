@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -22,6 +24,11 @@ class _AndroidContainerState extends ConsumerState<AndroidManager>
   @override
   void initState() {
     super.initState();
+    ref.listenManual(initProvider, (previous, next) {
+      if (next && previous != true) {
+        unawaited(_importNativeLogs());
+      }
+    }, fireImmediately: true);
     ref.listenManual(appSettingProvider.select((state) => state.hidden), (
       prev,
       next,
@@ -61,10 +68,11 @@ class _AndroidContainerState extends ConsumerState<AndroidManager>
     super.onServiceCrash(message);
   }
 
-  @override
-  void onNativeLog(String message) {
-    commonPrint.log(message, logLevel: LogLevel.error);
-    super.onNativeLog(message);
+  Future<void> _importNativeLogs() async {
+    final logs = await service?.getNativeLogs() ?? const <String>[];
+    for (final message in logs) {
+      commonPrint.log(message, logLevel: LogLevel.error);
+    }
   }
 
   @override
