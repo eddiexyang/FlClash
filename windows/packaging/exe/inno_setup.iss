@@ -1,4 +1,5 @@
 [Setup]
+AppId={{APP_ID}}
 AppVersion={{APP_VERSION}}
 AppName={{DISPLAY_NAME}}
 DefaultDirName={{INSTALL_DIR_NAME}}
