@@ -56,38 +56,50 @@ class RemoteService : Service(),
                     true -> VpnService::class.intent
                     false -> CommonService::class.intent
                 }
-                if (intent != nextIntent) {
-                    delegate?.unbind()
-                    delegate = ServiceDelegate(nextIntent, ::handleServiceDisconnected) { binder ->
-                        when (binder) {
-                            is VpnService.LocalBinder -> binder.getService()
-                            is CommonService.LocalBinder -> binder.getService()
-                            else -> throw IllegalArgumentException("Invalid binder type")
+                val operation = if (State.options?.enable == true) {
+                    GlobalState.beginServiceOperation("VpnService start")
+                } else {
+                    null
+                }
+                try {
+                    if (intent != nextIntent) {
+                        delegate?.unbind()
+                        delegate = ServiceDelegate(
+                            nextIntent,
+                            ::handleServiceDisconnected
+                        ) { binder ->
+                            when (binder) {
+                                is VpnService.LocalBinder -> binder.getService()
+                                is CommonService.LocalBinder -> binder.getService()
+                                else -> throw IllegalArgumentException("Invalid binder type")
+                            }
                         }
+                        intent = nextIntent
+                        delegate?.bind()
                     }
-                    intent = nextIntent
-                    delegate?.bind()
-                }
-                val currentDelegate = delegate
-                val didStart = currentDelegate?.useService { service ->
-                    service.start()
-                }?.getOrNull() == true
-                if (!didStart) {
-                    GlobalState.logError("RemoteService failed to start")
-                    currentDelegate?.unbind()
-                    if (delegate === currentDelegate) {
-                        intent = null
-                        delegate = null
+                    val currentDelegate = delegate
+                    val didStart = currentDelegate?.useService { service ->
+                        service.start()
+                    }?.getOrNull() == true
+                    if (!didStart) {
+                        GlobalState.logError("RemoteService failed to start")
+                        currentDelegate?.unbind()
+                        if (delegate === currentDelegate) {
+                            intent = null
+                            delegate = null
+                        }
+                        State.runTime = 0L
+                        result.onResult(0L)
+                        return@withLock
                     }
-                    State.runTime = 0L
-                    result.onResult(0L)
-                    return@withLock
+                    State.runTime = when (runTime != 0L) {
+                        true -> runTime
+                        false -> System.currentTimeMillis()
+                    }
+                    result.onResult(State.runTime)
+                } finally {
+                    operation?.let(GlobalState::completeServiceOperation)
                 }
-                State.runTime = when (runTime != 0L) {
-                    true -> runTime
-                    false -> System.currentTimeMillis()
-                }
-                result.onResult(State.runTime)
             }
         }
     }
@@ -123,22 +135,29 @@ class RemoteService : Service(),
             onStarted: IVoidInterface
         ) {
             launch {
-                val message = State.setupLock.withLock {
-                    if (
-                        State.coreConfigured &&
-                        State.configuredSetupParams == setupParamsString
-                    ) {
-                        return@withLock ""
-                    }
-                    Core.quickSetupAwait(
-                        initParamsString,
-                        setupParamsString,
-                    ).also {
-                        if (it.isEmpty()) {
-                            State.coreConfigured = true
-                            State.configuredSetupParams = setupParamsString
+                val operation = GlobalState.beginServiceOperation(
+                    "RemoteService core setup"
+                )
+                val message = try {
+                    State.setupLock.withLock {
+                        if (
+                            State.coreConfigured &&
+                            State.configuredSetupParams == setupParamsString
+                        ) {
+                            return@withLock ""
+                        }
+                        Core.quickSetupAwait(
+                            initParamsString,
+                            setupParamsString,
+                        ).also {
+                            if (it.isEmpty()) {
+                                State.coreConfigured = true
+                                State.configuredSetupParams = setupParamsString
+                            }
                         }
                     }
+                } finally {
+                    GlobalState.completeServiceOperation(operation)
                 }
                 runCatching {
                     val chunks = message.chunkedForAidl().ifEmpty {

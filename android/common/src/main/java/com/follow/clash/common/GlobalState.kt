@@ -2,6 +2,7 @@ package com.follow.clash.common
 
 
 import android.app.Application
+import android.os.Process
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,7 @@ object GlobalState : CoroutineScope by CoroutineScope(Dispatchers.Default) {
 
     fun drainErrorLogs(): List<String> {
         return runCatching {
+            recoverInterruptedServiceOperation()
             val file = serviceErrorLogFile
             if (!file.exists()) {
                 return@runCatching emptyList()
@@ -56,6 +58,49 @@ object GlobalState : CoroutineScope by CoroutineScope(Dispatchers.Default) {
 
     private val serviceErrorLogFile: File
         get() = File(application.filesDir, "android-service-errors.log")
+
+    private val serviceOperationFile: File
+        get() = File(application.filesDir, "android-service-operation.pending")
+
+    @Synchronized
+    fun beginServiceOperation(operation: String): String {
+        val token = "${Process.myPid()} ${System.currentTimeMillis()} $operation"
+        runCatching {
+            serviceOperationFile.writeText(token)
+        }
+        return token
+    }
+
+    @Synchronized
+    fun completeServiceOperation(token: String) {
+        runCatching {
+            val file = serviceOperationFile
+            if (file.exists() && file.readText() == token) {
+                file.delete()
+            }
+        }
+    }
+
+    @Synchronized
+    private fun recoverInterruptedServiceOperation() {
+        runCatching {
+            val file = serviceOperationFile
+            if (!file.exists()) {
+                return
+            }
+            val value = file.readText()
+            val parts = value.split(' ', limit = 3)
+            val pid = parts.getOrNull(0)?.toIntOrNull()
+            val operation = parts.getOrNull(2)
+            if (pid != null && File("/proc/$pid").exists()) {
+                return
+            }
+            file.delete()
+            logError(
+                "${operation ?: "VpnService operation"} terminated unexpectedly"
+            )
+        }
+    }
 
     fun init(application: Application) {
         _application = application
