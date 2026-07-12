@@ -62,6 +62,12 @@ class _AndroidContainerState extends ConsumerState<AndroidManager>
   }
 
   @override
+  void onNativeLog(String message) {
+    commonPrint.log(message, logLevel: LogLevel.error);
+    super.onNativeLog(message);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return widget.child;
   }

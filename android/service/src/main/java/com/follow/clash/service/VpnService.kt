@@ -54,11 +54,6 @@ class VpnService : SystemVpnService(), IBaseService,
     private val restoreLock = Mutex()
     private var restoreJob: Job? = null
 
-    private fun logError(message: String) {
-        GlobalState.log(message)
-        runCatching { Core.logError("VpnService $message") }
-    }
-
     override fun onCreate() {
         super.onCreate()
         State.alwaysOn = false
@@ -165,12 +160,12 @@ class VpnService : SystemVpnService(), IBaseService,
             try {
                 val isSuccess = super.onTransact(code, data, reply, flags)
                 if (!isSuccess) {
-                    logError("disconnected")
+                    GlobalState.logError("VpnService disconnected")
                     handleDestroy()
                 }
                 return isSuccess
             } catch (e: RemoteException) {
-                logError("onTransact failed: $e")
+                GlobalState.logError("VpnService onTransact failed: $e")
                 return false
             }
         }
@@ -205,7 +200,9 @@ class VpnService : SystemVpnService(), IBaseService,
                 val options = persistedState.vpnOptions
                 val setupParams = persistedState.setupParams
                 if (options == null || setupParams == null) {
-                    logError("Always-on restore skipped: configuration is missing")
+                    GlobalState.logError(
+                        "VpnService Always-on restore skipped: configuration is missing"
+                    )
                     return@withLock
                 }
                 State.options = options.copy(enable = true)
@@ -222,19 +219,25 @@ class VpnService : SystemVpnService(), IBaseService,
                 }
                 when {
                     message == null -> {
-                        logError("Always-on restore failed: core setup timed out")
+                        GlobalState.logError(
+                            "VpnService Always-on restore failed: core setup timed out"
+                        )
                         return@withLock
                     }
 
                     message.isNotEmpty() -> {
-                        logError("Always-on restore failed: $message")
+                        GlobalState.logError(
+                            "VpnService Always-on restore failed: $message"
+                        )
                         return@withLock
                     }
                 }
                 State.runTime = System.currentTimeMillis()
                 if (!start()) {
                     State.runTime = 0L
-                    logError("Always-on restore failed: VPN could not start")
+                    GlobalState.logError(
+                        "VpnService Always-on restore failed: VPN could not start"
+                    )
                     return@withLock
                 }
                 GlobalState.log("Always-on VPN restored")
@@ -360,7 +363,7 @@ class VpnService : SystemVpnService(), IBaseService,
             applicationContext.vpnRunning = true
             true
         } catch (exception: Exception) {
-            logError("start failed: $exception")
+            GlobalState.logError("VpnService start failed: $exception")
             stop()
             false
         }

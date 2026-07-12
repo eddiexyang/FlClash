@@ -4,6 +4,7 @@ import com.follow.clash.RunState
 import com.follow.clash.Service
 import com.follow.clash.State
 import com.follow.clash.common.Components
+import com.follow.clash.common.GlobalState
 import com.follow.clash.invokeMethodOnMainThread
 import com.follow.clash.service.models.SharedState
 import com.google.gson.Gson
@@ -114,6 +115,10 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
 
 
     fun handleInit(result: MethodChannel.Result) {
+        val nativeLogs = GlobalState.drainErrorLogs()
+        if (nativeLogs.isNotEmpty()) {
+            flutterMethodChannel.invokeMethodOnMainThread<Any>("nativeLogs", nativeLogs)
+        }
         Service.bind()
         launch {
             Service.setEventListener {

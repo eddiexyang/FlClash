@@ -44,8 +44,7 @@ class RemoteService : Service(),
     }
 
     private fun handleServiceDisconnected(message: String) {
-        GlobalState.log("Background service disconnected: $message")
-        runCatching { Core.logError("RemoteService disconnected: $message") }
+        GlobalState.logError("RemoteService disconnected: $message")
         intent = null
         delegate = null
     }
@@ -74,8 +73,7 @@ class RemoteService : Service(),
                     service.start()
                 }?.getOrNull() == true
                 if (!didStart) {
-                    GlobalState.log("Background service failed to start")
-                    runCatching { Core.logError("RemoteService failed to start") }
+                    GlobalState.logError("RemoteService failed to start")
                     currentDelegate?.unbind()
                     if (delegate === currentDelegate) {
                         intent = null
