@@ -175,6 +175,11 @@ class VpnService : SystemVpnService(), IBaseService,
         return if (intent.action == SERVICE_INTERFACE) {
             GlobalState.log("VpnService system bind")
             restoreService()
+            runCatching {
+                startService(Intent(this, VpnService::class.java))
+            }.onFailure {
+                GlobalState.logError("VpnService self-start failed: $it")
+            }
             super.onBind(intent)
         } else {
             binder
