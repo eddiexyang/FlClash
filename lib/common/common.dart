@@ -39,6 +39,7 @@ export 'scroll.dart';
 export 'snowflake.dart';
 export 'string.dart';
 export 'system.dart';
+export 'table_sort.dart';
 export 'task.dart';
 export 'text.dart';
 export 'tray.dart';

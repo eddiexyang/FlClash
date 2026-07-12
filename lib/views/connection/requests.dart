@@ -75,8 +75,9 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
   String _searchQuery = '';
 
   // Sorting
-  RequestColumn _sortColumn = RequestColumn.time;
-  bool _sortAscending = true; // 默认时间倒序(也就是最新的在上面)
+  TableSortState<RequestColumn> _sort = const TableSortState(
+    primaryColumn: RequestColumn.time,
+  ); // 默认时间倒序(也就是最新的在上面)
 
   // Scrolling
   final ScrollController _verticalScrollController = ScrollController();
@@ -185,12 +186,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
 
   void _handleSort(RequestColumn column) {
     setState(() {
-      if (_sortColumn == column) {
-        _sortAscending = !_sortAscending;
-      } else {
-        _sortColumn = column;
-        _sortAscending = true;
-      }
+      _sort = _sort.select(column);
     });
   }
 
@@ -253,10 +249,9 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
 
     // Sort
     final sortedList = List<TrackerInfo>.from(list);
-    sortedList.sort((a, b) {
-      final compare = _sortColumn.compare(a, b);
-      return _sortAscending ? compare : -compare;
-    });
+    sortedList.sort(
+      (a, b) => _sort.compare(a, b, (column, a, b) => column.compare(a, b)),
+    );
 
     return sortedList;
   }
@@ -398,8 +393,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
                               _ResizableHeaderRow(
                                 columns: _columns,
                                 columnWidths: effectiveColumnWidths,
-                                sortColumn: _sortColumn,
-                                isAscending: _sortAscending,
+                                sort: _sort,
                                 onSort: _handleSort,
                                 onResizeDelta: (index, delta) {
                                   _handleResize(index, delta / scaleRatio);
@@ -447,16 +441,14 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
 class _ResizableHeaderRow extends StatelessWidget {
   final List<RequestColumn> columns;
   final Map<RequestColumn, double> columnWidths;
-  final RequestColumn sortColumn;
-  final bool isAscending;
+  final TableSortState<RequestColumn> sort;
   final ValueChanged<RequestColumn> onSort;
   final Function(int, double) onResizeDelta;
 
   const _ResizableHeaderRow({
     required this.columns,
     required this.columnWidths,
-    required this.sortColumn,
-    required this.isAscending,
+    required this.sort,
     required this.onSort,
     required this.onResizeDelta,
   });
@@ -471,7 +463,12 @@ class _ResizableHeaderRow extends StatelessWidget {
           final index = entry.key;
           final col = entry.value;
           final width = columnWidths[col]!;
-          final isSorted = col == sortColumn;
+          final isPrimarySort = col == sort.primaryColumn;
+          final isSecondarySort = col == sort.secondaryColumn;
+          final isSorted = isPrimarySort || isSecondarySort;
+          final isAscending = isPrimarySort
+              ? sort.primaryAscending
+              : sort.secondaryAscending;
           final isLast = index == columns.length - 1;
 
           return SizedBox(
@@ -492,7 +489,7 @@ class _ResizableHeaderRow extends StatelessWidget {
                               style: Theme.of(context).textTheme.labelMedium
                                   ?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    color: isSorted
+                                    color: isPrimarySort
                                         ? Theme.of(context).colorScheme.primary
                                         : null,
                                   ),
@@ -500,12 +497,35 @@ class _ResizableHeaderRow extends StatelessWidget {
                             ),
                           ),
                           if (isSorted)
-                            Icon(
-                              isAscending
-                                  ? Icons.arrow_upward
-                                  : Icons.arrow_downward,
-                              size: 14,
-                              color: Theme.of(context).colorScheme.primary,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  isPrimarySort ? '1' : '2',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        fontSize: 9,
+                                        color: isPrimarySort
+                                            ? Theme.of(
+                                                context,
+                                              ).colorScheme.primary
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
+                                Icon(
+                                  isAscending
+                                      ? Icons.arrow_upward
+                                      : Icons.arrow_downward,
+                                  size: 14,
+                                  color: isPrimarySort
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                ),
+                              ],
                             ),
                         ],
                       ),
