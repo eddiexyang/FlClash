@@ -709,7 +709,13 @@ extension SetupControllerExt on AppController {
       realTunEnable = false;
       _ref.read(realTunEnableProvider.notifier).value = false;
     }
-    final realPatchConfig = patchConfig.copyWith.tun(enable: realTunEnable);
+    final systemProxy = _ref.read(
+      networkSettingProvider.select((state) => state.systemProxy),
+    );
+    final realPatchConfig = patchConfig.copyWith(
+      mixedPort: patchConfig.activeMixedPort(systemProxy: systemProxy),
+      tun: patchConfig.tun.copyWith(enable: realTunEnable),
+    );
     final setupState = await _ref.read(setupStateProvider(profile?.id).future);
     globalState.lastSetupState = setupState;
     if (system.isAndroid) {
@@ -1421,16 +1427,14 @@ extension CommonControllerExt on AppController {
           throw StateError('Android VPN service is not running');
         }
       } else if (system.isDesktop) {
-        final port = _ref.read(
-          patchClashConfigProvider.select((state) => state.mixedPort),
+        // Use the established control channel: a new loopback connection can
+        // be affected by TUN routing, and the optional mixed listener is not a
+        // valid measure of whole-core health.
+        final isHealthy = await coreController.checkHealth(
+          timeout: const Duration(seconds: 3),
         );
-        if (port > 0) {
-          final socket = await Socket.connect(
-            InternetAddress.loopbackIPv4,
-            port,
-            timeout: const Duration(seconds: 2),
-          );
-          socket.destroy();
+        if (!isHealthy) {
+          throw StateError('Core control channel is not responsive');
         }
       }
       _coreHealthFailures = 0;

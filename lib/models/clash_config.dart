@@ -206,6 +206,19 @@ extension TunExt on Tun {
   }
 }
 
+extension ClashConfigExt on ClashConfig {
+  /// Returns the mixed port that should be applied to the running core.
+  ///
+  /// On desktop, retain the configured port as a preference but close the
+  /// runtime mixed listener while the system proxy is disabled.
+  int activeMixedPort({required bool systemProxy}) {
+    if (system.isDesktop && !systemProxy) {
+      return 0;
+    }
+    return mixedPort;
+  }
+}
+
 @freezed
 abstract class FallbackFilter with _$FallbackFilter {
   const factory FallbackFilter({

@@ -72,9 +72,13 @@ NavigationItemsState currentNavigationItemsState(Ref ref) {
 
 @riverpod
 UpdateParams updateParams(Ref ref) {
-  final routeMode = ref.watch(
-    networkSettingProvider.select((state) => state.routeMode),
+  final networkSettings = ref.watch(
+    networkSettingProvider.select(
+      (state) => VM2(state.routeMode, state.systemProxy),
+    ),
   );
+  final routeMode = networkSettings.a;
+  final systemProxy = networkSettings.b;
   return ref.watch(
     patchClashConfigProvider.select(
       (state) => UpdateParams(
@@ -87,7 +91,7 @@ UpdateParams updateParams(Ref ref) {
         tcpConcurrent: state.tcpConcurrent,
         externalController: state.externalController,
         unifiedDelay: state.unifiedDelay,
-        mixedPort: state.mixedPort,
+        mixedPort: state.activeMixedPort(systemProxy: systemProxy),
       ),
     ),
   );

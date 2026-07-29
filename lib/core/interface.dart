@@ -80,6 +80,23 @@ abstract class CoreHandlerInterface with CoreInterface {
 
   FutureOr<bool> destroy();
 
+  Future<bool> checkHealth({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    if (!completer.isCompleted) {
+      return false;
+    }
+    try {
+      final response = await invoke<bool>(
+        method: ActionMethod.getIsInit,
+        timeout: timeout,
+      ).timeout(timeout);
+      return response ?? false;
+    } on TimeoutException {
+      return false;
+    }
+  }
+
   Future<T?> _invoke<T>({
     required ActionMethod method,
     dynamic data,
