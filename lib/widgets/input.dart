@@ -234,9 +234,6 @@ class _ListInputPageState extends ConsumerState<ListInputPage> {
   }
 
   void _handleReorder(int oldIndex, newIndex) {
-    if (oldIndex < newIndex) {
-      newIndex -= 1;
-    }
     final nextItems = List<String>.from(_items);
     final item = nextItems.removeAt(oldIndex);
     nextItems.insert(newIndex, item);
@@ -435,7 +432,7 @@ class _ListInputPageState extends ConsumerState<ListInputPage> {
                     animation,
                   );
                 },
-                onReorder: _handleReorder,
+                onReorderItem: _handleReorder,
               ),
       ),
     );
@@ -479,9 +476,6 @@ class _MapInputPageState extends ConsumerState<MapInputPage> {
   }
 
   void _handleReorder(int oldIndex, newIndex) {
-    if (oldIndex < newIndex) {
-      newIndex -= 1;
-    }
     final nextItems = List<MapEntry<String, String>>.from(_items);
     final item = nextItems.removeAt(oldIndex);
     nextItems.insert(newIndex, item);
@@ -691,7 +685,7 @@ class _MapInputPageState extends ConsumerState<MapInputPage> {
                     animation,
                   );
                 },
-                onReorder: _handleReorder,
+                onReorderItem: _handleReorder,
               ),
       ),
     );

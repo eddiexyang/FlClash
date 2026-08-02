@@ -37,7 +37,7 @@ dependencies:
   ffi: ^2.1.4
   dio: ^5.8.0+1
   win32: ^5.5.1
-  re_editor: ^0.8.0
+  re_editor: ^0.10.0
   re_highlight: ^0.0.3
   archive: ^4.0.7
   emoji_regex: ^0.0.5

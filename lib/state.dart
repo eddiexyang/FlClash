@@ -44,6 +44,7 @@ class GlobalState {
   late CommonTheme theme;
   late Color accentColor;
   bool needInitStatus = true;
+  // ignore: deprecated_member_use
   CorePalette? corePalette;
   DateTime? startTime;
   UpdateTasks tasks = [];

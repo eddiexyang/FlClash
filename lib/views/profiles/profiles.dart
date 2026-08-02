@@ -494,11 +494,8 @@ class _ReorderableProfilesSheetState extends State<ReorderableProfilesSheet> {
               animation,
             );
           },
-          onReorder: (oldIndex, newIndex) {
+          onReorderItem: (oldIndex, newIndex) {
             setState(() {
-              if (oldIndex < newIndex) {
-                newIndex -= 1;
-              }
               final profile = profiles.removeAt(oldIndex);
               profiles.insert(newIndex, profile);
             });

@@ -126,7 +126,14 @@ class _AddedRulesViewState extends ConsumerState<AddedRulesView> {
                   );
                 },
                 itemCount: rules.length,
-                onReorder: ref.read(globalRulesProvider.notifier).order,
+                onReorderItem: (oldIndex, newIndex) {
+                  ref
+                      .read(globalRulesProvider.notifier)
+                      .order(
+                        oldIndex,
+                        oldIndex < newIndex ? newIndex + 1 : newIndex,
+                      );
+                },
               ),
       ),
     );
