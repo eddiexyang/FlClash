@@ -39,8 +39,9 @@ class AppController {
   Future<void> attach(BuildContext context, WidgetRef ref) async {
     _context = context;
     _ref = ref;
-    await _init();
     isAttach = true;
+    commonPrint.flush();
+    await _init();
   }
 
   bool get expectedRunning => _expectedRunning;
@@ -325,7 +326,7 @@ extension ProfilesControllerExt on AppController {
 
 extension LogsControllerExt on AppController {
   void addLog(Log log) {
-    _ref.read(logsProvider).add(log);
+    _ref.read(logsProvider.notifier).addLog(log);
   }
 
   Future<bool> exportLogs() async {
