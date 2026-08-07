@@ -168,6 +168,17 @@ func handleChangeProxy(data string, fn func(string string)) {
 			fn("Group is not selectable")
 			return
 		}
+		var affectedConnections []statistic.Tracker
+		var previousProxyName string
+		proxyGroup, tracksSelectedProxy := adapterProxy.ProxyAdapter.(outboundgroup.ProxyGroup)
+		if params.CloseConnections {
+			// Capture the old connections before switching so connections opened
+			// with the new selection are never included.
+			affectedConnections = connectionsUsingGroup(groupName)
+			if tracksSelectedProxy {
+				previousProxyName = proxyGroup.Now()
+			}
+		}
 		if proxyName == "" {
 			selector.ForceSet(proxyName)
 		} else {
@@ -176,6 +187,10 @@ func handleChangeProxy(data string, fn func(string string)) {
 		if err != nil {
 			fn(err.Error())
 			return
+		}
+		if params.CloseConnections &&
+			(!tracksSelectedProxy || proxyGroup.Now() != previousProxyName) {
+			closeTrackedConnections(affectedConnections)
 		}
 
 		fn("")
@@ -294,6 +309,28 @@ func closeConnections() bool {
 		}
 		return true
 	})
+	return success
+}
+
+func connectionsUsingGroup(groupName string) []statistic.Tracker {
+	connections := make([]statistic.Tracker, 0)
+	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
+		if slices.Contains(c.Chains(), groupName) {
+			connections = append(connections, c)
+		}
+		return true
+	})
+	return connections
+}
+
+func closeTrackedConnections(connections []statistic.Tracker) bool {
+	success := true
+	for _, c := range connections {
+		if err := c.Close(); err != nil {
+			success = false
+			log.Warnln("[APP] close connection %s failed: %v", c.ID(), err)
+		}
+	}
 	return success
 }
 

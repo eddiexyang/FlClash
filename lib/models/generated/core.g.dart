@@ -126,12 +126,14 @@ _ChangeProxyParams _$ChangeProxyParamsFromJson(Map<String, dynamic> json) =>
     _ChangeProxyParams(
       groupName: json['group-name'] as String,
       proxyName: json['proxy-name'] as String,
+      closeConnections: json['close-connections'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$ChangeProxyParamsToJson(_ChangeProxyParams instance) =>
     <String, dynamic>{
       'group-name': instance.groupName,
       'proxy-name': instance.proxyName,
+      'close-connections': instance.closeConnections,
     };
 
 _UpdateGeoDataParams _$UpdateGeoDataParamsFromJson(Map<String, dynamic> json) =>

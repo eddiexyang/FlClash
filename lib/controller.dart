@@ -425,12 +425,15 @@ extension ProxiesControllerExt on AppController {
     required String groupName,
     required String proxyName,
   }) async {
+    final closeConnections = _ref.read(appSettingProvider).closeConnections;
     await coreController.changeProxy(
-      ChangeProxyParams(groupName: groupName, proxyName: proxyName),
+      ChangeProxyParams(
+        groupName: groupName,
+        proxyName: proxyName,
+        closeConnections: closeConnections,
+      ),
     );
-    if (_ref.read(appSettingProvider).closeConnections) {
-      await coreController.closeConnections();
-    } else {
+    if (!closeConnections) {
       await coreController.resetConnections();
     }
     addCheckIp();
