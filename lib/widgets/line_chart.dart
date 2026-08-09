@@ -19,7 +19,7 @@ class LineChart extends StatefulWidget {
   final double? maxX;
   final List<String> xLabels;
 
-  const LineChart({
+  LineChart({
     super.key,
     this.gradient = false,
     required this.points,
