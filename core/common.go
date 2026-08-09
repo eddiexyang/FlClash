@@ -179,8 +179,17 @@ func readFile(path string) ([]byte, error) {
 }
 
 func updateConfig(params *UpdateParams) {
+	modeChanged := updateConfigLocked(params)
+	if modeChanged {
+		closeConnections()
+		resolver.ResetConnection()
+	}
+}
+
+func updateConfigLocked(params *UpdateParams) bool {
 	runLock.Lock()
 	defer runLock.Unlock()
+	modeChanged := false
 	general := currentConfig.General
 	if params.MixedPort != nil {
 		general.MixedPort = *params.MixedPort
@@ -206,6 +215,7 @@ func updateConfig(params *UpdateParams) {
 		adapter.UnifiedDelay.Store(general.UnifiedDelay)
 	}
 	if params.Mode != nil {
+		modeChanged = general.Mode != *params.Mode
 		general.Mode = *params.Mode
 		tunnel.SetMode(general.Mode)
 	}
@@ -237,6 +247,7 @@ func updateConfig(params *UpdateParams) {
 	general.Tun.MTU = 1500
 
 	updateListeners()
+	return modeChanged
 }
 
 func applyConfig(params *SetupParams) error {

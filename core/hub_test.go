@@ -4,7 +4,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/metacubex/mihomo/config"
 	C "github.com/metacubex/mihomo/constant"
+	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
 
@@ -101,5 +103,37 @@ func TestConnectionsUsingGroupFiltersByChain(t *testing.T) {
 				wantCloseCalls,
 			)
 		}
+	}
+}
+
+func TestUpdateConfigClosesConnectionsWhenModeChanges(t *testing.T) {
+	previousConfig := currentConfig
+	previousRunning := isRunning
+	previousMode := tunnel.Mode()
+	previousManager := statistic.DefaultManager
+	parsedConfig, err := config.ParseRawConfig(config.DefaultRawConfig())
+	if err != nil {
+		t.Fatalf("parse default config: %v", err)
+	}
+	currentConfig = parsedConfig
+	isRunning = false
+	statistic.DefaultManager = &statistic.Manager{}
+	t.Cleanup(func() {
+		currentConfig = previousConfig
+		isRunning = previousRunning
+		tunnel.SetMode(previousMode)
+		statistic.DefaultManager = previousManager
+	})
+
+	tracker := &chainTracker{id: "existing-proxy", chain: C.Chain{"node-a"}}
+	statistic.DefaultManager.Join(tracker)
+	directMode := tunnel.Direct
+	updateConfig(&UpdateParams{Mode: &directMode})
+
+	if tunnel.Mode() != tunnel.Direct {
+		t.Fatalf("runtime mode = %s, want direct", tunnel.Mode())
+	}
+	if tracker.closeCalls != 1 {
+		t.Fatalf("existing connection close calls = %d, want 1", tracker.closeCalls)
 	}
 }
