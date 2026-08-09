@@ -28,9 +28,13 @@ class _LogsViewState extends ConsumerState<LogsView> {
   void initState() {
     super.initState();
     _logs = ref.read(logsProvider).list;
+    final logLevel = ref.read(patchClashConfigProvider).logLevel;
     _scrollController = ScrollController(initialScrollOffset: double.maxFinite);
     _scrollController.addListener(_resumeLiveWhenReachTop);
-    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(logs: _logs);
+    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
+      logs: _logs,
+      keywords: [logLevel.name],
+    );
     ref.listenManual(logsProvider.select((state) => state.list), (prev, next) {
       if (prev != next) {
         final isEquality = logListEquality.equals(prev, next);
@@ -39,9 +43,17 @@ class _LogsViewState extends ConsumerState<LogsView> {
         }
       }
     });
+    ref.listenManual(
+      patchClashConfigProvider.select((state) => state.logLevel),
+      (prev, next) {
+        if (prev != next) {
+          _setLogLevelFilter(next);
+        }
+      },
+    );
   }
 
-  List<Widget> _buildActions(LogLevel selectedLevel) {
+  List<Widget> _buildActions() {
     return [
       ValueListenableBuilder<LogsState>(
         valueListenable: _logsStateNotifier,
@@ -60,20 +72,26 @@ class _LogsViewState extends ConsumerState<LogsView> {
           );
         },
       ),
-      PopupMenuButton<LogLevel>(
-        icon: const Icon(Icons.filter_alt_outlined),
-        tooltip: appLocalizations.logLevel,
-        onSelected: _updateLogLevel,
-        itemBuilder: (context) {
-          return LogLevel.values
-              .map(
-                (level) => CheckedPopupMenuItem<LogLevel>(
-                  value: level,
-                  checked: selectedLevel == level,
-                  child: Text(level.name),
-                ),
-              )
-              .toList();
+      ValueListenableBuilder<LogsState>(
+        valueListenable: _logsStateNotifier,
+        builder: (_, state, _) {
+          final selectedLevel = _selectedLogLevel(state);
+          return PopupMenuButton<LogLevel>(
+            icon: const Icon(Icons.filter_alt_outlined),
+            tooltip: appLocalizations.logLevel,
+            onSelected: _updateLogLevel,
+            itemBuilder: (context) {
+              return LogLevel.values
+                  .map(
+                    (level) => CheckedPopupMenuItem<LogLevel>(
+                      value: level,
+                      checked: selectedLevel == level,
+                      child: Text(level.name),
+                    ),
+                  )
+                  .toList();
+            },
+          );
         },
       ),
       IconButton(
@@ -95,7 +113,29 @@ class _LogsViewState extends ConsumerState<LogsView> {
 
   bool get _shouldUpdateNow => _logsStateNotifier.value.autoScrollToEnd;
 
+  LogLevel _selectedLogLevel(LogsState state) {
+    final selectedName = state.keywords.isEmpty ? null : state.keywords.first;
+    return LogLevel.values.firstWhere(
+      (level) => level.name == selectedName,
+      orElse: () => LogLevel.warning,
+    );
+  }
+
+  void _setLogLevelFilter(LogLevel level) {
+    final keywords = [level.name];
+    if (stringListEquality.equals(
+      _logsStateNotifier.value.keywords,
+      keywords,
+    )) {
+      return;
+    }
+    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
+      keywords: keywords,
+    );
+  }
+
   void _updateLogLevel(LogLevel level) {
+    _setLogLevelFilter(level);
     ref
         .read(patchClashConfigProvider.notifier)
         .update((state) => state.copyWith(logLevel: level));
@@ -188,11 +228,8 @@ class _LogsViewState extends ConsumerState<LogsView> {
 
   @override
   Widget build(BuildContext context) {
-    final configLogLevel = ref.watch(
-      patchClashConfigProvider.select((state) => state.logLevel),
-    );
     return CommonScaffold(
-      actions: _buildActions(configLogLevel),
+      actions: _buildActions(),
       searchState: AppBarSearchState(onSearch: _onSearch),
       title: appLocalizations.logs,
       body: ValueListenableBuilder<LogsState>(
