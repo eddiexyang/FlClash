@@ -104,7 +104,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
 
   LogLevel _parseSelectedLevel(List<String> keywords) {
     if (keywords.isEmpty) {
-      return LogLevel.debug;
+      return LogLevel.warning;
     }
     final target = keywords.first;
     for (final level in LogLevel.values) {
@@ -112,7 +112,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
         return level;
       }
     }
-    return LogLevel.debug;
+    return LogLevel.warning;
   }
 
   void _selectLevelFilter(LogLevel level) {
