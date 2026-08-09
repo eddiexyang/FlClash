@@ -40,7 +40,7 @@ class Migration {
       }
       data = await _oldToNow(configMap);
     }
-    data = await _migrateLogLevelDefaultToInfo(data);
+    data = await _migrateLogLevelDefaultToWarning(data);
     final res = await sync(data);
     await preferences.setVersion(currentVersion);
     return res;
@@ -50,21 +50,23 @@ class Migration {
     return await oldToNowTask(configMap);
   }
 
-  Future<MigrationData> _migrateLogLevelDefaultToInfo(
+  Future<MigrationData> _migrateLogLevelDefaultToWarning(
     MigrationData data,
   ) async {
-    final hasMigrated = await preferences.getBool(logLevelInfoMigrationDoneKey);
+    final hasMigrated = await preferences.getBool(
+      logLevelWarningMigrationDoneKey,
+    );
     if (hasMigrated == true) {
       return data;
     }
     final configMap = data.configMap;
     if (configMap == null) {
-      await preferences.setBool(logLevelInfoMigrationDoneKey, true);
+      await preferences.setBool(logLevelWarningMigrationDoneKey, true);
       return data;
     }
     final patch = configMap['patchClashConfig'];
     if (patch is! Map) {
-      await preferences.setBool(logLevelInfoMigrationDoneKey, true);
+      await preferences.setBool(logLevelWarningMigrationDoneKey, true);
       return data;
     }
     final patchConfig = Map<String, Object?>.from(
@@ -72,13 +74,13 @@ class Migration {
     );
     final logLevel = patchConfig['log-level'];
     if (logLevel == 'error') {
-      patchConfig['log-level'] = 'info';
+      patchConfig['log-level'] = 'warning';
       final nextConfig = Map<String, Object?>.from(configMap);
       nextConfig['patchClashConfig'] = patchConfig;
-      await preferences.setBool(logLevelInfoMigrationDoneKey, true);
+      await preferences.setBool(logLevelWarningMigrationDoneKey, true);
       return data.copyWith(configMap: nextConfig);
     }
-    await preferences.setBool(logLevelInfoMigrationDoneKey, true);
+    await preferences.setBool(logLevelWarningMigrationDoneKey, true);
     return data;
   }
 }

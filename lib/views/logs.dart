@@ -41,7 +41,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
     });
   }
 
-  List<Widget> _buildActions() {
+  List<Widget> _buildActions(LogLevel selectedLevel) {
     return [
       ValueListenableBuilder<LogsState>(
         valueListenable: _logsStateNotifier,
@@ -60,27 +60,20 @@ class _LogsViewState extends ConsumerState<LogsView> {
           );
         },
       ),
-      ValueListenableBuilder<LogsState>(
-        valueListenable: _logsStateNotifier,
-        builder: (_, state, _) {
-          final selectedLevel = _parseSelectedLevel(state.keywords);
-          return PopupMenuButton<LogLevel>(
-            icon: const Icon(Icons.filter_alt_outlined),
-            tooltip: appLocalizations.logLevel,
-            onSelected: _selectLevelFilter,
-            itemBuilder: (context) {
-              return LogLevel.values
-                  .where((level) => level != LogLevel.silent)
-                  .map(
-                    (level) => CheckedPopupMenuItem<LogLevel>(
-                      value: level,
-                      checked: selectedLevel == level,
-                      child: Text(level.name),
-                    ),
-                  )
-                  .toList();
-            },
-          );
+      PopupMenuButton<LogLevel>(
+        icon: const Icon(Icons.filter_alt_outlined),
+        tooltip: appLocalizations.logLevel,
+        onSelected: _updateLogLevel,
+        itemBuilder: (context) {
+          return LogLevel.values
+              .map(
+                (level) => CheckedPopupMenuItem<LogLevel>(
+                  value: level,
+                  checked: selectedLevel == level,
+                  child: Text(level.name),
+                ),
+              )
+              .toList();
         },
       ),
       IconButton(
@@ -102,23 +95,10 @@ class _LogsViewState extends ConsumerState<LogsView> {
 
   bool get _shouldUpdateNow => _logsStateNotifier.value.autoScrollToEnd;
 
-  LogLevel _parseSelectedLevel(List<String> keywords) {
-    if (keywords.isEmpty) {
-      return LogLevel.warning;
-    }
-    final target = keywords.first;
-    for (final level in LogLevel.values) {
-      if (level.name == target) {
-        return level;
-      }
-    }
-    return LogLevel.warning;
-  }
-
-  void _selectLevelFilter(LogLevel level) {
-    _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-      keywords: [level.name],
-    );
+  void _updateLogLevel(LogLevel level) {
+    ref
+        .read(patchClashConfigProvider.notifier)
+        .update((state) => state.copyWith(logLevel: level));
   }
 
   void _setAutoScroll(bool enabled) {
@@ -213,7 +193,7 @@ class _LogsViewState extends ConsumerState<LogsView> {
     );
     final isCoreLogFiltered = configLogLevel.index > LogLevel.info.index;
     return CommonScaffold(
-      actions: _buildActions(),
+      actions: _buildActions(configLogLevel),
       searchState: AppBarSearchState(onSearch: _onSearch),
       title: appLocalizations.logs,
       body: ValueListenableBuilder<LogsState>(
