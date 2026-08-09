@@ -65,11 +65,9 @@ class _LogsViewState extends ConsumerState<LogsView> {
         builder: (_, state, _) {
           final selectedLevel = _parseSelectedLevel(state.keywords);
           return PopupMenuButton<LogLevel>(
-            icon: Icon(
-              selectedLevel == null ? Icons.tune : Icons.filter_alt_outlined,
-            ),
+            icon: const Icon(Icons.filter_alt_outlined),
             tooltip: appLocalizations.logLevel,
-            onSelected: _toggleLevelFilter,
+            onSelected: _selectLevelFilter,
             itemBuilder: (context) {
               return LogLevel.values
                   .where((level) => level != LogLevel.silent)
@@ -104,9 +102,9 @@ class _LogsViewState extends ConsumerState<LogsView> {
 
   bool get _shouldUpdateNow => _logsStateNotifier.value.autoScrollToEnd;
 
-  LogLevel? _parseSelectedLevel(List<String> keywords) {
+  LogLevel _parseSelectedLevel(List<String> keywords) {
     if (keywords.isEmpty) {
-      return null;
+      return LogLevel.debug;
     }
     final target = keywords.first;
     for (final level in LogLevel.values) {
@@ -114,15 +112,12 @@ class _LogsViewState extends ConsumerState<LogsView> {
         return level;
       }
     }
-    return null;
+    return LogLevel.debug;
   }
 
-  void _toggleLevelFilter(LogLevel level) {
-    final selectedLevel = _parseSelectedLevel(
-      _logsStateNotifier.value.keywords,
-    );
+  void _selectLevelFilter(LogLevel level) {
     _logsStateNotifier.value = _logsStateNotifier.value.copyWith(
-      keywords: selectedLevel == level ? [] : [level.name],
+      keywords: [level.name],
     );
   }
 
