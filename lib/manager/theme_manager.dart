@@ -77,6 +77,7 @@ class ThemeManager extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, ref) {
+    final theme = Theme.of(context);
     final textScale = ref.read(
       themeSettingProvider.select((state) => state.textScale),
     );
@@ -100,13 +101,17 @@ class ThemeManager extends ConsumerWidget {
         ),
       ),
       child: Theme(
-        data: Theme.of(context).copyWith(
-          floatingActionButtonTheme: Theme.of(context).floatingActionButtonTheme
-              .copyWith(
-                shape: const RoundedSuperellipseBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(16.0)),
-                ),
-              ),
+        data: theme.copyWith(
+          appBarTheme: theme.appBarTheme.copyWith(
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
+          ),
+          floatingActionButtonTheme: theme.floatingActionButtonTheme.copyWith(
+            shape: const RoundedSuperellipseBorder(
+              borderRadius: BorderRadius.all(Radius.circular(16.0)),
+            ),
+          ),
         ),
         child: LayoutBuilder(
           builder: (_, container) {
