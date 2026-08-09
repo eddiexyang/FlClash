@@ -11,6 +11,10 @@ on:
 env:
   IS_STABLE: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && !contains(github.ref_name, '+') }}
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/dev' }}
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -169,7 +173,7 @@ jobs:
           overwrite: true
 
   release:
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && !contains(github.ref_name, '+') }}
+    if: ${{ github.ref == 'refs/heads/dev' || (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && !contains(github.ref_name, '+')) }}
     permissions: write-all
     needs: [ build ]
     runs-on: ubuntu-latest
@@ -179,10 +183,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify tag belongs to main
-        id: main
+      - name: Verify release source
+        id: release
         shell: bash
         run: |
+          if [[ "$GITHUB_REF" == 'refs/heads/dev' ]]; then
+            git fetch origin dev
+            if [[ "$(git rev-parse origin/dev)" == "$GITHUB_SHA" ]]; then
+              echo 'eligible=true' >> "$GITHUB_OUTPUT"
+            else
+              echo 'eligible=false' >> "$GITHUB_OUTPUT"
+              echo 'A newer dev commit exists; skipping stale release.'
+            fi
+            exit 0
+          fi
+
           git fetch origin main
           if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo 'eligible=true' >> "$GITHUB_OUTPUT"
@@ -192,15 +207,34 @@ jobs:
           fi
 
       - name: Download
-        if: steps.main.outputs.eligible == 'true'
+        if: steps.release.outputs.eligible == 'true'
         uses: actions/download-artifact@v7
         with:
           path: ./dist/
           pattern: artifact-*
           merge-multiple: true
 
+      - name: Update dev tag
+        if: steps.release.outputs.eligible == 'true' && github.ref == 'refs/heads/dev'
+        shell: bash
+        run: |
+          git tag --force dev "$GITHUB_SHA"
+          git push --force origin refs/tags/dev
+
+      - name: Release dev
+        if: steps.release.outputs.eligible == 'true' && github.ref == 'refs/heads/dev'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: dev
+          tag_name: dev
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: ./dist/**/*
+          fail_on_unmatched_files: true
+
       - name: Release
-        if: steps.main.outputs.eligible == 'true'
+        if: steps.release.outputs.eligible == 'true' && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: ./dist/**/*
