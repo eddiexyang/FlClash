@@ -191,7 +191,6 @@ class _LogsViewState extends ConsumerState<LogsView> {
     final configLogLevel = ref.watch(
       patchClashConfigProvider.select((state) => state.logLevel),
     );
-    final isCoreLogFiltered = configLogLevel.index > LogLevel.info.index;
     return CommonScaffold(
       actions: _buildActions(configLogLevel),
       searchState: AppBarSearchState(onSearch: _onSearch),
@@ -199,46 +198,10 @@ class _LogsViewState extends ConsumerState<LogsView> {
       body: ValueListenableBuilder<LogsState>(
         valueListenable: _logsStateNotifier,
         builder: (context, state, _) {
-          final hint = isCoreLogFiltered
-              ? Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.colorScheme.errorContainer.withValues(
-                      alpha: 0.5,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        size: 16,
-                        color: context.colorScheme.onErrorContainer,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '当前核心日志级别为 ${configLogLevel.name}，连接日志会被过滤。'
-                          '请在配置-通用-日志等级切换到 info 或 debug。',
-                          style: context.textTheme.labelMedium?.copyWith(
-                            color: context.colorScheme.onErrorContainer,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : const SizedBox.shrink();
           final logs = state.list;
           if (logs.isEmpty) {
             return Column(
               children: [
-                hint,
                 Expanded(
                   child: NullStatus(
                     illustration: LogEmptyIllustration(),
@@ -254,7 +217,6 @@ class _LogsViewState extends ConsumerState<LogsView> {
               .toList();
           return Column(
             children: [
-              hint,
               Expanded(
                 child: Align(
                   alignment: Alignment.topCenter,
