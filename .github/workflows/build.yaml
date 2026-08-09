@@ -49,12 +49,12 @@ jobs:
           Add-Content $env:GITHUB_PATH $cargoPath
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.24.0'
           cache-dependency-path: |
@@ -78,14 +78,14 @@ jobs:
 
       - name: Setup Java
         if: startsWith(matrix.platform, 'android')
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Setup Android
         if: startsWith(matrix.platform, 'android')
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Setup Android SDK
         if: startsWith(matrix.platform, 'android')
@@ -162,7 +162,7 @@ jobs:
           test "$ACTUAL" = "$EXPECTED"
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: artifact-${{ matrix.platform }}${{ matrix.arch && format('-{0}', matrix.arch) }}
           path: ./dist
@@ -175,7 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -193,7 +193,7 @@ jobs:
 
       - name: Download
         if: steps.main.outputs.eligible == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: ./dist/
           pattern: artifact-*
