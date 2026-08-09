@@ -302,7 +302,6 @@
   "copyLink": "リンクをコピー",
   "exportFile": "ファイルをエクスポート",
   "cacheCorrupt": "キャッシュが破損しています。クリアしますか？",
-  "detectionTip": "サードパーティAPIに依存（参考値）",
   "listen": "リスン",
   "undo": "元に戻す",
   "redo": "やり直す",

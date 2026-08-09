@@ -302,7 +302,6 @@
   "copyLink": "Copy link",
   "exportFile": "Export file",
   "cacheCorrupt": "The cache is corrupt. Do you want to clear it?",
-  "detectionTip": "Relying on third-party api is for reference only",
   "listen": "Listen",
   "undo": "undo",
   "redo": "redo",

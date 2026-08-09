@@ -269,9 +269,6 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "destinationIPASN": MessageLookupByLibrary.simpleMessage("ASN назначения"),
     "details": m3,
-    "detectionTip": MessageLookupByLibrary.simpleMessage(
-      "Опирается на сторонний API, только для справки",
-    ),
     "developerMode": MessageLookupByLibrary.simpleMessage("Режим разработчика"),
     "developerModeEnableTip": MessageLookupByLibrary.simpleMessage(
       "Режим разработчика активирован.",

@@ -258,9 +258,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Destination IPASN",
     ),
     "details": m3,
-    "detectionTip": MessageLookupByLibrary.simpleMessage(
-      "Relying on third-party api is for reference only",
-    ),
     "developerMode": MessageLookupByLibrary.simpleMessage("Developer mode"),
     "developerModeEnableTip": MessageLookupByLibrary.simpleMessage(
       "Developer mode is enabled.",

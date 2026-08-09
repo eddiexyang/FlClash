@@ -31,11 +31,12 @@ import (
 )
 
 var (
-	currentConfig *config.Config
-	version       = 0
-	isRunning     = false
-	runLock       sync.Mutex
-	mBatch, _     = batch.New[bool](context.Background(), batch.WithConcurrencyNum[bool](50))
+	currentConfig   *config.Config
+	version         = 0
+	isRunning       = false
+	runLock         sync.Mutex
+	updateConfigMux sync.Mutex
+	mBatch, _       = batch.New[bool](context.Background(), batch.WithConcurrencyNum[bool](50))
 )
 
 func getExternalProvidersRaw() map[string]cp.Provider {
@@ -179,17 +180,59 @@ func readFile(path string) ([]byte, error) {
 }
 
 func updateConfig(params *UpdateParams) {
-	modeChanged := updateConfigLocked(params)
-	if modeChanged {
-		closeConnections()
+	updateConfigMux.Lock()
+	defer updateConfigMux.Unlock()
+
+	oldMixedPort := currentConfig.General.MixedPort
+	mixedPortChanged := params.MixedPort != nil && oldMixedPort != *params.MixedPort
+
+	oldTun := currentConfig.General.Tun
+	nextTun := oldTun
+	if params.Tun != nil {
+		nextTun.Enable = params.Tun.Enable
+		nextTun.AutoRoute = *params.Tun.AutoRoute
+		nextTun.Device = *params.Tun.Device
+		nextTun.RouteAddress = *params.Tun.RouteAddress
+		nextTun.DNSHijack = *params.Tun.DNSHijack
+		nextTun.Stack = *params.Tun.Stack
+	}
+	tunListenerChanged := params.Tun != nil && (oldTun.Enable != nextTun.Enable ||
+		oldTun.AutoRoute != nextTun.AutoRoute ||
+		oldTun.Device != nextTun.Device ||
+		oldTun.Stack != nextTun.Stack ||
+		!unorderedSliceEqual(oldTun.DNSHijack, nextTun.DNSHijack) ||
+		!unorderedSliceEqual(oldTun.RouteAddress, nextTun.RouteAddress))
+	updateConfigLocked(params)
+	if tunListenerChanged || mixedPortChanged {
 		resolver.ResetConnection()
 	}
 }
 
-func updateConfigLocked(params *UpdateParams) bool {
+func unorderedSliceEqual[T comparable](left, right []T) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	counts := make(map[T]int, len(left))
+	for _, value := range left {
+		counts[value]++
+	}
+	for _, value := range right {
+		count := counts[value]
+		if count == 0 {
+			return false
+		}
+		if count == 1 {
+			delete(counts, value)
+		} else {
+			counts[value] = count - 1
+		}
+	}
+	return len(counts) == 0
+}
+
+func updateConfigLocked(params *UpdateParams) {
 	runLock.Lock()
 	defer runLock.Unlock()
-	modeChanged := false
 	general := currentConfig.General
 	if params.MixedPort != nil {
 		general.MixedPort = *params.MixedPort
@@ -215,7 +258,6 @@ func updateConfigLocked(params *UpdateParams) bool {
 		adapter.UnifiedDelay.Store(general.UnifiedDelay)
 	}
 	if params.Mode != nil {
-		modeChanged = general.Mode != *params.Mode
 		general.Mode = *params.Mode
 		tunnel.SetMode(general.Mode)
 	}
@@ -247,10 +289,11 @@ func updateConfigLocked(params *UpdateParams) bool {
 	general.Tun.MTU = 1500
 
 	updateListeners()
-	return modeChanged
 }
 
 func applyConfig(params *SetupParams) error {
+	updateConfigMux.Lock()
+	defer updateConfigMux.Unlock()
 	runtime.GC()
 	runLock.Lock()
 	defer runLock.Unlock()

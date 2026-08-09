@@ -83,7 +83,7 @@ class GlobalState {
       viewSize: Size.zero,
       requests: FixedList(maxLength),
       logs: FixedList(5000),
-      traffics: FixedList(30),
+      traffics: FixedList(trafficHistoryLength),
       totalTraffic: Traffic(),
       systemUiOverlayStyle: SystemUiOverlayStyle(),
     );

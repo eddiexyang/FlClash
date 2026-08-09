@@ -55,6 +55,8 @@ type chainTracker struct {
 	statistic.Tracker
 	id         string
 	chain      C.Chain
+	metadata   *C.Metadata
+	manager    *statistic.Manager
 	closeCalls int
 }
 
@@ -66,8 +68,15 @@ func (t *chainTracker) Chains() C.Chain {
 	return t.chain
 }
 
+func (t *chainTracker) Info() *statistic.TrackerInfo {
+	return &statistic.TrackerInfo{Metadata: t.metadata}
+}
+
 func (t *chainTracker) Close() error {
 	t.closeCalls++
+	if t.manager != nil {
+		t.manager.Leave(t)
+	}
 	return nil
 }
 
@@ -106,7 +115,7 @@ func TestConnectionsUsingGroupFiltersByChain(t *testing.T) {
 	}
 }
 
-func TestUpdateConfigClosesConnectionsWhenModeChanges(t *testing.T) {
+func TestUpdateConfigClosesConnectionsWhenRuntimeModeChanges(t *testing.T) {
 	previousConfig := currentConfig
 	previousRunning := isRunning
 	previousMode := tunnel.Mode()
@@ -115,9 +124,11 @@ func TestUpdateConfigClosesConnectionsWhenModeChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse default config: %v", err)
 	}
+	parsedConfig.General.Mode = tunnel.Direct
 	currentConfig = parsedConfig
 	isRunning = false
 	statistic.DefaultManager = &statistic.Manager{}
+	tunnel.SetMode(tunnel.Rule)
 	t.Cleanup(func() {
 		currentConfig = previousConfig
 		isRunning = previousRunning
@@ -125,7 +136,15 @@ func TestUpdateConfigClosesConnectionsWhenModeChanges(t *testing.T) {
 		statistic.DefaultManager = previousManager
 	})
 
-	tracker := &chainTracker{id: "existing-proxy", chain: C.Chain{"node-a"}}
+	tracker := &chainTracker{
+		id:    "existing-proxy",
+		chain: C.Chain{"node-a"},
+		metadata: &C.Metadata{
+			RouteRevision:    ^uint64(0),
+			RouteRevisionSet: true,
+		},
+		manager: statistic.DefaultManager,
+	}
 	statistic.DefaultManager.Join(tracker)
 	directMode := tunnel.Direct
 	updateConfig(&UpdateParams{Mode: &directMode})
@@ -135,5 +154,8 @@ func TestUpdateConfigClosesConnectionsWhenModeChanges(t *testing.T) {
 	}
 	if tracker.closeCalls != 1 {
 		t.Fatalf("existing connection close calls = %d, want 1", tracker.closeCalls)
+	}
+	if statistic.DefaultManager.Get(tracker.id) != nil {
+		t.Fatal("existing connection remains in the manager")
 	}
 }

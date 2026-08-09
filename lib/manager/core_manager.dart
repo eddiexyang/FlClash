@@ -41,7 +41,13 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     );
     ref.listenManual(updateParamsProvider, (prev, next) {
       if (prev != next) {
-        appController.updateConfigDebounce();
+        final refreshNetworkDetection =
+            prev?.mode != next.mode ||
+            prev?.tun != next.tun ||
+            prev?.mixedPort != next.mixedPort;
+        appController.updateConfigDebounce(
+          refreshNetworkDetection: refreshNetworkDetection,
+        );
       }
     });
   }

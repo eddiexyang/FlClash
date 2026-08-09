@@ -77,16 +77,22 @@ class SystemBrightness extends _$SystemBrightness
 
 @Riverpod(keepAlive: true)
 class Traffics extends _$Traffics with AutoDisposeNotifierMixin {
+  final FixedList<DateTime> _sampleTimes = FixedList(trafficHistoryLength);
+
   @override
   FixedList<Traffic> build() {
-    return FixedList(0);
+    return FixedList(trafficHistoryLength);
   }
 
+  List<DateTime> get sampleTimes => _sampleTimes.list;
+
   void addTraffic(Traffic value) {
+    _sampleTimes.add(DateTime.now());
     this.value = state.copyWith()..add(value);
   }
 
   void clear() {
+    _sampleTimes.clear();
     value = state.copyWith()..clear();
   }
 }
@@ -323,20 +329,39 @@ class NetworkDetection extends _$NetworkDetection
     with AutoDisposeNotifierMixin {
   bool? _preIsStart;
   CancelToken? _cancelToken;
-  int _startMillisecondsEpoch = 0;
+  int _checkId = 0;
 
   @override
   NetworkDetectionState build() {
     return NetworkDetectionState(isLoading: true, ipInfo: null);
   }
 
+  int invalidateCheck() {
+    final checkId = ++_checkId;
+    _cancelToken?.cancel();
+    state = state.copyWith(isLoading: true, ipInfo: null);
+    return checkId;
+  }
+
+  void finishInvalidatedCheck(int checkId) {
+    if (checkId != _checkId) {
+      return;
+    }
+    state = state.copyWith(isLoading: false, ipInfo: null);
+  }
+
   void startCheck() {
+    final checkId = ++_checkId;
+    _cancelToken?.cancel();
     debouncer.call(FunctionTag.checkIp, () {
-      _checkIp();
+      _checkIp(checkId);
     }, duration: commonDuration);
   }
 
-  Future<void> _checkIp() async {
+  Future<void> _checkIp(int checkId) async {
+    if (checkId != _checkId) {
+      return;
+    }
     final isInit = ref.read(initProvider);
     if (!isInit) {
       return;
@@ -345,22 +370,23 @@ class NetworkDetection extends _$NetworkDetection
     if (!isStart && _preIsStart == false && state.ipInfo != null) {
       return;
     }
-    final millisecondsEpoch = DateTime.now().millisecondsSinceEpoch;
-    _startMillisecondsEpoch = millisecondsEpoch;
-    final runTime = millisecondsEpoch + 1;
-    _cancelToken?.cancel();
-    _cancelToken = CancelToken();
+    final cancelToken = CancelToken();
+    _cancelToken = cancelToken;
     commonPrint.log('checkIp start');
     state = state.copyWith(isLoading: true, ipInfo: null);
     _preIsStart = isStart;
-    final res = await request.checkIp(cancelToken: _cancelToken);
+    final res = await request.checkIp(cancelToken: cancelToken);
     commonPrint.log('checkIp res: $res');
-    if (res.isError && runTime > _startMillisecondsEpoch) {
-      state = state.copyWith(isLoading: true, ipInfo: null);
+    if (checkId != _checkId) {
+      return;
+    }
+    if (res.isError) {
+      state = state.copyWith(isLoading: false, ipInfo: null);
       return;
     }
     final ipInfo = res.data;
     if (ipInfo == null) {
+      state = state.copyWith(isLoading: false, ipInfo: null);
       return;
     }
     state = state.copyWith(isLoading: false, ipInfo: ipInfo);

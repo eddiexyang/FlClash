@@ -26,6 +26,10 @@ class AppController {
   int _coreHealthFailures = 0;
   bool _healthRecoveryRequested = false;
   DateTime? _lastCoreHealthCheck;
+  Future<void> _configApplyQueue = Future.value();
+  int _routeConfigRevision = 0;
+  int? _pendingRouteDetectionRevision;
+  int? _pendingRouteDetectionCheckId;
 
   static AppController? _instance;
 
@@ -554,21 +558,62 @@ extension SetupControllerExt on AppController {
     return setupState.needSetup(globalState.lastSetupState) == true;
   }
 
-  Future<void> updateConfigDebounce() async {
-    debouncer.call(FunctionTag.updateConfig, () async {
-      await safeRun(() async {
-        final updateParams = _ref.read(updateParamsProvider);
-        final res = await _requestAdmin(updateParams.tun.enable);
-        if (res.isError) {
-          return;
-        }
-        final realTunEnable = _ref.read(realTunEnableProvider);
-        final message = await coreController.updateConfig(
-          updateParams.copyWith.tun(enable: realTunEnable),
-        );
-        if (message.isNotEmpty) throw message;
-      });
+  void updateConfigDebounce({
+    bool refreshNetworkDetection = false,
+  }) {
+    if (refreshNetworkDetection) {
+      _pendingRouteDetectionRevision = ++_routeConfigRevision;
+      _pendingRouteDetectionCheckId = _ref
+          .read(networkDetectionProvider.notifier)
+          .invalidateCheck();
+    }
+    debouncer.call(FunctionTag.updateConfig, () {
+      final updateParams = _ref.read(updateParamsProvider);
+      final routeRevision = _routeConfigRevision;
+      _configApplyQueue = _configApplyQueue
+          .then(
+            (_) => _applyConfigUpdate(updateParams, routeRevision),
+          )
+          .catchError((error, stackTrace) {
+            commonPrint.log(
+              'update_config_queue_failed error=$error stack=$stackTrace',
+              logLevel: LogLevel.warning,
+            );
+          });
     });
+  }
+
+  Future<void> _applyConfigUpdate(
+    UpdateParams updateParams,
+    int routeRevision,
+  ) async {
+    final didApply = await safeRun<bool>(() async {
+      final res = await _requestAdmin(updateParams.tun.enable);
+      if (res.isError) {
+        return false;
+      }
+      final realTunEnable = _ref.read(realTunEnableProvider);
+      final message = await coreController.updateConfig(
+        updateParams.copyWith.tun(enable: realTunEnable),
+      );
+      if (message.isNotEmpty) throw message;
+      return true;
+    });
+    if (routeRevision != _routeConfigRevision) {
+      return;
+    }
+    if (_pendingRouteDetectionRevision == routeRevision) {
+      _pendingRouteDetectionRevision = null;
+      final detectionCheckId = _pendingRouteDetectionCheckId;
+      _pendingRouteDetectionCheckId = null;
+      if (didApply == true) {
+        addCheckIp();
+      } else if (detectionCheckId != null) {
+        _ref
+            .read(networkDetectionProvider.notifier)
+            .finishInvalidatedCheck(detectionCheckId);
+      }
+    }
   }
 
   void addCheckIp() {
@@ -600,7 +645,6 @@ extension SetupControllerExt on AppController {
     if (mode == Mode.global) {
       updateCurrentGroupName(GroupName.GLOBAL.name);
     }
-    addCheckIp();
   }
 
   void autoApplyProfile() {

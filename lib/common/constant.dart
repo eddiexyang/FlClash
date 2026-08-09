@@ -18,6 +18,9 @@ final unixSocketPath = '/tmp/FlClashSocket_${Random().nextInt(10000)}.sock';
 const helperPort = 47890;
 const maxTextScale = 1.4;
 const minTextScale = 0.8;
+const networkSpeedWindowSeconds = 60;
+// Keep one extra sample for both ends of a nominal one-second interval.
+const trafficHistoryLength = 61;
 final baseInfoEdgeInsets = EdgeInsets.symmetric(
   vertical: 16.mAp,
   horizontal: 16.mAp,

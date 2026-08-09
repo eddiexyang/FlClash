@@ -40,7 +40,9 @@ class TrafficUsage extends StatelessWidget {
         ),
         Text(
           trafficValue.traffic.unit,
-          style: context.textTheme.bodySmall?.toLighter,
+          style: context.textTheme.bodySmall?.copyWith(
+            color: context.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -48,8 +50,13 @@ class TrafficUsage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = globalState.theme.darken3PrimaryContainer;
-    final secondaryColor = globalState.theme.darken2SecondaryContainer;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = isDark
+        ? const Color(0xFFB3E5FC)
+        : const Color(0xFF003366);
+    final secondaryColor = isDark
+        ? const Color(0xFFC45100)
+        : const Color(0xFFD65F00);
     return SizedBox(
       height: getWidgetHeight(2),
       child: CommonCard(
