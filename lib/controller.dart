@@ -116,6 +116,10 @@ extension InitControllerExt on AppController {
       return;
     }
     commonPrint.log('init status');
+    if (system.isDesktop) {
+      await updateStatus(true, isInit: true);
+      return;
+    }
     if (system.isAndroid) {
       await globalState.updateStartTime();
     }
@@ -504,7 +508,8 @@ extension SetupControllerExt on AppController {
   }
 
   Future<void> updateStatus(bool isStart, {bool isInit = false}) async {
-    if (isStart) {
+    final shouldStart = system.isDesktop || isStart;
+    if (shouldStart) {
       _setExpectedRunning(true);
       if (!isInit) {
         final res = await tryStartCore(true);
@@ -996,7 +1001,11 @@ extension CoreControllerExt on AppController {
   }
 
   Future<void> restartCore([bool start = false]) async {
-    final shouldStart = start || _expectedRunning || _ref.read(isStartProvider);
+    final shouldStart =
+        system.isDesktop ||
+        start ||
+        _expectedRunning ||
+        _ref.read(isStartProvider);
     _recoverSession++;
     _ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
     await coreController.shutdown(true);
@@ -1331,6 +1340,9 @@ extension CommonControllerExt on AppController {
   }
 
   void updateStart() {
+    if (system.isDesktop) {
+      return;
+    }
     updateStatus(!_ref.read(isStartProvider));
   }
 

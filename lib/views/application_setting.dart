@@ -225,7 +225,7 @@ class ApplicationSettingView extends StatelessWidget {
     List<Widget> items = [
       MinimizeItem(),
       if (system.isDesktop) ...[AutoLaunchItem(), SilentLaunchItem()],
-      AutoRunItem(),
+      if (!system.isDesktop) AutoRunItem(),
       if (system.isAndroid) ...[HiddenItem()],
       AnimateTabItem(),
       OpenLogsItem(),

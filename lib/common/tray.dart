@@ -80,14 +80,6 @@ class Tray {
       },
     );
     menuItems.add(showMenuItem);
-    final startMenuItem = MenuItem.checkbox(
-      label: trayState.isStart ? appLocalizations.stop : appLocalizations.start,
-      onClick: (_) async {
-        appController.updateStart();
-      },
-      checked: false,
-    );
-    menuItems.add(startMenuItem);
     if (system.isMacOS) {
       final speedStatistics = MenuItem.checkbox(
         label: appLocalizations.speedStatistics,
@@ -141,27 +133,25 @@ class Tray {
         menuItems.add(MenuItem.separator());
       }
     }
-    if (trayState.isStart) {
-      menuItems.add(
-        MenuItem.checkbox(
-          label: appLocalizations.tun,
-          onClick: (_) {
-            appController.updateTun();
-          },
-          checked: trayState.tunEnable,
-        ),
-      );
-      menuItems.add(
-        MenuItem.checkbox(
-          label: appLocalizations.systemProxy,
-          onClick: (_) {
-            appController.updateSystemProxy();
-          },
-          checked: trayState.systemProxy,
-        ),
-      );
-      menuItems.add(MenuItem.separator());
-    }
+    menuItems.add(
+      MenuItem.checkbox(
+        label: appLocalizations.tun,
+        onClick: (_) {
+          appController.updateTun();
+        },
+        checked: trayState.tunEnable,
+      ),
+    );
+    menuItems.add(
+      MenuItem.checkbox(
+        label: appLocalizations.systemProxy,
+        onClick: (_) {
+          appController.updateSystemProxy();
+        },
+        checked: trayState.systemProxy,
+      ),
+    );
+    menuItems.add(MenuItem.separator());
     final autoStartMenuItem = MenuItem.checkbox(
       label: appLocalizations.autoLaunch,
       onClick: (_) async {

@@ -38,12 +38,15 @@ class HotKeyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hotActions = HotAction.values
+        .where((action) => action != HotAction.start)
+        .toList();
     return BaseScaffold(
       title: appLocalizations.hotkeyManagement,
       body: ListView.builder(
-        itemCount: HotAction.values.length,
+        itemCount: hotActions.length,
         itemBuilder: (_, index) {
-          final hotAction = HotAction.values[index];
+          final hotAction = hotActions[index];
           return Consumer(
             builder: (_, ref, _) {
               final hotKeyAction = ref.watch(
