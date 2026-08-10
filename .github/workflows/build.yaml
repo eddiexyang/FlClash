@@ -173,7 +173,7 @@ jobs:
           overwrite: true
 
   release:
-    if: ${{ github.ref == 'refs/heads/dev' || (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && !contains(github.ref_name, '+')) }}
+    if: ${{ github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' || (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && !contains(github.ref_name, '+')) }}
     permissions: write-all
     needs: [ build ]
     runs-on: ubuntu-latest
@@ -187,13 +187,15 @@ jobs:
         id: release
         shell: bash
         run: |
-          if [[ "$GITHUB_REF" == 'refs/heads/dev' ]]; then
-            git fetch origin dev
-            if [[ "$(git rev-parse origin/dev)" == "$GITHUB_SHA" ]]; then
+          if [[ "$GITHUB_REF" == 'refs/heads/dev' || "$GITHUB_REF" == 'refs/heads/main' ]]; then
+            branch="${GITHUB_REF#refs/heads/}"
+            git fetch origin "$branch"
+            if [[ "$(git rev-parse "origin/$branch")" == "$GITHUB_SHA" ]]; then
               echo 'eligible=true' >> "$GITHUB_OUTPUT"
+              echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
             else
               echo 'eligible=false' >> "$GITHUB_OUTPUT"
-              echo 'A newer dev commit exists; skipping stale release.'
+              echo "A newer $branch commit exists; skipping stale release."
             fi
             exit 0
           fi
@@ -230,6 +232,18 @@ jobs:
           prerelease: true
           make_latest: false
           overwrite_files: true
+          files: ./dist/**/*
+          fail_on_unmatched_files: true
+
+      - name: Release main
+        if: steps.release.outputs.eligible == 'true' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.release.outputs.short_sha }}
+          tag_name: ${{ steps.release.outputs.short_sha }}
+          target_commitish: ${{ github.sha }}
+          prerelease: false
+          make_latest: true
           files: ./dist/**/*
           fail_on_unmatched_files: true
 

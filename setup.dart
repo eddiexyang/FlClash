@@ -93,20 +93,6 @@ class Build {
 
   static String get appName => 'FlClash';
 
-  static String get appVersion {
-    final pubspec = File(join(current, 'pubspec.yaml')).readAsStringSync();
-    final match = RegExp(
-      r'^version:\s*([^\s]+)\s*$',
-      multiLine: true,
-    ).firstMatch(pubspec);
-    if (match == null) {
-      throw 'Version not found in pubspec.yaml';
-    }
-    return match.group(1)!;
-  }
-
-  static String get appBuildName => appVersion.split('+').first;
-
   static String get coreName => 'FlClashCore';
 
   static String get libName => 'libclash';
@@ -530,9 +516,7 @@ class BuildCommand extends Command {
       ],
       name: 'android',
     );
-    final outputDirectory = Directory(
-      join(Build.distPath, Build.appVersion),
-    );
+    final outputDirectory = Directory(Build.distPath);
     await outputDirectory.create(recursive: true);
     for (final target in selectedTargets) {
       final source = File(
@@ -550,7 +534,7 @@ class BuildCommand extends Command {
       }
       final destination = join(
         outputDirectory.path,
-        '${Build.appName}-${Build.appBuildName}-android-${target.abi}.apk',
+        '${Build.appName}-android-${target.abi}.apk',
       );
       await source.copy(destination);
     }
@@ -599,7 +583,7 @@ class BuildCommand extends Command {
           target: target,
           targets: 'exe,zip',
           artifactName:
-              '${Build.appName}-{{build_name}}-windows-$archName'
+              '${Build.appName}-windows-$archName'
               '{{#is_installer}}-setup{{/is_installer}}.{{ext}}',
           env: env,
         );
@@ -616,8 +600,7 @@ class BuildCommand extends Command {
         await _buildDistributor(
           target: target,
           targets: targets,
-          artifactName:
-              '${Build.appName}-{{build_name}}-linux-$archName.{{ext}}',
+          artifactName: '${Build.appName}-linux-$archName.{{ext}}',
           args: ' --build-target-platform $defaultTarget',
           env: env,
         );
@@ -634,8 +617,7 @@ class BuildCommand extends Command {
         await _buildDistributor(
           target: target,
           targets: 'dmg',
-          artifactName:
-              '${Build.appName}-{{build_name}}-macos-$archName.{{ext}}',
+          artifactName: '${Build.appName}-macos-$archName.{{ext}}',
           env: env,
         );
         return;
