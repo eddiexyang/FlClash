@@ -47,7 +47,7 @@ class _NetworkSpeedState extends State<NetworkSpeed> {
 
   @override
   Widget build(BuildContext context) {
-    final color = context.colorScheme.onSurfaceVariant.opacity80;
+    final color = context.colorScheme.onSurface;
     return SizedBox(
       height: getWidgetHeight(2),
       child: RepaintBoundary(

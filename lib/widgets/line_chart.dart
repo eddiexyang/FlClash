@@ -129,6 +129,7 @@ class _LineChartState extends State<LineChart>
           animation: _controller.view,
           builder: (_, _) {
             final colorScheme = Theme.of(context).colorScheme;
+            final foregroundColor = colorScheme.onSurface;
             return CustomPaint(
               painter: LineChartPainter(
                 prevRenderPoints: _prevRenderPoints,
@@ -138,11 +139,11 @@ class _LineChartState extends State<LineChart>
                 color: widget.color,
                 prevMaxY: _prevMaxY,
                 currentMaxY: _currentMaxY,
-                axisColor: colorScheme.onSurfaceVariant,
-                gridColor: colorScheme.outline,
+                axisColor: foregroundColor.withValues(alpha: 0.72),
+                gridColor: foregroundColor.withValues(alpha: 0.50),
                 labelStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
+                  color: foregroundColor,
+                  fontWeight: FontWeight.w600,
                 ),
                 textDirection: Directionality.of(context),
                 textScaler: MediaQuery.textScalerOf(context),
@@ -271,8 +272,8 @@ class LineChartPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          color.withValues(alpha: 0.18),
-          color.withValues(alpha: 0.02),
+          color.withValues(alpha: 0.30),
+          color.withValues(alpha: 0.06),
         ],
       );
 
