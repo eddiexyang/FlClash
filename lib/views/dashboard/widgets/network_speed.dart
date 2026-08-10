@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
@@ -15,29 +13,22 @@ class NetworkSpeed extends StatefulWidget {
 }
 
 class _NetworkSpeedState extends State<NetworkSpeed> {
-  List<Point> _getPoints(
-    List<Traffic> traffics,
-    List<DateTime> sampleTimes,
-  ) {
-    final sampleCount = math.min(traffics.length, sampleTimes.length);
-    if (sampleCount == 0) return const [];
+  List<Point> initPoints = const [Point(0, 0), Point(1, 0)];
 
-    final trafficOffset = traffics.length - sampleCount;
-    final timeOffset = sampleTimes.length - sampleCount;
-    final windowEnd = DateTime.now();
-    final windowStart = windowEnd.subtract(
-      const Duration(seconds: networkSpeedWindowSeconds),
-    );
-    final points = <Point>[];
-    for (var index = 0; index < sampleCount; index++) {
-      final sampleTime = sampleTimes[timeOffset + index];
-      if (sampleTime.isBefore(windowStart)) continue;
-      final elapsed = sampleTime.difference(windowStart);
-      final x = elapsed.inMicroseconds / Duration.microsecondsPerSecond;
-      final speed = traffics[trafficOffset + index].speed;
-      points.add(Point(x, speed.toDouble()));
-    }
-    return points;
+  List<Point> _getPoints(List<Traffic> traffics) {
+    List<Point> trafficPoints = traffics
+        .toList()
+        .asMap()
+        .map(
+          (index, e) => MapEntry(
+            index,
+            Point((index + initPoints.length).toDouble(), e.speed.toDouble()),
+          ),
+        )
+        .values
+        .toList();
+
+    return [...initPoints, ...trafficPoints];
   }
 
   Traffic _getLastTraffic(List<Traffic> traffics) {
@@ -47,7 +38,7 @@ class _NetworkSpeedState extends State<NetworkSpeed> {
 
   @override
   Widget build(BuildContext context) {
-    final color = context.colorScheme.onSurface;
+    final color = context.colorScheme.onSurfaceVariant.opacity80;
     return SizedBox(
       height: getWidgetHeight(2),
       child: RepaintBoundary(
@@ -55,11 +46,7 @@ class _NetworkSpeedState extends State<NetworkSpeed> {
           onPressed: () {},
           child: Consumer(
             builder: (_, ref, _) {
-              ref.watch(runTimeProvider);
               final traffics = ref.watch(trafficsProvider).list;
-              final sampleTimes = ref.read(
-                trafficsProvider.notifier,
-              ).sampleTimes;
               return Column(
                 children: [
                   Padding(
@@ -94,10 +81,7 @@ class _NetworkSpeedState extends State<NetworkSpeed> {
                       child: LineChart(
                         gradient: true,
                         color: Theme.of(context).colorScheme.primary,
-                        points: _getPoints(traffics, sampleTimes),
-                        minX: 0,
-                        maxX: networkSpeedWindowSeconds.toDouble(),
-                        xLabels: const ['-60s', '-30s', '0s'],
+                        points: _getPoints(traffics),
                       ),
                     ),
                   ),

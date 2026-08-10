@@ -10,11 +10,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class TrafficUsage extends StatelessWidget {
   const TrafficUsage({super.key});
 
-  static const _lightUploadColor = Color(0xFF0057B8);
-  static const _lightDownloadColor = Color(0xFFB83A00);
-  static const _darkUploadColor = Color(0xFF5CC8FF);
-  static const _darkDownloadColor = Color(0xFFFFB14E);
-
   Widget _buildTrafficDataItem(
     BuildContext context,
     Icon icon,
@@ -45,9 +40,7 @@ class TrafficUsage extends StatelessWidget {
         ),
         Text(
           trafficValue.traffic.unit,
-          style: context.textTheme.bodySmall?.copyWith(
-            color: context.colorScheme.onSurfaceVariant,
-          ),
+          style: context.textTheme.bodySmall?.toLighter,
         ),
       ],
     );
@@ -55,9 +48,8 @@ class TrafficUsage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDark ? _darkUploadColor : _lightUploadColor;
-    final secondaryColor = isDark ? _darkDownloadColor : _lightDownloadColor;
+    final primaryColor = globalState.theme.darken3PrimaryContainer;
+    final secondaryColor = globalState.theme.darken2SecondaryContainer;
     return SizedBox(
       height: getWidgetHeight(2),
       child: CommonCard(

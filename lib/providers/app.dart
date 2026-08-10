@@ -77,22 +77,16 @@ class SystemBrightness extends _$SystemBrightness
 
 @Riverpod(keepAlive: true)
 class Traffics extends _$Traffics with AutoDisposeNotifierMixin {
-  final FixedList<DateTime> _sampleTimes = FixedList(trafficHistoryLength);
-
   @override
   FixedList<Traffic> build() {
-    return FixedList(trafficHistoryLength);
+    return FixedList(0);
   }
 
-  List<DateTime> get sampleTimes => _sampleTimes.list;
-
   void addTraffic(Traffic value) {
-    _sampleTimes.add(DateTime.now());
     this.value = state.copyWith()..add(value);
   }
 
   void clear() {
-    _sampleTimes.clear();
     value = state.copyWith()..clear();
   }
 }

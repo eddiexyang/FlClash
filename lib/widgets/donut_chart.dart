@@ -11,7 +11,7 @@ class DonutChartData {
   const DonutChartData({
     required double value,
     required this.color,
-  }) : _value = value < 0 ? 0 : value;
+  }) : _value = value + 1;
 
   double get value => _value;
 
@@ -86,7 +86,6 @@ class _DonutChartState extends State<DonutChart>
             _oldData,
             widget.data,
             _animationController.value,
-            Theme.of(context).colorScheme.outline,
           ),
         );
       },
@@ -98,22 +97,30 @@ class DonutChartPainter extends CustomPainter {
   final List<DonutChartData> oldData;
   final List<DonutChartData> newData;
   final double progress;
-  final Color trackColor;
 
   late final Paint _arcPaint;
 
   List<DonutChartData>? _cachedInterpolatedData;
   double? _cachedProgress;
 
-  DonutChartPainter(
-    this.oldData,
-    this.newData,
-    this.progress,
-    this.trackColor,
-  ) {
+  DonutChartPainter(this.oldData, this.newData, this.progress) {
     _arcPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
+  }
+
+  static const _logBase = 10.0;
+  static const _minValue = 0.1;
+  static final _logBaseInv = 1.0 / log(_logBase);
+
+  double _logTransform(double value) {
+    if (value < _minValue) return 0;
+    return log(value) * _logBaseInv + 1;
+  }
+
+  double _expTransform(double value) {
+    if (value <= 0) return 0;
+    return pow(_logBase, value - 1).toDouble();
   }
 
   List<DonutChartData> get _interpolatedData {
@@ -137,7 +144,12 @@ class DonutChartPainter extends CustomPainter {
     for (var i = 0; i < newData.length; i++) {
       final oldValue = oldData[i].value;
       final newValue = newData[i].value;
-      final interpolatedValue = oldValue + (newValue - oldValue) * progress;
+      final logOldValue = _logTransform(oldValue);
+      final logNewValue = _logTransform(newValue);
+      final interpolatedLogValue =
+          logOldValue + (logNewValue - logOldValue) * progress;
+
+      final interpolatedValue = _expTransform(interpolatedLogValue);
 
       result.add(DonutChartData(
         value: interpolatedValue,
@@ -160,24 +172,19 @@ class DonutChartPainter extends CustomPainter {
       total += item.value;
     }
 
+    if (total <= 0) return;
+
     final center = Offset(size.width / 2, size.height / 2);
     final strokeWidth = 10.0.ap;
     final radius = min(size.width / 2, size.height / 2) - strokeWidth / 2;
-    if (radius <= 0) return;
 
-    _arcPaint.strokeWidth = strokeWidth;
-    if (total <= 0) {
-      _arcPaint.color = trackColor;
-      canvas.drawCircle(center, radius, _arcPaint);
-      return;
-    }
-
-    final gapRatio = (strokeWidth / (2 * radius)).clamp(0.0, 1.0);
-    final gapAngle = 2 * asin(gapRatio) * 1.2;
+    final gapAngle = 2 * asin(strokeWidth * 1 / (2 * radius)) * 1.2;
     final availableAngle = 2 * pi - (data.length * gapAngle);
     final totalInv = 1.0 / total;
 
     double startAngle = -pi / 2 + gapAngle / 2;
+
+    _arcPaint.strokeWidth = strokeWidth;
 
     for (final item in data) {
       final sweepAngle = availableAngle * (item.value * totalInv);
@@ -202,7 +209,6 @@ class DonutChartPainter extends CustomPainter {
   bool shouldRepaint(DonutChartPainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.oldData != oldData ||
-        oldDelegate.newData != newData ||
-        oldDelegate.trackColor != trackColor;
+        oldDelegate.newData != newData;
   }
 }
