@@ -686,7 +686,7 @@ class _ProxyChainBar extends StatelessWidget {
 class _ChainInsertTarget extends StatelessWidget {
   final ValueChanged<_ProxyChainDragData> onAccept;
 
-  const _ChainInsertTarget({super.key, required this.onAccept});
+  const _ChainInsertTarget({required this.onAccept});
 
   @override
   Widget build(BuildContext context) {
@@ -718,7 +718,6 @@ class _ChainHop extends StatelessWidget {
   final VoidCallback onRemove;
 
   const _ChainHop({
-    super.key,
     required this.proxy,
     required this.index,
     required this.onRemove,
