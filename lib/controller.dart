@@ -28,7 +28,7 @@ class AppController {
   DateTime? _lastCoreHealthCheck;
   Future<void> _configApplyQueue = Future.value();
   Future<void> _proxyChainApplyQueue = Future.value();
-  List<String> _proxyChain = [];
+  final Map<int, List<String>> _proxyChains = {};
   int _routeConfigRevision = 0;
   int? _pendingRouteDetectionRevision;
   int? _pendingRouteDetectionCheckId;
@@ -351,13 +351,26 @@ extension LogsControllerExt on AppController {
 }
 
 extension ProxiesControllerExt on AppController {
-  List<String> get proxyChain => List.unmodifiable(_proxyChain);
+  List<String> get proxyChain {
+    final profileId = currentProfile?.id;
+    if (profileId == null) {
+      return const [];
+    }
+    return List.unmodifiable(_proxyChains[profileId] ?? const []);
+  }
 
   Future<String> updateProxyChain(List<String> proxyNames) async {
-    _proxyChain = List<String>.from(proxyNames);
-    final pendingChain = List<String>.from(_proxyChain);
+    final pendingChain = List<String>.from(proxyNames);
+    final profileId = currentProfile?.id;
+    if (profileId == null) {
+      return '';
+    }
+    _proxyChains[profileId] = pendingChain;
     var message = '';
     final apply = _proxyChainApplyQueue.then((_) async {
+      if (profileId != currentProfile?.id) {
+        return;
+      }
       message = await coreController.updateProxyChain(pendingChain);
     });
     _proxyChainApplyQueue = apply.catchError((error, stackTrace) {
@@ -809,7 +822,7 @@ extension SetupControllerExt on AppController {
       preloadInvoke: preloadInvoke,
     );
     if (message.isEmpty) {
-      message = await updateProxyChain(_proxyChain);
+      message = await updateProxyChain(proxyChain);
       String? proxyGroupName;
       for (final entry in setupParams.selectedMap.entries) {
         if (entry.key.toLowerCase() == GroupName.Proxy.name.toLowerCase() &&
@@ -940,7 +953,7 @@ extension SetupControllerExt on AppController {
         params: setupParams,
       );
       final restoredMessage = retryMessage.isEmpty
-          ? await updateProxyChain(_proxyChain)
+          ? await updateProxyChain(proxyChain)
           : retryMessage;
       return _SetupConfigMessageResult(
         message: restoredMessage,

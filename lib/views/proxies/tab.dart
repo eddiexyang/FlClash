@@ -22,7 +22,10 @@ const _chainBarFabGap = 12.0;
 const _chainProxy = Proxy(name: internalChainProxyName, type: 'Relay');
 
 bool _isChainGroup(Group group) {
-  return group.name.toLowerCase() == GroupName.Proxy.name.toLowerCase();
+  final isSelectable =
+      group.type == GroupType.Selector || group.type.isComputedSelected;
+  return isSelectable &&
+      group.name.toLowerCase() == GroupName.Proxy.name.toLowerCase();
 }
 
 @immutable
@@ -47,20 +50,13 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
   TabController? _tabController;
   final _hasMoreButtonNotifier = ValueNotifier<bool>(false);
   final _chainBarKey = GlobalKey();
-  late final List<Proxy> _chain;
+  final List<Proxy> _chain = [];
+  int? _chainProfileId;
   ProxyGroupViewKeyMap _keyMap = {};
 
   @override
   void initState() {
     super.initState();
-    final proxiesByName = {
-      for (final group in appController.groups)
-        for (final proxy in group.all) proxy.name: proxy,
-    };
-    _chain = appController.proxyChain
-        .map((name) => proxiesByName[name])
-        .whereType<Proxy>()
-        .toList();
     ref.listenManual(proxiesTabControllerStateProvider, (prev, next) {
       if (prev == next) {
         return;
@@ -148,6 +144,28 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
       _chain.removeAt(index);
     });
     _applyChain();
+  }
+
+  void _syncChainProfile(List<Group> groups) {
+    final profileId = appController.currentProfile?.id;
+    final chainNames = appController.proxyChain;
+    final currentNames = _chain.map((proxy) => proxy.name).toList();
+    if (_chainProfileId == profileId &&
+        stringListEquality.equals(currentNames, chainNames)) {
+      return;
+    }
+    final proxiesByName = {
+      for (final group in groups)
+        for (final proxy in group.all) proxy.name: proxy,
+    };
+    _chainProfileId = profileId;
+    _chain
+      ..clear()
+      ..addAll(
+        chainNames
+            .map((name) => proxiesByName[name])
+            .whereType<Proxy>(),
+      );
   }
 
   Widget _buildMoreButton() {
@@ -256,6 +274,10 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     ref.watch(themeSettingProvider.select((state) => state.textScale));
     final state = ref.watch(proxiesTabStateProvider.select((state) => state));
     final groups = state.groups;
+    final allGroups = ref.watch(
+      currentGroupsStateProvider.select((state) => state.value),
+    );
+    _syncChainProfile(allGroups);
     if (groups.isEmpty || _tabController == null) {
       return NullStatus(
         illustration: ProxyEmptyIllustration(),
@@ -465,7 +487,7 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
             );
           }
           final proxyIndex = index - (hasChainNode ? 1 : 0);
-          final proxy = currentProxies[proxyIndex];
+          final proxy = proxies[proxyIndex];
           final card = ProxyCard(
             testUrl: group.testUrl,
             groupType: group.type,
