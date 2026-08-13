@@ -5,6 +5,7 @@ import 'package:fl_clash/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/common.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -330,7 +331,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
                   16 + _chainBarHeight + _chainBarFabGap,
               bottom: 16,
             ),
-            child: ProxyChainBar(
+            child: _ProxyChainBar(
               key: _chainBarKey,
               proxies: _chain,
               onDrop: _insertChainNode,
@@ -603,12 +604,12 @@ class DraggableProxyCard extends StatelessWidget {
   }
 }
 
-class ProxyChainBar extends StatelessWidget {
+class _ProxyChainBar extends StatelessWidget {
   final List<Proxy> proxies;
   final void Function(_ProxyChainDragData data, int index) onDrop;
   final void Function(int index) onRemove;
 
-  const ProxyChainBar({
+  const _ProxyChainBar({
     super.key,
     required this.proxies,
     required this.onDrop,
@@ -660,11 +661,11 @@ class ProxyChainBar extends StatelessWidget {
                   child: Row(
                     children: [
                       for (var index = 0; index <= proxies.length; index++) ...[
-                        ChainInsertTarget(
+                        _ChainInsertTarget(
                           onAccept: (data) => onDrop(data, index),
                         ),
                         if (index < proxies.length)
-                          ChainHop(
+                          _ChainHop(
                             proxy: proxies[index],
                             index: index,
                             onRemove: () => onRemove(index),
@@ -682,10 +683,10 @@ class ProxyChainBar extends StatelessWidget {
   }
 }
 
-class ChainInsertTarget extends StatelessWidget {
+class _ChainInsertTarget extends StatelessWidget {
   final ValueChanged<_ProxyChainDragData> onAccept;
 
-  const ChainInsertTarget({super.key, required this.onAccept});
+  const _ChainInsertTarget({super.key, required this.onAccept});
 
   @override
   Widget build(BuildContext context) {
@@ -711,12 +712,12 @@ class ChainInsertTarget extends StatelessWidget {
   }
 }
 
-class ChainHop extends StatelessWidget {
+class _ChainHop extends StatelessWidget {
   final Proxy proxy;
   final int index;
   final VoidCallback onRemove;
 
-  const ChainHop({
+  const _ChainHop({
     super.key,
     required this.proxy,
     required this.index,
