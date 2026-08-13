@@ -19,6 +19,8 @@ typedef ProxyGroupViewKeyMap =
 const _chainBarHeight = 56.0;
 const _chainBarFabGap = 12.0;
 
+const _chainProxy = Proxy(name: internalChainProxyName, type: 'Relay');
+
 bool _isChainGroup(Group group) {
   return group.name.toLowerCase() == GroupName.Proxy.name.toLowerCase();
 }
@@ -45,12 +47,20 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
   TabController? _tabController;
   final _hasMoreButtonNotifier = ValueNotifier<bool>(false);
   final _chainBarKey = GlobalKey();
-  final List<Proxy> _chain = [];
+  late final List<Proxy> _chain;
   ProxyGroupViewKeyMap _keyMap = {};
 
   @override
   void initState() {
     super.initState();
+    final proxiesByName = {
+      for (final group in appController.groups)
+        for (final proxy in group.all) proxy.name: proxy,
+    };
+    _chain = appController.proxyChain
+        .map((name) => proxiesByName[name])
+        .whereType<Proxy>()
+        .toList();
     ref.listenManual(proxiesTabControllerStateProvider, (prev, next) {
       if (prev == next) {
         return;
@@ -79,7 +89,33 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
   Future<void> delayTestCurrentGroup() async {
     final currentGroupName = appController.getCurrentGroupName();
     final currentState = _keyMap[currentGroupName]?.currentState;
-    await delayTest(currentState?.currentProxies ?? [], currentState?.testUrl);
+    try {
+      if (currentState != null && _isChainGroup(currentState.widget.group)) {
+        final message = await appController.updateProxyChain(
+          appController.proxyChain,
+        );
+        if (message.isNotEmpty) {
+          globalState.showNotifier(message);
+          return;
+        }
+      }
+      await delayTest(currentState?.currentProxies ?? [], currentState?.testUrl);
+    } catch (error) {
+      globalState.showNotifier(error.toString());
+    }
+  }
+
+  void _applyChain() {
+    appController
+        .updateProxyChain(_chain.map((proxy) => proxy.name).toList())
+        .then((message) {
+          if (message.isNotEmpty) {
+            globalState.showNotifier(message);
+          }
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          globalState.showNotifier(error.toString());
+        });
   }
 
   void _insertChainNode(_ProxyChainDragData data, int targetIndex) {
@@ -101,6 +137,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
       }
       _chain.insert(insertIndex, data.proxy);
     });
+    _applyChain();
   }
 
   void _removeChainNode(int index) {
@@ -110,18 +147,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     setState(() {
       _chain.removeAt(index);
     });
-  }
-
-  void _focusChainBar() {
-    final chainBarContext = _chainBarKey.currentContext;
-    if (chainBarContext == null) {
-      return;
-    }
-    Scrollable.ensureVisible(
-      chainBarContext,
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-    );
+    _applyChain();
   }
 
   Widget _buildMoreButton() {
@@ -317,8 +343,6 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
                   group: group,
                   columns: state.columns,
                   cardType: state.proxyCardType,
-                  chainLength: _chain.length,
-                  onChainPressed: _focusChainBar,
                 ),
             ],
           ),
@@ -347,16 +371,12 @@ class ProxyGroupView extends ConsumerStatefulWidget {
   final Group group;
   final int columns;
   final ProxyCardType cardType;
-  final int chainLength;
-  final VoidCallback onChainPressed;
 
   const ProxyGroupView({
     super.key,
     required this.group,
     required this.columns,
     required this.cardType,
-    required this.chainLength,
-    required this.onChainPressed,
   });
 
   @override
@@ -412,10 +432,12 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
-    final proxies = group.all;
     final hasChainNode = _isChainGroup(group);
+    final proxies = group.all
+        .where((proxy) => proxy.name != internalChainProxyName)
+        .toList();
     testUrl = group.testUrl;
-    currentProxies = proxies;
+    currentProxies = hasChainNode ? [_chainProxy, ...proxies] : proxies;
     return CommonScrollBar(
       controller: _controller,
       child: GridView.builder(
@@ -433,13 +455,13 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
           crossAxisSpacing: 8,
           mainAxisExtent: getItemHeight(widget.cardType),
         ),
-        itemCount: currentProxies.length + (hasChainNode ? 1 : 0),
+        itemCount: currentProxies.length,
         itemBuilder: (_, index) {
           if (hasChainNode && index == 0) {
             return ChainProxyCard(
               type: widget.cardType,
-              nodeCount: widget.chainLength,
-              onPressed: widget.onChainPressed,
+              groupName: group.name,
+              testUrl: group.testUrl,
             );
           }
           final proxyIndex = index - (hasChainNode ? 1 : 0);
@@ -465,46 +487,124 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
   }
 }
 
-class ChainProxyCard extends StatelessWidget {
+class ChainProxyCard extends ConsumerWidget {
   final ProxyCardType type;
-  final int nodeCount;
-  final VoidCallback onPressed;
+  final String groupName;
+  final String? testUrl;
 
   const ChainProxyCard({
     super.key,
     required this.type,
-    required this.nodeCount,
-    required this.onPressed,
+    required this.groupName,
+    required this.testUrl,
   });
 
-  @override
-  Widget build(BuildContext context) {
+  Future<void> _handleTestCurrentDelay() async {
+    try {
+      final message = await appController.updateProxyChain(
+        appController.proxyChain,
+      );
+      if (message.isNotEmpty) {
+        globalState.showNotifier(message);
+        return;
+      }
+      await proxyDelayTest(_chainProxy, testUrl);
+    } catch (error) {
+      globalState.showNotifier(error.toString());
+    }
+  }
+
+  Future<void> _selectChain() async {
+    try {
+      final message = await appController.updateProxyChain(
+        appController.proxyChain,
+      );
+      if (message.isNotEmpty) {
+        globalState.showNotifier(message);
+        return;
+      }
+      appController.updateCurrentSelectedMap(groupName, internalChainProxyName);
+      appController.changeProxyDebounce(groupName, internalChainProxyName);
+    } catch (error) {
+      globalState.showNotifier(error.toString());
+    }
+  }
+
+  Widget _buildDelayText(BuildContext context, WidgetRef ref) {
     final measure = globalState.measure;
-    final title = SizedBox(
-      height: measure.bodyMediumHeight * (type == ProxyCardType.min ? 1 : 2),
-      child: Row(
-        children: [
-          Icon(Icons.account_tree, size: measure.bodyMediumHeight),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              'Chain',
-              maxLines: type == ProxyCardType.min ? 1 : 2,
-              overflow: TextOverflow.ellipsis,
-              style: context.textTheme.bodyMedium,
-            ),
-          ),
-        ],
+    final delay = ref.watch(
+      getDelayProvider(proxyName: internalChainProxyName, testUrl: testUrl),
+    );
+    return SizedBox(
+      height: measure.labelSmallHeight,
+      child: FadeThroughBox(
+        alignment: type == ProxyCardType.expand
+            ? Alignment.centerLeft
+            : Alignment.centerRight,
+        child: delay == 0 || delay == null
+            ? SizedBox(
+                height: measure.labelSmallHeight,
+                width: measure.labelSmallHeight,
+                child: delay == 0
+                    ? const CircularProgressIndicator(strokeWidth: 2)
+                    : IconButton(
+                        icon: const Icon(Icons.bolt),
+                        iconSize: measure.labelSmallHeight,
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          _handleTestCurrentDelay();
+                        },
+                      ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  _handleTestCurrentDelay();
+                },
+                child: Text(
+                  delay > 0 ? '$delay ms' : 'Timeout',
+                  style: context.textTheme.labelSmall?.copyWith(
+                    overflow: TextOverflow.ellipsis,
+                    color: utils.getDelayColor(delay),
+                  ),
+                ),
+              ),
       ),
     );
-    final count = Text(
-      '$nodeCount',
-      style: context.textTheme.labelSmall?.copyWith(
-        color: context.colorScheme.primary,
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final measure = globalState.measure;
+    final title = Align(
+      alignment: Alignment.topLeft,
+      child: SizedBox(
+        height: measure.bodyMediumHeight * (type == ProxyCardType.min ? 1 : 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.account_tree, size: measure.bodyMediumHeight),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'Chain',
+                maxLines: type == ProxyCardType.min ? 1 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.textTheme.bodyMedium,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+    final delayText = _buildDelayText(context, ref);
+    final selectedProxyName = ref.watch(
+      getSelectedProxyNameProvider(groupName),
     );
     return CommonCard(
-      onPressed: onPressed,
+      onPressed: () {
+        _selectChain();
+      },
+      isSelected: selectedProxyName == internalChainProxyName,
       child: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -527,7 +627,7 @@ class ChainProxyCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              SizedBox(height: measure.labelSmallHeight, child: count),
+              delayText,
             ] else
               SizedBox(
                 height: measure.bodySmallHeight,
@@ -544,7 +644,7 @@ class ChainProxyCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    count,
+                    delayText,
                   ],
                 ),
               ),
@@ -649,11 +749,6 @@ class _ProxyChainBar extends StatelessWidget {
                   child: Icon(Icons.account_tree),
                 ),
               ),
-              VerticalDivider(
-                width: 1,
-                thickness: 1,
-                color: context.colorScheme.outlineVariant,
-              ),
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -669,6 +764,7 @@ class _ProxyChainBar extends StatelessWidget {
                             proxy: proxies[index],
                             index: index,
                             onRemove: () => onRemove(index),
+                            onDragOutside: () => onRemove(index),
                           ),
                       ],
                     ],
@@ -716,11 +812,13 @@ class _ChainHop extends StatelessWidget {
   final Proxy proxy;
   final int index;
   final VoidCallback onRemove;
+  final VoidCallback onDragOutside;
 
   const _ChainHop({
     required this.proxy,
     required this.index,
     required this.onRemove,
+    required this.onDragOutside,
   });
 
   Widget _buildHop(BuildContext context, {required bool canRemove}) {
@@ -782,6 +880,11 @@ class _ChainHop extends StatelessWidget {
         data: data,
         feedback: feedback,
         childWhenDragging: childWhenDragging,
+        onDragEnd: (details) {
+          if (!details.wasAccepted) {
+            onDragOutside();
+          }
+        },
         rootOverlay: true,
         child: child,
       );
@@ -790,6 +893,11 @@ class _ChainHop extends StatelessWidget {
       data: data,
       feedback: feedback,
       childWhenDragging: childWhenDragging,
+      onDragEnd: (details) {
+        if (!details.wasAccepted) {
+          onDragOutside();
+        }
+      },
       rootOverlay: true,
       child: child,
     );

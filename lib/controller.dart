@@ -27,6 +27,8 @@ class AppController {
   bool _healthRecoveryRequested = false;
   DateTime? _lastCoreHealthCheck;
   Future<void> _configApplyQueue = Future.value();
+  Future<void> _proxyChainApplyQueue = Future.value();
+  List<String> _proxyChain = [];
   int _routeConfigRevision = 0;
   int? _pendingRouteDetectionRevision;
   int? _pendingRouteDetectionCheckId;
@@ -349,6 +351,25 @@ extension LogsControllerExt on AppController {
 }
 
 extension ProxiesControllerExt on AppController {
+  List<String> get proxyChain => List.unmodifiable(_proxyChain);
+
+  Future<String> updateProxyChain(List<String> proxyNames) async {
+    _proxyChain = List<String>.from(proxyNames);
+    final pendingChain = List<String>.from(_proxyChain);
+    var message = '';
+    final apply = _proxyChainApplyQueue.then((_) async {
+      message = await coreController.updateProxyChain(pendingChain);
+    });
+    _proxyChainApplyQueue = apply.catchError((error, stackTrace) {
+      commonPrint.log(
+        'update_proxy_chain_queue_failed error=$error stack=$stackTrace',
+        logLevel: LogLevel.warning,
+      );
+    });
+    await apply;
+    return message;
+  }
+
   void updateGroupsDebounce([Duration? duration]) {
     debouncer.call(FunctionTag.updateGroups, updateGroups, duration: duration);
   }
@@ -787,6 +808,26 @@ extension SetupControllerExt on AppController {
       params: setupParams,
       preloadInvoke: preloadInvoke,
     );
+    if (message.isEmpty) {
+      message = await updateProxyChain(_proxyChain);
+      String? proxyGroupName;
+      for (final entry in setupParams.selectedMap.entries) {
+        if (entry.key.toLowerCase() == GroupName.Proxy.name.toLowerCase() &&
+            entry.value == internalChainProxyName) {
+          proxyGroupName = entry.key;
+          break;
+        }
+      }
+      if (message.isEmpty && proxyGroupName != null) {
+        message = await coreController.changeProxy(
+          ChangeProxyParams(
+            groupName: proxyGroupName,
+            proxyName: internalChainProxyName,
+            closeConnections: false,
+          ),
+        );
+      }
+    }
     var hasShownDialog = false;
     if (message.isNotEmpty) {
       final result = await _handleSetupConfigForMacOSSshAuthorization(
@@ -898,8 +939,11 @@ extension SetupControllerExt on AppController {
         setupState: setupState,
         params: setupParams,
       );
+      final restoredMessage = retryMessage.isEmpty
+          ? await updateProxyChain(_proxyChain)
+          : retryMessage;
       return _SetupConfigMessageResult(
-        message: retryMessage,
+        message: restoredMessage,
         hasShownDialog: true,
       );
     }

@@ -29,6 +29,8 @@ mixin CoreInterface {
 
   Future<ProxiesData> getProxies();
 
+  Future<String> updateProxyChain(List<String> proxyNames);
+
   Future<String> changeProxy(ChangeProxyParams changeProxyParams);
 
   Future<bool> startListener();
@@ -206,6 +208,15 @@ abstract class CoreHandlerInterface with CoreInterface {
     return data != null
         ? ProxiesData.fromJson(data)
         : ProxiesData(proxies: {}, all: []);
+  }
+
+  @override
+  Future<String> updateProxyChain(List<String> proxyNames) async {
+    return await _invoke<String>(
+          method: ActionMethod.updateProxyChain,
+          data: json.encode(proxyNames),
+        ) ??
+        '';
   }
 
   @override
