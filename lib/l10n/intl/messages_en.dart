@@ -73,11 +73,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Access Control Settings",
     ),
     "action": MessageLookupByLibrary.simpleMessage("Action"),
-    "action_mode": MessageLookupByLibrary.simpleMessage("Switch mode"),
-    "action_proxy": MessageLookupByLibrary.simpleMessage("System proxy"),
-    "action_start": MessageLookupByLibrary.simpleMessage("Start/Stop"),
-    "action_tun": MessageLookupByLibrary.simpleMessage("TUN"),
-    "action_view": MessageLookupByLibrary.simpleMessage("Show/Hide"),
     "add": MessageLookupByLibrary.simpleMessage("Add"),
     "addProfile": MessageLookupByLibrary.simpleMessage("Add Profile"),
     "addRule": MessageLookupByLibrary.simpleMessage("Add rule"),
@@ -357,13 +352,6 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "host": MessageLookupByLibrary.simpleMessage("Host"),
     "hostsDesc": MessageLookupByLibrary.simpleMessage("Add Hosts"),
-    "hotkeyConflict": MessageLookupByLibrary.simpleMessage("Hotkey conflict"),
-    "hotkeyManagement": MessageLookupByLibrary.simpleMessage(
-      "Hotkey Management",
-    ),
-    "hotkeyManagementDesc": MessageLookupByLibrary.simpleMessage(
-      "Use keyboard to control applications",
-    ),
     "hours": MessageLookupByLibrary.simpleMessage("Hours"),
     "hoursAgo": m6,
     "icon": MessageLookupByLibrary.simpleMessage("Icon"),
@@ -377,9 +365,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "importUrl": MessageLookupByLibrary.simpleMessage("Import from URL"),
     "infiniteTime": MessageLookupByLibrary.simpleMessage("Long term effective"),
     "init": MessageLookupByLibrary.simpleMessage("Init"),
-    "inputCorrectHotkey": MessageLookupByLibrary.simpleMessage(
-      "Please enter the correct hotkey",
-    ),
     "intelligentSelected": MessageLookupByLibrary.simpleMessage(
       "Intelligent selection",
     ),
@@ -474,7 +459,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "networkType": MessageLookupByLibrary.simpleMessage("Network type"),
     "neutralScheme": MessageLookupByLibrary.simpleMessage("Neutral"),
     "noData": MessageLookupByLibrary.simpleMessage("No data"),
-    "noHotKey": MessageLookupByLibrary.simpleMessage("No HotKey"),
     "noIcon": MessageLookupByLibrary.simpleMessage("None"),
     "noMoreInfoDesc": MessageLookupByLibrary.simpleMessage("No more info"),
     "noNetwork": MessageLookupByLibrary.simpleMessage("No network"),
@@ -548,9 +532,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "portTip": m11,
     "preferH3Desc": MessageLookupByLibrary.simpleMessage(
       "Prioritize the use of DOH\'s http/3",
-    ),
-    "pressKeyboard": MessageLookupByLibrary.simpleMessage(
-      "Please press the keyboard.",
     ),
     "preview": MessageLookupByLibrary.simpleMessage("Preview"),
     "process": MessageLookupByLibrary.simpleMessage("Process"),

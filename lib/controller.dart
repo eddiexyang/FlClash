@@ -1407,7 +1407,6 @@ extension BackupControllerExt on AppController {
           config.proxiesStyleProps;
       _ref.read(overrideDnsProvider.notifier).value = config.overrideDns;
       _ref.read(networkSettingProvider.notifier).value = config.networkProps;
-      _ref.read(hotKeyActionsProvider.notifier).value = config.hotKeyActions;
       return;
     } finally {
       await restoreDir.safeDelete(recursive: true);

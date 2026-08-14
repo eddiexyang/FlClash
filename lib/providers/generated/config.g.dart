@@ -378,59 +378,6 @@ abstract class _$OverrideDns extends $Notifier<bool> {
   }
 }
 
-@ProviderFor(HotKeyActions)
-const hotKeyActionsProvider = HotKeyActionsProvider._();
-
-final class HotKeyActionsProvider
-    extends $NotifierProvider<HotKeyActions, List<HotKeyAction>> {
-  const HotKeyActionsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'hotKeyActionsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$hotKeyActionsHash();
-
-  @$internal
-  @override
-  HotKeyActions create() => HotKeyActions();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<HotKeyAction> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<HotKeyAction>>(value),
-    );
-  }
-}
-
-String _$hotKeyActionsHash() => r'5512b83196646a49fa7307282315d9dccc658dc8';
-
-abstract class _$HotKeyActions extends $Notifier<List<HotKeyAction>> {
-  List<HotKeyAction> build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final created = build();
-    final ref = this.ref as $Ref<List<HotKeyAction>, List<HotKeyAction>>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<List<HotKeyAction>, List<HotKeyAction>>,
-              List<HotKeyAction>,
-              Object?,
-              Object?
-            >;
-    element.handleValue(ref, created);
-  }
-}
-
 @ProviderFor(ProxiesStyleSetting)
 const proxiesStyleSettingProvider = ProxiesStyleSettingProvider._();
 

@@ -64,14 +64,6 @@ class OverrideDns extends _$OverrideDns with AutoDisposeNotifierMixin {
 }
 
 @riverpod
-class HotKeyActions extends _$HotKeyActions with AutoDisposeNotifierMixin {
-  @override
-  List<HotKeyAction> build() {
-    return [];
-  }
-}
-
-@riverpod
 class ProxiesStyleSetting extends _$ProxiesStyleSetting
     with AutoDisposeNotifierMixin {
   @override
@@ -98,7 +90,6 @@ Config _config(Ref ref) {
   final themeProps = ref.watch(themeSettingProvider);
   final currentProfileId = ref.watch(currentProfileIdProvider);
   final overrideDns = ref.watch(overrideDnsProvider);
-  final hotKeyActions = ref.watch(hotKeyActionsProvider);
   final proxiesStyleProps = ref.watch(proxiesStyleSettingProvider);
   final patchClashConfig = ref.watch(patchClashConfigProvider);
   return Config(
@@ -109,7 +100,6 @@ Config _config(Ref ref) {
     themeProps: themeProps,
     currentProfileId: currentProfileId,
     overrideDns: overrideDns,
-    hotKeyActions: hotKeyActions,
     proxiesStyleProps: proxiesStyleProps,
     patchClashConfig: patchClashConfig,
   );
@@ -126,7 +116,6 @@ List<Override> buildConfigOverrides(Config config) {
       (_, _) => config.currentProfileId,
     ),
     overrideDnsProvider.overrideWithBuild((_, _) => config.overrideDns),
-    hotKeyActionsProvider.overrideWithBuild((_, _) => config.hotKeyActions),
     proxiesStyleSettingProvider.overrideWithBuild(
       (_, _) => config.proxiesStyleProps,
     ),

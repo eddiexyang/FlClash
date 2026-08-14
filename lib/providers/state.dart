@@ -435,16 +435,6 @@ Set<String> unfoldSet(Ref ref) {
 }
 
 @riverpod
-HotKeyAction getHotKeyAction(Ref ref, HotAction hotAction) {
-  return ref.watch(
-    hotKeyActionsProvider.select((state) {
-      final index = state.indexWhere((item) => item.action == hotAction);
-      return index != -1 ? state[index] : HotKeyAction(action: hotAction);
-    }),
-  );
-}
-
-@riverpod
 Profile? currentProfile(Ref ref) {
   final profileId = ref.watch(currentProfileIdProvider);
   return ref.watch(

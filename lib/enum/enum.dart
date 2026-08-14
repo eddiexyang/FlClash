@@ -7,9 +7,7 @@ import 'package:fl_clash/common/system.dart';
 import 'package:fl_clash/views/dashboard/widgets/widgets.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hotkey_manager/hotkey_manager.dart';
 
 enum SupportPlatform {
   Windows,
@@ -168,34 +166,6 @@ enum ExternalControllerStatus {
 
   const ExternalControllerStatus(this.value);
 }
-
-enum KeyboardModifier {
-  alt([PhysicalKeyboardKey.altLeft, PhysicalKeyboardKey.altRight]),
-  capsLock([PhysicalKeyboardKey.capsLock]),
-  control([PhysicalKeyboardKey.controlLeft, PhysicalKeyboardKey.controlRight]),
-  fn([PhysicalKeyboardKey.fn]),
-  meta([PhysicalKeyboardKey.metaLeft, PhysicalKeyboardKey.metaRight]),
-  shift([PhysicalKeyboardKey.shiftLeft, PhysicalKeyboardKey.shiftRight]);
-
-  final List<PhysicalKeyboardKey> physicalKeys;
-
-  const KeyboardModifier(this.physicalKeys);
-}
-
-extension KeyboardModifierExt on KeyboardModifier {
-  HotKeyModifier toHotKeyModifier() {
-    return switch (this) {
-      KeyboardModifier.alt => HotKeyModifier.alt,
-      KeyboardModifier.capsLock => HotKeyModifier.capsLock,
-      KeyboardModifier.control => HotKeyModifier.control,
-      KeyboardModifier.fn => HotKeyModifier.fn,
-      KeyboardModifier.meta => HotKeyModifier.meta,
-      KeyboardModifier.shift => HotKeyModifier.shift,
-    };
-  }
-}
-
-enum HotAction { start, view, mode, proxy, tun }
 
 enum ProxiesIconStyle { none, standard, icon }
 

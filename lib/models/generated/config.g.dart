@@ -299,11 +299,6 @@ const _$DynamicSchemeVariantEnumMap = {
 _Config _$ConfigFromJson(Map<String, dynamic> json) => _Config(
   currentProfileId: (json['currentProfileId'] as num?)?.toInt(),
   overrideDns: json['overrideDns'] as bool? ?? false,
-  hotKeyActions:
-      (json['hotKeyActions'] as List<dynamic>?)
-          ?.map((e) => HotKeyAction.fromJson(e as Map<String, dynamic>))
-          .toList() ??
-      const [],
   appSettingProps: json['appSettingProps'] == null
       ? defaultAppSettingProps
       : AppSettingProps.safeFromJson(
@@ -334,7 +329,6 @@ _Config _$ConfigFromJson(Map<String, dynamic> json) => _Config(
 Map<String, dynamic> _$ConfigToJson(_Config instance) => <String, dynamic>{
   'currentProfileId': instance.currentProfileId,
   'overrideDns': instance.overrideDns,
-  'hotKeyActions': instance.hotKeyActions,
   'appSettingProps': instance.appSettingProps,
   'networkProps': instance.networkProps,
   'vpnProps': instance.vpnProps,

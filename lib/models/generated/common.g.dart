@@ -176,43 +176,6 @@ const _$GroupTypeEnumMap = {
   GroupType.Relay: 'Relay',
 };
 
-_HotKeyAction _$HotKeyActionFromJson(Map<String, dynamic> json) =>
-    _HotKeyAction(
-      action: $enumDecode(_$HotActionEnumMap, json['action']),
-      key: (json['key'] as num?)?.toInt(),
-      modifiers:
-          (json['modifiers'] as List<dynamic>?)
-              ?.map((e) => $enumDecode(_$KeyboardModifierEnumMap, e))
-              .toSet() ??
-          const {},
-    );
-
-Map<String, dynamic> _$HotKeyActionToJson(_HotKeyAction instance) =>
-    <String, dynamic>{
-      'action': _$HotActionEnumMap[instance.action]!,
-      'key': instance.key,
-      'modifiers': instance.modifiers
-          .map((e) => _$KeyboardModifierEnumMap[e]!)
-          .toList(),
-    };
-
-const _$HotActionEnumMap = {
-  HotAction.start: 'start',
-  HotAction.view: 'view',
-  HotAction.mode: 'mode',
-  HotAction.proxy: 'proxy',
-  HotAction.tun: 'tun',
-};
-
-const _$KeyboardModifierEnumMap = {
-  KeyboardModifier.alt: 'alt',
-  KeyboardModifier.capsLock: 'capsLock',
-  KeyboardModifier.control: 'control',
-  KeyboardModifier.fn: 'fn',
-  KeyboardModifier.meta: 'meta',
-  KeyboardModifier.shift: 'shift',
-};
-
 _Script _$ScriptFromJson(Map<String, dynamic> json) => _Script(
   id: (json['id'] as num).toInt(),
   label: json['label'] as String,
