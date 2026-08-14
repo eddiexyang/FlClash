@@ -105,15 +105,6 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
           currentProxies = currentProxies
               .where((proxy) => proxy.name != internalChainProxyName)
               .toList();
-        } else {
-          final message = await appController.updateProxyChain(
-            proxyChain,
-            closeConnections: false,
-          );
-          if (message.isNotEmpty) {
-            globalState.showNotifier(message);
-            return;
-          }
         }
       }
       await delayTest(currentProxies, currentState?.testUrl);
@@ -579,35 +570,15 @@ class ChainProxyCard extends ConsumerWidget {
         _rejectEmptyChainDelay(testUrl);
         return;
       }
-      final message = await appController.updateProxyChain(
-        proxyChain,
-        closeConnections: false,
-      );
-      if (message.isNotEmpty) {
-        globalState.showNotifier(message);
-        return;
-      }
       await proxyDelayTest(_chainProxy, testUrl);
     } catch (error) {
       globalState.showNotifier(error.toString());
     }
   }
 
-  Future<void> _selectChain() async {
-    try {
-      final message = await appController.updateProxyChain(
-        appController.proxyChain,
-        closeConnections: false,
-      );
-      if (message.isNotEmpty) {
-        globalState.showNotifier(message);
-        return;
-      }
-      appController.updateCurrentSelectedMap(groupName, internalChainProxyName);
-      appController.changeProxyDebounce(groupName, internalChainProxyName);
-    } catch (error) {
-      globalState.showNotifier(error.toString());
-    }
+  void _selectChain() {
+    appController.updateCurrentSelectedMap(groupName, internalChainProxyName);
+    appController.changeProxyDebounce(groupName, internalChainProxyName);
   }
 
   Widget _buildDelayText(BuildContext context, WidgetRef ref) {
