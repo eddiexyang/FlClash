@@ -796,9 +796,6 @@ class TrackerInfoDetailView extends StatelessWidget {
                       index == chains.length - 1
                           ? chains[index]
                           : '${chains[index]} →',
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
                       style: style,
                     ),
                 ],
