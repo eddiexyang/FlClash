@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/common.dart';
+import 'package:fl_clash/models/core.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -20,6 +21,16 @@ const _chainBarHeight = 56.0;
 const _chainBarFabGap = 12.0;
 
 const _chainProxy = Proxy(name: internalChainProxyName, type: 'Relay');
+
+void _rejectEmptyChainDelay(String? testUrl) {
+  appController.setDelay(
+    Delay(
+      name: internalChainProxyName,
+      url: appController.getRealTestUrl(testUrl),
+      value: -1,
+    ),
+  );
+}
 
 bool _isChainGroup(Group group) {
   final isSelectable =
@@ -85,17 +96,24 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
   Future<void> delayTestCurrentGroup() async {
     final currentGroupName = appController.getCurrentGroupName();
     final currentState = _keyMap[currentGroupName]?.currentState;
+    List<Proxy> currentProxies = currentState?.currentProxies ?? const [];
     try {
       if (currentState != null && _isChainGroup(currentState.widget.group)) {
-        final message = await appController.updateProxyChain(
-          appController.proxyChain,
-        );
-        if (message.isNotEmpty) {
-          globalState.showNotifier(message);
-          return;
+        final proxyChain = appController.proxyChain;
+        if (proxyChain.isEmpty) {
+          _rejectEmptyChainDelay(currentState.testUrl);
+          currentProxies = currentProxies
+              .where((proxy) => proxy.name != internalChainProxyName)
+              .toList();
+        } else {
+          final message = await appController.updateProxyChain(proxyChain);
+          if (message.isNotEmpty) {
+            globalState.showNotifier(message);
+            return;
+          }
         }
       }
-      await delayTest(currentState?.currentProxies ?? [], currentState?.testUrl);
+      await delayTest(currentProxies, currentState?.testUrl);
     } catch (error) {
       globalState.showNotifier(error.toString());
     }
@@ -523,9 +541,12 @@ class ChainProxyCard extends ConsumerWidget {
 
   Future<void> _handleTestCurrentDelay() async {
     try {
-      final message = await appController.updateProxyChain(
-        appController.proxyChain,
-      );
+      final proxyChain = appController.proxyChain;
+      if (proxyChain.isEmpty) {
+        _rejectEmptyChainDelay(testUrl);
+        return;
+      }
+      final message = await appController.updateProxyChain(proxyChain);
       if (message.isNotEmpty) {
         globalState.showNotifier(message);
         return;
