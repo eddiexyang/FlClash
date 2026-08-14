@@ -30,6 +30,7 @@ class AppController {
   Future<void> _proxyChainApplyQueue = Future.value();
   final Map<int, List<String>> _proxyChains = {};
   final Map<int, Map<String, Map<String, dynamic>>> _proxyChainSources = {};
+  final Map<int, List<String>> _proxyChainAvailableProxyNames = {};
   final Map<int, List<Map<String, dynamic>>> _proxyChainRuntimeProxies = {};
   int _routeConfigRevision = 0;
   int? _pendingRouteDetectionRevision;
@@ -392,6 +393,7 @@ extension ProxiesControllerExt on AppController {
           return message;
         }
         _proxyChains[profileId] = pendingChain;
+        _proxyChainRuntimeProxies[profileId] = chainProxies;
         return '';
       } catch (error, stackTrace) {
         commonPrint.log(
@@ -441,11 +443,14 @@ extension ProxiesControllerExt on AppController {
           final selectedMap = _ref.read(
             currentProfileProvider.select((state) => state?.selectedMap ?? {}),
           );
+          final profileId = _ref.read(currentProfileProvider)?.id;
           return await coreController.getProxiesGroups(
             selectedMap: selectedMap,
             sortType: sortType,
             delayMap: delayMap,
             defaultTestUrl: testUrl,
+            chainProxyNames:
+                _proxyChainAvailableProxyNames[profileId] ?? const [],
           );
         },
         retryIf: (res) => res.isEmpty,
@@ -467,6 +472,9 @@ extension ProxiesControllerExt on AppController {
   }
 
   void updateCurrentSelectedMap(String groupName, String proxyName) {
+    if (!proxyGroupAllowsProxyInteraction(groupName)) {
+      return;
+    }
     final currentProfile = _ref.read(currentProfileProvider);
     if (currentProfile != null &&
         currentProfile.selectedMap[groupName] != proxyName) {
@@ -492,22 +500,45 @@ extension ProxiesControllerExt on AppController {
     _ref.read(delayDataSourceProvider.notifier).setDelay(delay);
   }
 
-  Future<void> changeProxy({
+  Future<String> changeProxy({
     required String groupName,
     required String proxyName,
   }) async {
+    if (!proxyGroupAllowsProxyInteraction(groupName)) {
+      return '';
+    }
+    final previousProxyName = _ref
+        .read(groupsProvider)
+        .getGroup(groupName)
+        ?.realNow;
     final closeConnections = _ref.read(appSettingProvider).closeConnections;
-    await coreController.changeProxy(
+    final message = await coreController.changeProxy(
       ChangeProxyParams(
         groupName: groupName,
         proxyName: proxyName,
         closeConnections: closeConnections,
       ),
     );
+    if (message.isNotEmpty) {
+      final currentProfile = _ref.read(currentProfileProvider);
+      if (currentProfile != null &&
+          previousProxyName != null &&
+          currentProfile.selectedMap[groupName] == proxyName) {
+        final selectedMap = Map<String, String>.from(
+          currentProfile.selectedMap,
+        )..[groupName] = previousProxyName;
+        _ref
+            .read(profilesProvider.notifier)
+            .put(currentProfile.copyWith(selectedMap: selectedMap));
+      }
+      globalState.showNotifier(message);
+      return message;
+    }
     if (!closeConnections) {
       await coreController.resetConnections();
     }
     addCheckIp();
+    return '';
   }
 
   void setProvider(ExternalProvider? provider) {
@@ -790,6 +821,7 @@ extension SetupControllerExt on AppController {
       fallbackSourceProxies: _proxyChainSources[profileId] ?? const {},
     );
     _proxyChainSources[profileId] = overlay.sourceProxies;
+    _proxyChainAvailableProxyNames[profileId] = overlay.availableProxyNames;
     _proxyChainRuntimeProxies[profileId] = overlay.chainProxies;
     return res;
   }
@@ -809,7 +841,7 @@ extension SetupControllerExt on AppController {
     return res;
   }
 
-  Future<String> _syncProxyChainRuntime(int? profileId) async {
+  Future<String> _stageProxyChainRuntime(int? profileId) async {
     if (profileId == null) {
       return '';
     }
@@ -821,6 +853,7 @@ extension SetupControllerExt on AppController {
       _proxyChains[profileId] ?? const [],
       chainProxies,
       closeConnections: false,
+      stageOnly: true,
     );
   }
 
@@ -867,13 +900,13 @@ extension SetupControllerExt on AppController {
     final configFilePath = await appPath.configFilePath;
     final yamlString = await encodeYamlTask(config);
     await File(configFilePath).safeWriteAsString(yamlString);
-    var message = await coreController.setupConfig(
-      setupState: setupState,
-      params: setupParams,
-      preloadInvoke: preloadInvoke,
-    );
+    var message = await _stageProxyChainRuntime(profile?.id);
     if (message.isEmpty) {
-      message = await _syncProxyChainRuntime(profile?.id);
+      message = await coreController.setupConfig(
+        setupState: setupState,
+        params: setupParams,
+        preloadInvoke: preloadInvoke,
+      );
     }
     var hasShownDialog = false;
     if (message.isNotEmpty) {
@@ -982,15 +1015,15 @@ extension SetupControllerExt on AppController {
           hasShownDialog: true,
         );
       }
-      final retryMessage = await coreController.setupConfig(
-        setupState: setupState,
-        params: setupParams,
-      );
-      final restoredMessage = retryMessage.isEmpty
-          ? await _syncProxyChainRuntime(setupState.profileId)
-          : retryMessage;
+      var retryMessage = await _stageProxyChainRuntime(setupState.profileId);
+      if (retryMessage.isEmpty) {
+        retryMessage = await coreController.setupConfig(
+          setupState: setupState,
+          params: setupParams,
+        );
+      }
       return _SetupConfigMessageResult(
-        message: restoredMessage,
+        message: retryMessage,
         hasShownDialog: true,
       );
     }

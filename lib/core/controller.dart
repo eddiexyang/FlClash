@@ -112,9 +112,10 @@ class CoreController {
     required DelayMap delayMap,
     required Map<String, String> selectedMap,
     required String defaultTestUrl,
+    List<String> chainProxyNames = const [],
   }) async {
     final proxiesData = await _interface.getProxies();
-    return toGroupsTask(
+    final groups = await toGroupsTask(
       ComputeGroupsState(
         proxiesData: proxiesData,
         sortType: sortType,
@@ -122,6 +123,12 @@ class CoreController {
         selectedMap: selectedMap,
         defaultTestUrl: defaultTestUrl,
       ),
+    );
+    return buildProxyChainGuiGroups(
+      groups: groups,
+      proxiesData: proxiesData,
+      sourceProxyNames: chainProxyNames,
+      testUrl: defaultTestUrl,
     );
   }
 
@@ -133,11 +140,13 @@ class CoreController {
     List<String> proxyNames,
     List<Map<String, dynamic>> proxies, {
     required bool closeConnections,
+    bool stageOnly = false,
   }) async {
     return await _interface.updateProxyChain(
       proxyNames,
       proxies,
       closeConnections: closeConnections,
+      stageOnly: stageOnly,
     );
   }
 

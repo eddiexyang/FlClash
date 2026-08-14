@@ -297,20 +297,31 @@ func applyConfig(params *SetupParams) error {
 	runtime.GC()
 	runLock.Lock()
 	defer runLock.Unlock()
-	var err error
+	var configErr error
 	constant.DefaultTestURL = params.TestURL
-	currentConfig, err = executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
-	if err != nil {
-		currentConfig, _ = config.ParseRawConfig(config.DefaultRawConfig())
+	nextConfig, configErr := executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
+	if configErr != nil {
+		nextConfig, _ = config.ParseRawConfig(config.DefaultRawConfig())
 	}
 
 	// Set MTU to 1500 to fix issues on some systems
-	currentConfig.General.Tun.MTU = 1500
+	nextConfig.General.Tun.MTU = 1500
 
-	hub.ApplyConfig(currentConfig)
-	patchSelectGroup(params.SelectedMap)
+	proxyChainRuntimeState.Lock()
+	prepared, chainErr := prepareProxyChainConfigLocked(nextConfig, params.SelectedMap)
+	if chainErr != nil {
+		proxyChainRuntimeState.Unlock()
+		return chainErr
+	}
+	hub.ApplyConfig(nextConfig)
+	activatePreparedProxyChainLocked(prepared)
+	proxyChainRuntimeState.Unlock()
+	currentConfig = nextConfig
+	if prepared == nil {
+		patchSelectGroup(params.SelectedMap)
+	}
 	updateListeners()
-	return err
+	return configErr
 }
 
 func UnmarshalJson(data []byte, v any) error {

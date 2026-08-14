@@ -33,6 +33,7 @@ mixin CoreInterface {
     List<String> proxyNames,
     List<Map<String, dynamic>> proxies, {
     required bool closeConnections,
+    bool stageOnly = false,
   });
 
   Future<String> changeProxy(ChangeProxyParams changeProxyParams);
@@ -219,12 +220,14 @@ abstract class CoreHandlerInterface with CoreInterface {
     List<String> proxyNames,
     List<Map<String, dynamic>> proxies, {
     required bool closeConnections,
+    bool stageOnly = false,
   }) async {
     return await _invoke<String>(
           method: ActionMethod.updateProxyChain,
           data: json.encode({
             'proxy-names': proxyNames,
             'proxies': proxies,
+            'stage-only': stageOnly,
             'close-connections': closeConnections,
           }),
         ) ??
