@@ -112,30 +112,35 @@ class TrackerInfoItem extends ConsumerWidget {
       ),
     );
     final icon = value
-        ? GestureDetector(
-            onTap: () {
-              if (onClickKeyword == null) return;
-              final process = trackerInfo.metadata.process;
-              if (process.isEmpty) return;
-              onClickKeyword!(process);
-            },
-            child: Container(
-              margin: const EdgeInsets.only(top: 4),
-              width: 42,
-              height: 42,
-              child: FutureBuilder<ImageProvider?>(
-                future: _getPackageIcon(trackerInfo),
-                builder: (_, snapshot) {
-                  if (!snapshot.hasData && snapshot.data == null) {
-                    return Container();
-                  } else {
-                    return Image(
-                      image: snapshot.data!,
-                      gaplessPlayback: true,
-                      width: 42,
-                      height: 42,
-                    );
-                  }
+        ? MouseRegion(
+            cursor: onClickKeyword == null
+                ? SystemMouseCursors.basic
+                : SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () {
+                if (onClickKeyword == null) return;
+                final process = trackerInfo.metadata.process;
+                if (process.isEmpty) return;
+                onClickKeyword!(process);
+              },
+              child: Container(
+                margin: const EdgeInsets.only(top: 4),
+                width: 42,
+                height: 42,
+                child: FutureBuilder<ImageProvider?>(
+                  future: _getPackageIcon(trackerInfo),
+                  builder: (_, snapshot) {
+                    if (!snapshot.hasData && snapshot.data == null) {
+                      return Container();
+                    } else {
+                      return Image(
+                        image: snapshot.data!,
+                        gaplessPlayback: true,
+                        width: 42,
+                        height: 42,
+                      );
+                    }
+                  },
                 },
               ),
             ),

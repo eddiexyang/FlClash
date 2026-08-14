@@ -326,25 +326,28 @@ class _ListInputPageState extends ConsumerState<ListInputPage> {
     return ReorderableDelayedDragStartListener(
       key: ValueKey(value),
       index: index,
-      child: CommonSelectedInputListItem(
-        isDecorator: isDecorator,
-        isLast: isLast,
-        isFirst: isFirst,
-        title: widget.titleBuilder(value),
-        isSelected: isSelected,
-        isEditing: isEditing,
-        onSelected: () {
-          _handleSelected(value);
-        },
-        onPressed: () {
-          _handleAddOrEdit(value);
-        },
-        leading: widget.leadingBuilder != null
-            ? widget.leadingBuilder!(value)
-            : null,
-        subtitle: widget.subtitleBuilder != null
-            ? widget.subtitleBuilder!(value)
-            : null,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: CommonSelectedInputListItem(
+          isDecorator: isDecorator,
+          isLast: isLast,
+          isFirst: isFirst,
+          title: widget.titleBuilder(value),
+          isSelected: isSelected,
+          isEditing: isEditing,
+          onSelected: () {
+            _handleSelected(value);
+          },
+          onPressed: () {
+            _handleAddOrEdit(value);
+          },
+          leading: widget.leadingBuilder != null
+              ? widget.leadingBuilder!(value)
+              : null,
+          subtitle: widget.subtitleBuilder != null
+              ? widget.subtitleBuilder!(value)
+              : null,
+        ),
       ),
     );
   }
@@ -576,25 +579,28 @@ class _MapInputPageState extends ConsumerState<MapInputPage> {
     return ReorderableDelayedDragStartListener(
       key: ValueKey(value),
       index: index,
-      child: CommonSelectedInputListItem(
-        isDecorator: isDecorator,
-        isLast: isLast,
-        isFirst: isFirst,
-        title: widget.titleBuilder(value),
-        leading: widget.leadingBuilder != null
-            ? widget.leadingBuilder!(value)
-            : null,
-        subtitle: widget.subtitleBuilder != null
-            ? widget.subtitleBuilder!(value)
-            : null,
-        isSelected: isSelected,
-        isEditing: isEditing,
-        onSelected: () {
-          _handleSelected(value);
-        },
-        onPressed: () {
-          _handleAddOrEdit(value);
-        },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: CommonSelectedInputListItem(
+          isDecorator: isDecorator,
+          isLast: isLast,
+          isFirst: isFirst,
+          title: widget.titleBuilder(value),
+          leading: widget.leadingBuilder != null
+              ? widget.leadingBuilder!(value)
+              : null,
+          subtitle: widget.subtitleBuilder != null
+              ? widget.subtitleBuilder!(value)
+              : null,
+          isSelected: isSelected,
+          isEditing: isEditing,
+          onSelected: () {
+            _handleSelected(value);
+          },
+          onPressed: () {
+            _handleAddOrEdit(value);
+          },
+        ),
       ),
     );
   }

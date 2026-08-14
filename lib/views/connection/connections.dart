@@ -522,6 +522,9 @@ class _ResizableHeaderRow extends StatelessWidget {
                 Positioned.fill(
                   child: InkWell(
                     onTap: isAction ? null : () => onSort(col),
+                    mouseCursor: isAction
+                        ? SystemMouseCursors.basic
+                        : SystemMouseCursors.click,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Row(

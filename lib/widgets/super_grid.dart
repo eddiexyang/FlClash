@@ -499,7 +499,10 @@ class SuperGridState extends State<SuperGrid> with TickerProviderStateMixin {
             },
             child: shakeTarget,
           );
-    return draggableChild;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: draggableChild,
+    );
   }
 
   Widget _builderItem(int index) {

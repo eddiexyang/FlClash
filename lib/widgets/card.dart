@@ -194,6 +194,7 @@ class CommonCard extends StatelessWidget {
         ),
         iconColor: WidgetStatePropertyAll(context.colorScheme.primary),
         iconSize: WidgetStateProperty.all(20),
+        mouseCursor: WidgetStateMouseCursor.clickable,
         backgroundColor: WidgetStateProperty.resolveWith(
           (states) => getBackgroundColor(context, states),
         ),

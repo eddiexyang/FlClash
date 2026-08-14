@@ -304,33 +304,38 @@ class LogItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final levelColor = log.logLevel.color ?? context.colorScheme.primary;
-    final levelIndicator = GestureDetector(
-      onTap: onClick == null ? null : () => onClick!(log.logLevel.name),
-      child: SizedBox(
-        width: 92,
-        child: Row(
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: levelColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                log.logLevel.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.textTheme.labelSmall?.copyWith(
-                  color: context.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
+    final levelIndicator = MouseRegion(
+      cursor: onClick == null
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onClick == null ? null : () => onClick!(log.logLevel.name),
+        child: SizedBox(
+          width: 92,
+          child: Row(
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: levelColor,
+                  shape: BoxShape.circle,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  log.logLevel.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.textTheme.labelSmall?.copyWith(
+                    color: context.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

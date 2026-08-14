@@ -296,16 +296,19 @@ class __StandardContentState extends ConsumerState<_StandardContent> {
                   return ReorderableDelayedDragStartListener(
                     key: ObjectKey(rule),
                     index: index,
-                    child: RuleItem(
-                      isEditing: selectedRules.isNotEmpty,
-                      isSelected: selectedRules.contains(rule.id),
-                      rule: rule,
-                      onSelected: () {
-                        _handleSelected(rule.id);
-                      },
-                      onEdit: (rule) {
-                        _handleAddOrUpdate(rule);
-                      },
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: RuleItem(
+                        isEditing: selectedRules.isNotEmpty,
+                        isSelected: selectedRules.contains(rule.id),
+                        rule: rule,
+                        onSelected: () {
+                          _handleSelected(rule.id);
+                        },
+                        onEdit: (rule) {
+                          _handleAddOrUpdate(rule);
+                        },
+                      ),
                     ),
                   );
                 },
@@ -403,6 +406,7 @@ class _ScriptContent extends ConsumerWidget {
                       type: CommonCardType.filled,
                       radius: 18,
                       child: ListTile(
+                        mouseCursor: SystemMouseCursors.click,
                         minLeadingWidth: 0,
                         minTileHeight: 0,
                         minVerticalPadding: 16,

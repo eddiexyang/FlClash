@@ -38,24 +38,29 @@ class _EffectGestureDetectorState extends State<EffectGestureDetector>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedScale(
-      scale: _scale,
-      duration: kThemeAnimationDuration,
-      curve: Curves.easeOut,
-      child: GestureDetector(
-        onLongPress: widget.onLongPress,
-        onLongPressStart: (_) {
-          setState(() {
-            _scale = 0.95;
-          });
-        },
-        onTap: widget.onTap,
-        onLongPressEnd: (_) {
-          setState(() {
-            _scale = 1;
-          });
-        },
-        child: widget.child,
+    return MouseRegion(
+      cursor: widget.onTap == null && widget.onLongPress == null
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      child: AnimatedScale(
+        scale: _scale,
+        duration: kThemeAnimationDuration,
+        curve: Curves.easeOut,
+        child: GestureDetector(
+          onLongPress: widget.onLongPress,
+          onLongPressStart: (_) {
+            setState(() {
+              _scale = 0.95;
+            });
+          },
+          onTap: widget.onTap,
+          onLongPressEnd: (_) {
+            setState(() {
+              _scale = 1;
+            });
+          },
+          child: widget.child,
+        ),
       ),
     );
   }

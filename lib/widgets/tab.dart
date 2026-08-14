@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
@@ -342,7 +341,7 @@ class _CommonTabBarState<T extends Object> extends State<CommonTabBar<T>>
           inMutuallyExclusiveGroup: true,
           selected: widget.groupValue == entry.key,
           child: MouseRegion(
-            cursor: kIsWeb ? SystemMouseCursors.click : MouseCursor.defer,
+            cursor: SystemMouseCursors.click,
             child: _Segment<T>(
               key: ValueKey<T>(entry.key),
               highlighted: isHighlighted,

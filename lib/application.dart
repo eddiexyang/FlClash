@@ -27,6 +27,10 @@ class ApplicationState extends ConsumerState<Application> {
   Timer? _autoUpdateProfilesTaskTimer;
   bool _preHasVpn = false;
 
+  static const _clickableButtonStyle = ButtonStyle(
+    mouseCursor: WidgetStateMouseCursor.clickable,
+  );
+
   final _pageTransitionsTheme = const PageTransitionsTheme(
     builders: <TargetPlatform, PageTransitionsBuilder>{
       TargetPlatform.android: commonSharedXPageTransitions,
@@ -41,6 +45,47 @@ class ApplicationState extends ConsumerState<Application> {
     int? primaryColor,
   }) {
     return ref.read(genColorSchemeProvider(brightness));
+  }
+
+  ThemeData _buildThemeData(ColorScheme colorScheme) {
+    return ThemeData(
+      useMaterial3: true,
+      pageTransitionsTheme: _pageTransitionsTheme,
+      colorScheme: colorScheme,
+      textButtonTheme: const TextButtonThemeData(
+        style: _clickableButtonStyle,
+      ),
+      elevatedButtonTheme: const ElevatedButtonThemeData(
+        style: _clickableButtonStyle,
+      ),
+      outlinedButtonTheme: const OutlinedButtonThemeData(
+        style: _clickableButtonStyle,
+      ),
+      filledButtonTheme: const FilledButtonThemeData(
+        style: _clickableButtonStyle,
+      ),
+      iconButtonTheme: const IconButtonThemeData(
+        style: _clickableButtonStyle,
+      ),
+      segmentedButtonTheme: const SegmentedButtonThemeData(
+        style: _clickableButtonStyle,
+      ),
+      checkboxTheme: const CheckboxThemeData(
+        mouseCursor: WidgetStateMouseCursor.clickable,
+      ),
+      radioTheme: const RadioThemeData(
+        mouseCursor: WidgetStateMouseCursor.clickable,
+      ),
+      switchTheme: const SwitchThemeData(
+        mouseCursor: WidgetStateMouseCursor.clickable,
+      ),
+      sliderTheme: const SliderThemeData(
+        mouseCursor: WidgetStateMouseCursor.clickable,
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        mouseCursor: WidgetStateMouseCursor.clickable,
+      ),
+    );
   }
 
   @override
@@ -138,18 +183,14 @@ class ApplicationState extends ConsumerState<Application> {
           locale: utils.getLocaleForString(locale),
           supportedLocales: AppLocalizations.delegate.supportedLocales,
           themeMode: themeProps.themeMode,
-          theme: ThemeData(
-            useMaterial3: true,
-            pageTransitionsTheme: _pageTransitionsTheme,
-            colorScheme: _getAppColorScheme(
+          theme: _buildThemeData(
+            _getAppColorScheme(
               brightness: Brightness.light,
               primaryColor: themeProps.primaryColor,
             ),
           ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            pageTransitionsTheme: _pageTransitionsTheme,
-            colorScheme: _getAppColorScheme(
+          darkTheme: _buildThemeData(
+            _getAppColorScheme(
               brightness: Brightness.dark,
               primaryColor: themeProps.primaryColor,
             ).toPureBlack(themeProps.pureBlack),

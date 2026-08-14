@@ -112,16 +112,19 @@ class _AddedRulesViewState extends ConsumerState<AddedRulesView> {
                   return ReorderableDelayedDragStartListener(
                     key: ObjectKey(rule),
                     index: index,
-                    child: RuleItem(
-                      isEditing: selectedRules.isNotEmpty,
-                      rule: rule,
-                      isSelected: selectedRules.contains(rule.id),
-                      onSelected: () {
-                        _handleSelected(rule.id);
-                      },
-                      onEdit: (Rule rule) {
-                        _handleAddOrUpdate(rule);
-                      },
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: RuleItem(
+                        isEditing: selectedRules.isNotEmpty,
+                        rule: rule,
+                        isSelected: selectedRules.contains(rule.id),
+                        onSelected: () {
+                          _handleSelected(rule.id);
+                        },
+                        onEdit: (Rule rule) {
+                          _handleAddOrUpdate(rule);
+                        },
+                      ),
                     ),
                   );
                 },

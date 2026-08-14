@@ -52,6 +52,9 @@ class _SelectionTapRegionState extends State<SelectionTapRegion> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
+      cursor: widget.onTap == null
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: Listener(

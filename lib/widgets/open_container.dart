@@ -78,16 +78,21 @@ class _OpenContainerState<T> extends State<OpenContainer<T?>> {
   Widget build(BuildContext context) {
     return _Hideable(
       key: _hideableKey,
-      child: GestureDetector(
-        onTap: widget.tappable ? openContainer : null,
-        child: Material(
-          color: Colors.transparent,
-          clipBehavior: widget.clipBehavior,
-          child: Builder(
-            key: _closedBuilderKey,
-            builder: (BuildContext context) {
-              return widget.closedBuilder(context, openContainer);
-            },
+      child: MouseRegion(
+        cursor: widget.tappable
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
+        child: GestureDetector(
+          onTap: widget.tappable ? openContainer : null,
+          child: Material(
+            color: Colors.transparent,
+            clipBehavior: widget.clipBehavior,
+            child: Builder(
+              key: _closedBuilderKey,
+              builder: (BuildContext context) {
+                return widget.closedBuilder(context, openContainer);
+              },
+            ),
           ),
         ),
       ),

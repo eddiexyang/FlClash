@@ -446,7 +446,10 @@ class _ReorderableProfilesSheetState extends State<ReorderableProfilesSheet> {
       key: Key(profile.id.toString()),
       trailing: ReorderableDelayedDragStartListener(
         index: index,
-        child: const Icon(Icons.drag_handle),
+        child: const MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Icon(Icons.drag_handle),
+        ),
       ),
       title: Text(profile.realLabel),
       isFirst: isFirst,

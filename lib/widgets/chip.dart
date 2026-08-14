@@ -20,30 +20,36 @@ class CommonChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (type == ChipType.delete) {
-      return Chip(
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Chip(
+          avatar: avatar,
+          labelPadding: const EdgeInsets.symmetric(
+            vertical: 0,
+            horizontal: 4,
+          ),
+          clipBehavior: Clip.antiAlias,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          onDeleted: onPressed ?? () {},
+          labelStyle: labelStyle,
+          label: Text(label),
+        ),
+      );
+    }
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: ActionChip(
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         avatar: avatar,
+        clipBehavior: Clip.antiAlias,
         labelPadding: const EdgeInsets.symmetric(
           vertical: 0,
           horizontal: 4,
         ),
-        clipBehavior: Clip.antiAlias,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        onDeleted: onPressed ?? () {},
+        onPressed: onPressed ?? () {},
         labelStyle: labelStyle,
         label: Text(label),
-      );
-    }
-    return ActionChip(
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      avatar: avatar,
-      clipBehavior: Clip.antiAlias,
-      labelPadding: const EdgeInsets.symmetric(
-        vertical: 0,
-        horizontal: 4,
       ),
-      onPressed: onPressed ?? () {},
-      labelStyle: labelStyle,
-      label: Text(label),
     );
   }
 }
