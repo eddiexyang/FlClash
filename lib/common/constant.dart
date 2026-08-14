@@ -52,6 +52,7 @@ const profilesDirectoryName = 'profiles';
 const localhost = '127.0.0.1';
 const clashConfigKey = 'clash_config';
 const configKey = 'config';
+const proxyChainKey = 'proxy_chain';
 const logLevelWarningMigrationDoneKey = 'log_level_warning_migration_done';
 const double dialogCommonWidth = 300;
 const defaultExternalController = '127.0.0.1:9090';

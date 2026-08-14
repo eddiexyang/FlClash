@@ -83,6 +83,12 @@ class _SetupConfigException implements Exception {
 
 extension InitControllerExt on AppController {
   Future<void> _init() async {
+    for (final profile in _ref.read(profilesProvider)) {
+      final proxyChain = await preferences.getProxyChain(profile.id);
+      if (proxyChain.isNotEmpty) {
+        _proxyChains[profile.id] = proxyChain;
+      }
+    }
     FlutterError.onError = (details) {
       commonPrint.log(
         'exception: ${details.exception} stack: ${details.stack}',
@@ -210,6 +216,8 @@ extension StateControllerExt on AppController {
 
 extension ProfilesControllerExt on AppController {
   Future<void> deleteProfile(int id) async {
+    _proxyChains.remove(id);
+    await preferences.clearProxyChain(id);
     _ref.read(profilesProvider.notifier).del(id);
     clearEffect(id);
     final currentProfileId = _ref.read(currentProfileIdProvider);
@@ -394,6 +402,12 @@ extension ProxiesControllerExt on AppController {
         }
         _proxyChains[profileId] = pendingChain;
         _proxyChainRuntimeProxies[profileId] = chainProxies;
+        if (!await preferences.saveProxyChain(profileId, pendingChain)) {
+          commonPrint.log(
+            'save_proxy_chain_failed profile_id=$profileId',
+            logLevel: LogLevel.warning,
+          );
+        }
         return '';
       } catch (error, stackTrace) {
         commonPrint.log(

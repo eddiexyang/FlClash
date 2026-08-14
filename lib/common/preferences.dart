@@ -95,6 +95,25 @@ class Preferences {
     return preferences?.setBool(key, value) ?? false;
   }
 
+  Future<List<String>> getProxyChain(int profileId) async {
+    final preferences = await sharedPreferencesCompleter.future;
+    return preferences?.getStringList('$proxyChainKey.$profileId') ?? const [];
+  }
+
+  Future<bool> saveProxyChain(int profileId, List<String> proxyNames) async {
+    final preferences = await sharedPreferencesCompleter.future;
+    return preferences?.setStringList(
+          '$proxyChainKey.$profileId',
+          proxyNames,
+        ) ??
+        false;
+  }
+
+  Future<bool> clearProxyChain(int profileId) async {
+    final preferences = await sharedPreferencesCompleter.future;
+    return preferences?.remove('$proxyChainKey.$profileId') ?? false;
+  }
+
   Future<void> clearPreferences() async {
     final sharedPreferencesIns = await sharedPreferencesCompleter.future;
     await sharedPreferencesIns?.clear();
