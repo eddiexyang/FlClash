@@ -222,9 +222,8 @@ extension LogsStateExt on LogsState {
       final logLevelName = log.logLevel.name;
       final levelMatched =
           minLogLevel == null || log.logLevel.index >= minLogLevel.index;
-      final displayPayload = displayProxyText(log.payload).toLowerCase();
       return levelMatched &&
-          (displayPayload.contains(lowQuery) ||
+          (log.payload.toLowerCase().contains(lowQuery) ||
               logLevelName.contains(lowQuery));
     }).toList();
   }

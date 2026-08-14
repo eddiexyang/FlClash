@@ -170,7 +170,7 @@ class ProxyCard extends StatelessWidget {
                           flex: 1,
                           child: TooltipText(
                             text: Text(
-                              displayProxyText(proxy.type),
+                              proxy.type,
                               style: context.textTheme.bodySmall?.copyWith(
                                 overflow: TextOverflow.ellipsis,
                                 color: context

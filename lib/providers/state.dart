@@ -489,16 +489,16 @@ String? getSelectedProxyName(Ref ref, String groupName) {
 String getProxyDesc(Ref ref, Proxy proxy) {
   final groupTypeNamesList = GroupType.values.map((e) => e.name).toList();
   if (!groupTypeNamesList.contains(proxy.type)) {
-    return displayProxyText(proxy.type);
+    return proxy.type;
   } else {
     final groups = ref.watch(groupsProvider);
     final index = groups.indexWhere((element) => element.name == proxy.name);
-    if (index == -1) return displayProxyText(proxy.type);
+    if (index == -1) return proxy.type;
     final state = ref.watch(realSelectedProxyStateProvider(proxy.name));
     final selectedName = state.proxyName.isNotEmpty
         ? displayProxyName(state.proxyName)
         : '*';
-    return displayProxyText('${proxy.type}($selectedName)');
+    return '${proxy.type}($selectedName)';
   }
 }
 

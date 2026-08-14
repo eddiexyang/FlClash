@@ -346,7 +346,7 @@ class LogItem extends StatelessWidget {
       ),
     );
     final payload = Text(
-      displayProxyText(log.payload),
+      log.payload,
       style: context.textTheme.bodySmall?.copyWith(
         height: 1.3,
         fontFamily: FontFamily.jetBrainsMono.value,
