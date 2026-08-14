@@ -528,7 +528,7 @@ class _ListHeaderState extends State<ListHeader> {
                                             flex: 1,
                                             child: EmojiText(
                                               overflow: TextOverflow.ellipsis,
-                                              ' · $proxyName',
+                                              ' · ${displayProxyName(proxyName)}',
                                               style: context
                                                   .textTheme
                                                   .labelMedium

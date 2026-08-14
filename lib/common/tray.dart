@@ -9,6 +9,7 @@ import 'package:tray_manager/tray_manager.dart';
 
 import 'app_localizations.dart';
 import 'constant.dart';
+import 'proxy_chain.dart';
 import 'system.dart';
 import 'window.dart';
 
@@ -109,7 +110,7 @@ class Tray {
         for (final proxy in group.all) {
           subMenuItems.add(
             MenuItem.checkbox(
-              label: proxy.name,
+              label: displayProxyName(proxy.name),
               checked:
                   appController.getSelectedProxyName(group.name) == proxy.name,
               onClick: (_) {
@@ -124,7 +125,7 @@ class Tray {
         }
         menuItems.add(
           MenuItem.submenu(
-            label: group.name,
+            label: displayProxyText(group.name),
             submenu: Menu(items: subMenuItems),
           ),
         );

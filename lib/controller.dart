@@ -1650,7 +1650,7 @@ extension CommonControllerExt on AppController {
       } else {
         globalState.showMessage(
           title: title ?? appLocalizations.tip,
-          message: TextSpan(text: e.toString()),
+          message: TextSpan(text: displayProxyText(e.toString())),
         );
       }
       return null;

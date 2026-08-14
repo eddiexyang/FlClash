@@ -49,6 +49,18 @@ String displayProxyChain(Iterable<String> proxyNames) {
   return proxyNames.map(displayProxyName).join(' → ');
 }
 
+final _internalProxyNamePattern = RegExp(
+  '${RegExp.escape(internalChainHopPrefix)}[0-9]+_[A-Za-z0-9_-]+'
+  '|${RegExp.escape(internalChainProxyName)}',
+);
+
+String displayProxyText(String text) {
+  return text.replaceAllMapped(
+    _internalProxyNamePattern,
+    (match) => displayProxyName(match.group(0)!),
+  );
+}
+
 Map<String, dynamic>? _toStringMap(Object? value) {
   if (value is! Map) {
     return null;

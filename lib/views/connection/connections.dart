@@ -815,7 +815,12 @@ class TrackerInfoDetailView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title),
-          Flexible(child: Text(desc, textAlign: TextAlign.end)),
+          Flexible(
+            child: Text(
+              displayProxyText(desc),
+              textAlign: TextAlign.end,
+            ),
+          ),
         ],
       ),
     );

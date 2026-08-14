@@ -1328,7 +1328,7 @@ class _ChainHopCard extends StatelessWidget {
           const SizedBox(width: 12),
           Flexible(
             child: EmojiText(
-              proxy.name,
+              displayProxyName(proxy.name),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: context.textTheme.bodyMedium,

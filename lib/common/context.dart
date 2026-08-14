@@ -4,6 +4,8 @@ import 'package:fl_clash/models/state.dart';
 import 'package:fl_clash/widgets/scaffold.dart';
 import 'package:flutter/material.dart';
 
+import 'proxy_chain.dart';
+
 extension BuildContextExtension on BuildContext {
   CommonScaffoldState? get commonScaffoldState {
     return findAncestorStateOfType<CommonScaffoldState>();
@@ -11,7 +13,7 @@ extension BuildContextExtension on BuildContext {
 
   void showNotifier(String text, {MessageActionState? actionState}) {
     return findAncestorStateOfType<StatusManagerState>()?.message(
-      text,
+      displayProxyText(text),
       actionState: actionState,
     );
   }
@@ -27,7 +29,7 @@ extension BuildContextExtension on BuildContext {
     ScaffoldMessenger.of(this).showSnackBar(
       SnackBar(
         action: action,
-        content: Text(message),
+        content: Text(displayProxyText(message)),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(milliseconds: 1500),
         margin: margin,

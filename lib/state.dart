@@ -293,8 +293,8 @@ class GlobalState {
                   final message = messages[index];
                   return ListItem(
                     padding: EdgeInsets.symmetric(horizontal: 24),
-                    title: Text(message.label),
-                    subtitle: Text(message.message),
+                    title: Text(displayProxyText(message.label)),
+                    subtitle: Text(displayProxyText(message.message)),
                   );
                 },
                 itemCount: messages.length,

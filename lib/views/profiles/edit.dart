@@ -113,7 +113,7 @@ class _EditProfileViewState extends State<EditProfileView> {
     if (message?.isNotEmpty == true) {
       globalState.showMessage(
         title: appLocalizations.tip,
-        message: TextSpan(text: message),
+        message: TextSpan(text: displayProxyText(message!)),
       );
       return;
     }

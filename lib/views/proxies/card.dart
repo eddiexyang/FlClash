@@ -77,7 +77,7 @@ class ProxyCard extends StatelessWidget {
       return SizedBox(
         height: measure.bodyMediumHeight * 1,
         child: EmojiText(
-          proxy.name,
+          displayProxyName(proxy.name),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: context.textTheme.bodyMedium,
@@ -87,7 +87,7 @@ class ProxyCard extends StatelessWidget {
       return SizedBox(
         height: measure.bodyMediumHeight * 2,
         child: EmojiText(
-          proxy.name,
+          displayProxyName(proxy.name),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: context.textTheme.bodyMedium,
@@ -160,7 +160,7 @@ class ProxyCard extends StatelessWidget {
                           flex: 1,
                           child: TooltipText(
                             text: Text(
-                              proxy.type,
+                              displayProxyText(proxy.type),
                               style: context.textTheme.bodySmall?.copyWith(
                                 overflow: TextOverflow.ellipsis,
                                 color: context
