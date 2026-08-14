@@ -791,6 +791,14 @@ class _ProxyChainBar extends StatelessWidget {
                           _ChainHop(
                             proxy: proxies[index],
                             index: index,
+                            onAccept: (data) {
+                              final sourceIndex = data.chainIndex;
+                              final targetIndex = sourceIndex != null &&
+                                      sourceIndex > index
+                                  ? index
+                                  : index + 1;
+                              onDrop(data, targetIndex);
+                            },
                             onRemove: () => onRemove(index),
                             onDragOutside: () => onRemove(index),
                           ),
@@ -818,17 +826,25 @@ class _ChainInsertTarget extends StatelessWidget {
       onWillAcceptWithDetails: (_) => true,
       onAcceptWithDetails: (details) => onAccept(details.data),
       builder: (context, candidateData, _) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          width: candidateData.isEmpty ? 28 : 44,
+        final isHovering = candidateData.isNotEmpty;
+        return SizedBox(
+          width: 28,
           height: 40,
-          alignment: Alignment.center,
-          child: Icon(
-            candidateData.isEmpty ? Icons.chevron_right : Icons.add_circle,
-            size: candidateData.isEmpty ? 18 : 24,
-            color: candidateData.isEmpty
-                ? context.colorScheme.onSurfaceVariant.opacity60
-                : context.colorScheme.primary,
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 120),
+              transitionBuilder: (child, animation) {
+                return ScaleTransition(scale: animation, child: child);
+              },
+              child: Icon(
+                isHovering ? Icons.add_circle : Icons.chevron_right,
+                key: ValueKey(isHovering),
+                size: isHovering ? 24 : 18,
+                color: isHovering
+                    ? context.colorScheme.primary
+                    : context.colorScheme.onSurfaceVariant.opacity60,
+              ),
+            ),
           ),
         );
       },
@@ -839,22 +855,35 @@ class _ChainInsertTarget extends StatelessWidget {
 class _ChainHop extends StatelessWidget {
   final Proxy proxy;
   final int index;
+  final ValueChanged<_ProxyChainDragData> onAccept;
   final VoidCallback onRemove;
   final VoidCallback onDragOutside;
 
   const _ChainHop({
     required this.proxy,
     required this.index,
+    required this.onAccept,
     required this.onRemove,
     required this.onDragOutside,
   });
 
-  Widget _buildHop(BuildContext context, {required bool canRemove}) {
-    return Container(
+  Widget _buildHop(
+    BuildContext context, {
+    bool isDropTarget = false,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
       constraints: const BoxConstraints(minWidth: 96, maxWidth: 220),
       height: 40,
       decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHigh,
+        color: isDropTarget
+            ? context.colorScheme.secondaryContainer
+            : context.colorScheme.surfaceContainerHigh,
+        border: Border.all(
+          color: isDropTarget
+              ? context.colorScheme.primary
+              : Colors.transparent,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -869,21 +898,18 @@ class _ChainHop extends StatelessWidget {
               style: context.textTheme.bodyMedium,
             ),
           ),
-          if (canRemove)
-            IconButton(
-              tooltip: appLocalizations.remove,
-              onPressed: onRemove,
-              icon: const Icon(Icons.close),
-              iconSize: 18,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(
-                width: 36,
-                height: 40,
-              ),
-              visualDensity: VisualDensity.compact,
-            )
-          else
-            const SizedBox(width: 12),
+          IconButton(
+            tooltip: appLocalizations.remove,
+            onPressed: onRemove,
+            icon: const Icon(Icons.close),
+            iconSize: 18,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(
+              width: 36,
+              height: 40,
+            ),
+            visualDensity: VisualDensity.compact,
+          ),
         ],
       ),
     );
@@ -894,40 +920,42 @@ class _ChainHop extends StatelessWidget {
     final data = _ProxyChainDragData(proxy: proxy, chainIndex: index);
     final feedback = Material(
       color: Colors.transparent,
-      elevation: 6,
-      borderRadius: BorderRadius.circular(12),
-      child: _buildHop(context, canRemove: false),
+      child: _buildHop(context),
     );
-    final child = _buildHop(context, canRemove: true);
-    final childWhenDragging = Opacity(
-      opacity: 0.35,
-      child: _buildHop(context, canRemove: true),
-    );
-    if (system.isDesktop) {
-      return Draggable<_ProxyChainDragData>(
-        data: data,
-        feedback: feedback,
-        childWhenDragging: childWhenDragging,
-        onDragEnd: (details) {
+    return DragTarget<_ProxyChainDragData>(
+      onWillAcceptWithDetails: (_) => true,
+      onAcceptWithDetails: (details) => onAccept(details.data),
+      builder: (context, candidateData, _) {
+        final child = _buildHop(
+          context,
+          isDropTarget: candidateData.isNotEmpty,
+        );
+        final childWhenDragging = Opacity(opacity: 0, child: child);
+        void handleDragEnd(DraggableDetails details) {
           if (!details.wasAccepted) {
             onDragOutside();
           }
-        },
-        rootOverlay: true,
-        child: child,
-      );
-    }
-    return LongPressDraggable<_ProxyChainDragData>(
-      data: data,
-      feedback: feedback,
-      childWhenDragging: childWhenDragging,
-      onDragEnd: (details) {
-        if (!details.wasAccepted) {
-          onDragOutside();
         }
+
+        if (system.isDesktop) {
+          return Draggable<_ProxyChainDragData>(
+            data: data,
+            feedback: feedback,
+            childWhenDragging: childWhenDragging,
+            onDragEnd: handleDragEnd,
+            rootOverlay: true,
+            child: child,
+          );
+        }
+        return LongPressDraggable<_ProxyChainDragData>(
+          data: data,
+          feedback: feedback,
+          childWhenDragging: childWhenDragging,
+          onDragEnd: handleDragEnd,
+          rootOverlay: true,
+          child: child,
+        );
       },
-      rootOverlay: true,
-      child: child,
     );
   }
 }
