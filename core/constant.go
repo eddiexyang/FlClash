@@ -51,6 +51,11 @@ type ChangeProxyParams struct {
 	CloseConnections bool    `json:"close-connections"`
 }
 
+type UpdateProxyChainParams struct {
+	ProxyNames       []string `json:"proxy-names"`
+	CloseConnections bool     `json:"close-connections"`
+}
+
 type TestDelayParams struct {
 	ProxyName string `json:"proxy-name"`
 	TestUrl   string `json:"test-url"`

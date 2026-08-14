@@ -106,7 +106,10 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
               .where((proxy) => proxy.name != internalChainProxyName)
               .toList();
         } else {
-          final message = await appController.updateProxyChain(proxyChain);
+          final message = await appController.updateProxyChain(
+            proxyChain,
+            closeConnections: false,
+          );
           if (message.isNotEmpty) {
             globalState.showNotifier(message);
             return;
@@ -121,7 +124,10 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
 
   void _applyChain() {
     appController
-        .updateProxyChain(_chain.map((proxy) => proxy.name).toList())
+        .updateProxyChain(
+          _chain.map((proxy) => proxy.name).toList(),
+          closeConnections: true,
+        )
         .then((message) {
           if (message.isNotEmpty) {
             globalState.showNotifier(message);
@@ -546,7 +552,10 @@ class ChainProxyCard extends ConsumerWidget {
         _rejectEmptyChainDelay(testUrl);
         return;
       }
-      final message = await appController.updateProxyChain(proxyChain);
+      final message = await appController.updateProxyChain(
+        proxyChain,
+        closeConnections: false,
+      );
       if (message.isNotEmpty) {
         globalState.showNotifier(message);
         return;
@@ -561,6 +570,7 @@ class ChainProxyCard extends ConsumerWidget {
     try {
       final message = await appController.updateProxyChain(
         appController.proxyChain,
+        closeConnections: false,
       );
       if (message.isNotEmpty) {
         globalState.showNotifier(message);

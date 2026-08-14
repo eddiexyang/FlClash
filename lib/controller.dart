@@ -359,19 +359,31 @@ extension ProxiesControllerExt on AppController {
     return List.unmodifiable(_proxyChains[profileId] ?? const []);
   }
 
-  Future<String> updateProxyChain(List<String> proxyNames) async {
+  Future<String> updateProxyChain(
+    List<String> proxyNames, {
+    required bool closeConnections,
+  }) async {
     final pendingChain = List<String>.from(proxyNames);
     final profileId = _ref.read(currentProfileProvider)?.id;
     if (profileId == null) {
       return '';
     }
+    final shouldCloseConnections =
+        closeConnections &&
+        !stringListEquality.equals(
+          _proxyChains[profileId] ?? const <String>[],
+          pendingChain,
+        );
     _proxyChains[profileId] = pendingChain;
     var message = '';
     final apply = _proxyChainApplyQueue.then((_) async {
       if (profileId != _ref.read(currentProfileProvider)?.id) {
         return;
       }
-      message = await coreController.updateProxyChain(pendingChain);
+      message = await coreController.updateProxyChain(
+        pendingChain,
+        closeConnections: shouldCloseConnections,
+      );
     });
     _proxyChainApplyQueue = apply.catchError((error, stackTrace) {
       commonPrint.log(
@@ -822,7 +834,10 @@ extension SetupControllerExt on AppController {
       preloadInvoke: preloadInvoke,
     );
     if (message.isEmpty) {
-      message = await updateProxyChain(proxyChain);
+      message = await updateProxyChain(
+        proxyChain,
+        closeConnections: false,
+      );
       String? proxyGroupName;
       for (final entry in setupParams.selectedMap.entries) {
         if (entry.key.toLowerCase() == GroupName.Proxy.name.toLowerCase() &&
@@ -953,7 +968,7 @@ extension SetupControllerExt on AppController {
         params: setupParams,
       );
       final restoredMessage = retryMessage.isEmpty
-          ? await updateProxyChain(proxyChain)
+          ? await updateProxyChain(proxyChain, closeConnections: false)
           : retryMessage;
       return _SetupConfigMessageResult(
         message: restoredMessage,

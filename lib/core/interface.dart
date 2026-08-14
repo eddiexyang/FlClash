@@ -29,7 +29,10 @@ mixin CoreInterface {
 
   Future<ProxiesData> getProxies();
 
-  Future<String> updateProxyChain(List<String> proxyNames);
+  Future<String> updateProxyChain(
+    List<String> proxyNames, {
+    required bool closeConnections,
+  });
 
   Future<String> changeProxy(ChangeProxyParams changeProxyParams);
 
@@ -211,10 +214,16 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
-  Future<String> updateProxyChain(List<String> proxyNames) async {
+  Future<String> updateProxyChain(
+    List<String> proxyNames, {
+    required bool closeConnections,
+  }) async {
     return await _invoke<String>(
           method: ActionMethod.updateProxyChain,
-          data: json.encode(proxyNames),
+          data: json.encode({
+            'proxy-names': proxyNames,
+            'close-connections': closeConnections,
+          }),
         ) ??
         '';
   }

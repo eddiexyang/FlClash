@@ -200,15 +200,22 @@ func updateProxyChain(proxyNames []string) error {
 func handleUpdateProxyChain(data []byte) string {
 	runLock.Lock()
 	defer runLock.Unlock()
-	var proxyNames []string
-	if err := json.Unmarshal(data, &proxyNames); err != nil {
+	var params UpdateProxyChainParams
+	if err := json.Unmarshal(data, &params); err != nil {
 		return err.Error()
 	}
-	affectedConnections := connectionsUsingGroup(flClashChainName)
-	if err := updateProxyChain(proxyNames); err != nil {
+	var affectedConnections []statistic.Tracker
+	if params.CloseConnections {
+		// A topology edit must move active Chain traffic to the new hops.
+		// Config reloads leave old connections on their captured Chain.
+		affectedConnections = connectionsUsingGroup(flClashChainName)
+	}
+	if err := updateProxyChain(params.ProxyNames); err != nil {
 		return err.Error()
 	}
-	closeTrackedConnections(affectedConnections)
+	if params.CloseConnections {
+		closeTrackedConnections(affectedConnections)
+	}
 	return ""
 }
 

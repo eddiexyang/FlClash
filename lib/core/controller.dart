@@ -129,8 +129,14 @@ class CoreController {
     return await _interface.changeProxy(changeProxyParams);
   }
 
-  Future<String> updateProxyChain(List<String> proxyNames) async {
-    return await _interface.updateProxyChain(proxyNames);
+  Future<String> updateProxyChain(
+    List<String> proxyNames, {
+    required bool closeConnections,
+  }) async {
+    return await _interface.updateProxyChain(
+      proxyNames,
+      closeConnections: closeConnections,
+    );
   }
 
   Future<List<TrackerInfo>> getConnections() async {
