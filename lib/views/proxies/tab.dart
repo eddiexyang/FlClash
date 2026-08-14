@@ -1384,7 +1384,7 @@ class _ChainHopCardState extends State<_ChainHopCard> {
           color: context.colorScheme.surfaceContainerHigh,
           border: Border.all(
             color: _hovered
-                ? context.colorScheme.primary.opacity40
+                ? context.colorScheme.primary.withValues(alpha: 0.4)
                 : Colors.transparent,
           ),
           borderRadius: BorderRadius.circular(12),

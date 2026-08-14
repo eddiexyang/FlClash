@@ -14,8 +14,7 @@ class CommonMinFilledButtonTheme extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 8),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
-          mouseCursor: WidgetStateMouseCursor.clickable,
-        ),
+        ).copyWith(mouseCursor: WidgetStateMouseCursor.clickable),
       ),
       child: child,
     );
@@ -36,8 +35,7 @@ class CommonMinIconButtonTheme extends StatelessWidget {
           visualDensity: VisualDensity.compact,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           iconSize: 20.ap,
-          mouseCursor: WidgetStateMouseCursor.clickable,
-        ),
+        ).copyWith(mouseCursor: WidgetStateMouseCursor.clickable),
       ),
       child: child,
     );
