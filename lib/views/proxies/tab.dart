@@ -1070,7 +1070,9 @@ class _ChainHop extends StatelessWidget {
         );
         void handleDragStarted() {
           final renderObject = context.findRenderObject();
-          final width = renderObject is RenderBox ? renderObject.size.width : 0;
+          final width = renderObject is RenderBox
+              ? renderObject.size.width
+              : 0.0;
           onDragStarted(data, width);
         }
 
