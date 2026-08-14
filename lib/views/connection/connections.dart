@@ -771,6 +771,11 @@ class TrackerInfoDetailView extends StatelessWidget {
   }
 
   Widget _buildChains(BuildContext context) {
+    final chains = trackerInfo.chains.reversed.map(displayProxyName).toList();
+    final style = context.textTheme.bodyMedium?.copyWith(
+      color: context.colorScheme.secondary,
+      fontFamily: FontFamily.jetBrainsMono.value,
+    );
     return ListItem(
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -779,12 +784,24 @@ class TrackerInfoDetailView extends StatelessWidget {
         children: [
           Text(appLocalizations.proxyChains),
           Flexible(
-            child: Text(
-              displayProxyChain(trackerInfo.chains.reversed),
-              textAlign: TextAlign.end,
-              style: context.textTheme.bodyMedium?.copyWith(
-                color: context.colorScheme.secondary,
-                fontFamily: FontFamily.jetBrainsMono.value,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (var index = 0; index < chains.length; index++)
+                    Text(
+                      index == chains.length - 1
+                          ? chains[index]
+                          : '${chains[index]} →',
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      style: style,
+                    ),
+                ],
               ),
             ),
           ),
