@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
 	"github.com/metacubex/mihomo/common/observable"
@@ -27,7 +26,6 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -35,11 +33,6 @@ var (
 	isInit            = false
 	externalProviders = map[string]cp.Provider{}
 	logSubscriber     observable.Subscription[log.Event]
-)
-
-const (
-	flClashChainName  = "__FLCLASH_INTERNAL_CHAIN__"
-	flClashChainGroup = "PROXY"
 )
 
 func handleInitClash(paramsString string) bool {
@@ -149,74 +142,6 @@ func handleGetProxies() ProxiesData {
 		All:     allNames,
 		Proxies: proxies,
 	}
-}
-
-func updateProxyChain(proxyNames []string) error {
-	currentProxies := tunnel.Proxies()
-	proxies := make(map[string]constant.Proxy, len(currentProxies)+1)
-	allProxies := tunnel.AllProxies()
-	delete(allProxies, flClashChainName)
-	var groupProxy constant.Proxy
-	for name, proxy := range currentProxies {
-		if name == flClashChainName {
-			continue
-		}
-		proxies[name] = proxy
-		if strings.EqualFold(name, flClashChainGroup) {
-			groupProxy = proxy
-		}
-	}
-	if groupProxy == nil {
-		return nil
-	}
-	group, ok := groupProxy.Adapter().(outboundgroup.RuntimeProxyGroup)
-	if !ok {
-		return nil
-	}
-	if _, ok := groupProxy.Adapter().(outboundgroup.SelectAble); !ok {
-		return nil
-	}
-
-	chainAdapter := outboundgroup.NewChain(
-		flClashChainName,
-		proxyNames,
-		func(name string) constant.Proxy {
-			if name == flClashChainName {
-				return nil
-			}
-			return allProxies[name]
-		},
-	)
-	if err := chainAdapter.Validate(); err != nil {
-		return err
-	}
-	chain := adapter.NewProxy(chainAdapter)
-	proxies[flClashChainName] = chain
-	group.SetRuntimeProxies([]constant.Proxy{chain})
-	tunnel.UpdateProxies(proxies, tunnel.Providers())
-	return nil
-}
-
-func handleUpdateProxyChain(data []byte) string {
-	runLock.Lock()
-	defer runLock.Unlock()
-	var params UpdateProxyChainParams
-	if err := json.Unmarshal(data, &params); err != nil {
-		return err.Error()
-	}
-	var affectedConnections []statistic.Tracker
-	if params.CloseConnections {
-		// A topology edit must move active Chain traffic to the new hops.
-		// Config reloads leave old connections on their captured Chain.
-		affectedConnections = connectionsUsingGroup(flClashChainName)
-	}
-	if err := updateProxyChain(params.ProxyNames); err != nil {
-		return err.Error()
-	}
-	if params.CloseConnections {
-		closeTrackedConnections(affectedConnections)
-	}
-	return ""
 }
 
 func handleChangeProxy(data string, fn func(string string)) {

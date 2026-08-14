@@ -27,7 +27,6 @@ class AppController {
   bool _healthRecoveryRequested = false;
   DateTime? _lastCoreHealthCheck;
   Future<void> _configApplyQueue = Future.value();
-  Future<void> _proxyChainApplyQueue = Future.value();
   final Map<int, List<String>> _proxyChains = {};
   int _routeConfigRevision = 0;
   int? _pendingRouteDetectionRevision;
@@ -363,36 +362,12 @@ extension ProxiesControllerExt on AppController {
     List<String> proxyNames, {
     required bool closeConnections,
   }) async {
-    final pendingChain = List<String>.from(proxyNames);
     final profileId = _ref.read(currentProfileProvider)?.id;
     if (profileId == null) {
       return '';
     }
-    final shouldCloseConnections =
-        closeConnections &&
-        !stringListEquality.equals(
-          _proxyChains[profileId] ?? const <String>[],
-          pendingChain,
-        );
-    _proxyChains[profileId] = pendingChain;
-    var message = '';
-    final apply = _proxyChainApplyQueue.then((_) async {
-      if (profileId != _ref.read(currentProfileProvider)?.id) {
-        return;
-      }
-      message = await coreController.updateProxyChain(
-        pendingChain,
-        closeConnections: shouldCloseConnections,
-      );
-    });
-    _proxyChainApplyQueue = apply.catchError((error, stackTrace) {
-      commonPrint.log(
-        'update_proxy_chain_queue_failed error=$error stack=$stackTrace',
-        logLevel: LogLevel.warning,
-      );
-    });
-    await apply;
-    return message;
+    _proxyChains[profileId] = List<String>.from(proxyNames);
+    return '';
   }
 
   void updateGroupsDebounce([Duration? duration]) {
@@ -828,34 +803,11 @@ extension SetupControllerExt on AppController {
     final configFilePath = await appPath.configFilePath;
     final yamlString = await encodeYamlTask(config);
     await File(configFilePath).safeWriteAsString(yamlString);
-    var message = await coreController.setupConfig(
+    final message = await coreController.setupConfig(
       setupState: setupState,
       params: setupParams,
       preloadInvoke: preloadInvoke,
     );
-    if (message.isEmpty) {
-      message = await updateProxyChain(
-        proxyChain,
-        closeConnections: false,
-      );
-      String? proxyGroupName;
-      for (final entry in setupParams.selectedMap.entries) {
-        if (entry.key.toLowerCase() == GroupName.Proxy.name.toLowerCase() &&
-            entry.value == internalChainProxyName) {
-          proxyGroupName = entry.key;
-          break;
-        }
-      }
-      if (message.isEmpty && proxyGroupName != null) {
-        message = await coreController.changeProxy(
-          ChangeProxyParams(
-            groupName: proxyGroupName,
-            proxyName: internalChainProxyName,
-            closeConnections: false,
-          ),
-        );
-      }
-    }
     var hasShownDialog = false;
     if (message.isNotEmpty) {
       final result = await _handleSetupConfigForMacOSSshAuthorization(
@@ -967,11 +919,8 @@ extension SetupControllerExt on AppController {
         setupState: setupState,
         params: setupParams,
       );
-      final restoredMessage = retryMessage.isEmpty
-          ? await updateProxyChain(proxyChain, closeConnections: false)
-          : retryMessage;
       return _SetupConfigMessageResult(
-        message: restoredMessage,
+        message: retryMessage,
         hasShownDialog: true,
       );
     }

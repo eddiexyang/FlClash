@@ -67,10 +67,6 @@ func handleAction(action *Action, result ActionResult) {
 	case getProxiesMethod:
 		result.success(handleGetProxies())
 		return
-	case updateProxyChainMethod:
-		data := []byte(action.Data.(string))
-		result.success(handleUpdateProxyChain(data))
-		return
 	case changeProxyMethod:
 		data := action.Data.(string)
 		handleChangeProxy(data, func(value string) {
