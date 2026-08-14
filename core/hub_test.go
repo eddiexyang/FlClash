@@ -20,6 +20,14 @@ func (t *closeErrorTracker) ID() string {
 	return t.id
 }
 
+func (t *closeErrorTracker) Info() *statistic.TrackerInfo {
+	return nil
+}
+
+func (t *closeErrorTracker) Chains() C.Chain {
+	return nil
+}
+
 func (t *closeErrorTracker) Close() error {
 	t.closeCalls++
 	return errors.New("close failed")
