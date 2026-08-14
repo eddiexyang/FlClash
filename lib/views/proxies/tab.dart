@@ -18,6 +18,7 @@ typedef ProxyGroupViewKeyMap =
 
 const _chainBarHeight = 56.0;
 const _chainBarFabGap = 12.0;
+const _chainDragDuration = Duration(milliseconds: 180);
 
 const _chainProxy = Proxy(name: internalChainProxyName, type: 'Relay');
 
@@ -729,7 +730,7 @@ class DraggableProxyCard extends StatelessWidget {
   }
 }
 
-class _ProxyChainBar extends StatelessWidget {
+class _ProxyChainBar extends StatefulWidget {
   final List<Proxy> proxies;
   final void Function(_ProxyChainDragData data, int index) onDrop;
   final void Function(int index) onRemove;
@@ -742,12 +743,100 @@ class _ProxyChainBar extends StatelessWidget {
   });
 
   @override
+  State<_ProxyChainBar> createState() => _ProxyChainBarState();
+}
+
+class _ProxyChainBarState extends State<_ProxyChainBar> {
+  _ProxyChainDragData? _activeDrag;
+  int? _previewTargetIndex;
+  int? _acceptedTargetIndex;
+  double _draggedWidth = 0;
+
+  int _clampTargetIndex(int index) {
+    return min(max(index, 0), widget.proxies.length);
+  }
+
+  void _handleDragStarted(_ProxyChainDragData data, double width) {
+    setState(() {
+      _activeDrag = data;
+      _previewTargetIndex = data.chainIndex;
+      _acceptedTargetIndex = null;
+      _draggedWidth = max(width, 96.0);
+    });
+  }
+
+  void _handleDragMove(_ProxyChainDragData data, int targetIndex) {
+    if (!identical(data, _activeDrag) || data.chainIndex == null) {
+      return;
+    }
+    final nextTargetIndex = _clampTargetIndex(targetIndex);
+    if (_previewTargetIndex == nextTargetIndex) {
+      return;
+    }
+    setState(() {
+      _previewTargetIndex = nextTargetIndex;
+    });
+  }
+
+  void _handleAccept(_ProxyChainDragData data, int targetIndex) {
+    final nextTargetIndex = _clampTargetIndex(targetIndex);
+    if (data.chainIndex == null) {
+      widget.onDrop(data, nextTargetIndex);
+      return;
+    }
+    _acceptedTargetIndex = nextTargetIndex;
+    _handleDragMove(data, nextTargetIndex);
+  }
+
+  void _handleDragEnd(
+    _ProxyChainDragData data,
+    DraggableDetails details,
+  ) {
+    final sourceIndex = data.chainIndex;
+    final targetIndex = _acceptedTargetIndex;
+    setState(() {
+      _activeDrag = null;
+      _previewTargetIndex = null;
+      _acceptedTargetIndex = null;
+      _draggedWidth = 0;
+    });
+    if (sourceIndex == null) {
+      return;
+    }
+    if (details.wasAccepted && targetIndex != null) {
+      widget.onDrop(data, targetIndex);
+      return;
+    }
+    widget.onRemove(sourceIndex);
+  }
+
+  void _handleBarLeave(_ProxyChainDragData? data) {
+    if (!identical(data, _activeDrag) || _previewTargetIndex == null) {
+      return;
+    }
+    setState(() {
+      _previewTargetIndex = null;
+    });
+  }
+
+  int _targetIndexForHop(_ProxyChainDragData data, int hopIndex) {
+    final sourceIndex = data.chainIndex;
+    if (sourceIndex == hopIndex) {
+      return hopIndex;
+    }
+    return sourceIndex != null && sourceIndex > hopIndex
+        ? hopIndex
+        : hopIndex + 1;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return DragTarget<_ProxyChainDragData>(
       onWillAcceptWithDetails: (_) => true,
       onAcceptWithDetails: (details) {
-        onDrop(details.data, proxies.length);
+        _handleAccept(details.data, widget.proxies.length);
       },
+      onLeave: _handleBarLeave,
       builder: (context, candidateData, _) {
         final isHovering = candidateData.isNotEmpty;
         return AnimatedContainer(
@@ -783,24 +872,37 @@ class _ProxyChainBar extends StatelessWidget {
                   padding: const EdgeInsets.only(right: 8),
                   child: Row(
                     children: [
-                      for (var index = 0; index <= proxies.length; index++) ...[
+                      for (
+                        var index = 0;
+                        index <= widget.proxies.length;
+                        index++
+                      ) ...[
                         _ChainInsertTarget(
-                          onAccept: (data) => onDrop(data, index),
+                          previewWidth: _previewTargetIndex == index
+                              ? _draggedWidth
+                              : 0,
+                          onMove: (data) => _handleDragMove(data, index),
+                          onAccept: (data) => _handleAccept(data, index),
                         ),
-                        if (index < proxies.length)
+                        if (index < widget.proxies.length)
                           _ChainHop(
-                            proxy: proxies[index],
+                            proxy: widget.proxies[index],
                             index: index,
-                            onAccept: (data) {
-                              final sourceIndex = data.chainIndex;
-                              final targetIndex = sourceIndex != null &&
-                                      sourceIndex > index
-                                  ? index
-                                  : index + 1;
-                              onDrop(data, targetIndex);
+                            onDragStarted: _handleDragStarted,
+                            onDragEnd: _handleDragEnd,
+                            onMove: (data) {
+                              _handleDragMove(
+                                data,
+                                _targetIndexForHop(data, index),
+                              );
                             },
-                            onRemove: () => onRemove(index),
-                            onDragOutside: () => onRemove(index),
+                            onAccept: (data) {
+                              _handleAccept(
+                                data,
+                                _targetIndexForHop(data, index),
+                              );
+                            },
+                            onRemove: () => widget.onRemove(index),
                           ),
                       ],
                     ],
@@ -816,36 +918,54 @@ class _ProxyChainBar extends StatelessWidget {
 }
 
 class _ChainInsertTarget extends StatelessWidget {
+  final double previewWidth;
+  final ValueChanged<_ProxyChainDragData> onMove;
   final ValueChanged<_ProxyChainDragData> onAccept;
 
-  const _ChainInsertTarget({required this.onAccept});
+  const _ChainInsertTarget({
+    required this.previewWidth,
+    required this.onMove,
+    required this.onAccept,
+  });
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<_ProxyChainDragData>(
       onWillAcceptWithDetails: (_) => true,
+      onMove: (details) => onMove(details.data),
       onAcceptWithDetails: (details) => onAccept(details.data),
       builder: (context, candidateData, _) {
         final isHovering = candidateData.isNotEmpty;
-        return SizedBox(
-          width: 28,
-          height: 40,
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 120),
-              transitionBuilder: (child, animation) {
-                return ScaleTransition(scale: animation, child: child);
-              },
-              child: Icon(
-                isHovering ? Icons.add_circle : Icons.chevron_right,
-                key: ValueKey(isHovering),
-                size: isHovering ? 24 : 18,
-                color: isHovering
-                    ? context.colorScheme.primary
-                    : context.colorScheme.onSurfaceVariant.opacity60,
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 28,
+              height: 40,
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: _chainDragDuration,
+                  transitionBuilder: (child, animation) {
+                    return ScaleTransition(scale: animation, child: child);
+                  },
+                  child: Icon(
+                    isHovering ? Icons.add_circle : Icons.chevron_right,
+                    key: ValueKey(isHovering),
+                    size: isHovering ? 24 : 18,
+                    color: isHovering
+                        ? context.colorScheme.primary
+                        : context.colorScheme.onSurfaceVariant.opacity60,
+                  ),
+                ),
               ),
             ),
-          ),
+            AnimatedContainer(
+              duration: _chainDragDuration,
+              curve: Curves.easeOutCubic,
+              width: previewWidth,
+              height: 40,
+            ),
+          ],
         );
       },
     );
@@ -855,16 +975,21 @@ class _ChainInsertTarget extends StatelessWidget {
 class _ChainHop extends StatelessWidget {
   final Proxy proxy;
   final int index;
+  final void Function(_ProxyChainDragData data, double width) onDragStarted;
+  final void Function(_ProxyChainDragData data, DraggableDetails details)
+      onDragEnd;
+  final ValueChanged<_ProxyChainDragData> onMove;
   final ValueChanged<_ProxyChainDragData> onAccept;
   final VoidCallback onRemove;
-  final VoidCallback onDragOutside;
 
   const _ChainHop({
     required this.proxy,
     required this.index,
+    required this.onDragStarted,
+    required this.onDragEnd,
+    required this.onMove,
     required this.onAccept,
     required this.onRemove,
-    required this.onDragOutside,
   });
 
   Widget _buildHop(
@@ -924,17 +1049,29 @@ class _ChainHop extends StatelessWidget {
     );
     return DragTarget<_ProxyChainDragData>(
       onWillAcceptWithDetails: (_) => true,
+      onMove: (details) => onMove(details.data),
       onAcceptWithDetails: (details) => onAccept(details.data),
       builder: (context, candidateData, _) {
         final child = _buildHop(
           context,
           isDropTarget: candidateData.isNotEmpty,
         );
-        final childWhenDragging = Opacity(opacity: 0, child: child);
-        void handleDragEnd(DraggableDetails details) {
-          if (!details.wasAccepted) {
-            onDragOutside();
-          }
+        final visibleChild = AnimatedSize(
+          duration: _chainDragDuration,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.centerLeft,
+          child: child,
+        );
+        final childWhenDragging = AnimatedSize(
+          duration: _chainDragDuration,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.centerLeft,
+          child: const SizedBox.shrink(),
+        );
+        void handleDragStarted() {
+          final renderObject = context.findRenderObject();
+          final width = renderObject is RenderBox ? renderObject.size.width : 0;
+          onDragStarted(data, width);
         }
 
         if (system.isDesktop) {
@@ -942,18 +1079,20 @@ class _ChainHop extends StatelessWidget {
             data: data,
             feedback: feedback,
             childWhenDragging: childWhenDragging,
-            onDragEnd: handleDragEnd,
+            onDragStarted: handleDragStarted,
+            onDragEnd: (details) => onDragEnd(data, details),
             rootOverlay: true,
-            child: child,
+            child: visibleChild,
           );
         }
         return LongPressDraggable<_ProxyChainDragData>(
           data: data,
           feedback: feedback,
           childWhenDragging: childWhenDragging,
-          onDragEnd: handleDragEnd,
+          onDragStarted: handleDragStarted,
+          onDragEnd: (details) => onDragEnd(data, details),
           rootOverlay: true,
-          child: child,
+          child: visibleChild,
         );
       },
     );
