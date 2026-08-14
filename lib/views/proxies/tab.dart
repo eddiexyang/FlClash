@@ -22,16 +22,6 @@ const _chainBarFabGap = 12.0;
 
 const _chainProxy = Proxy(name: internalChainProxyName, type: 'Relay');
 
-void _rejectEmptyChainDelay(String? testUrl) {
-  appController.setDelay(
-    Delay(
-      name: internalChainProxyName,
-      url: appController.getRealTestUrl(testUrl),
-      value: -1,
-    ),
-  );
-}
-
 bool _isChainGroup(Group group) {
   final isSelectable =
       group.type == GroupType.Selector || group.type.isComputedSelected;
@@ -96,17 +86,8 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
   Future<void> delayTestCurrentGroup() async {
     final currentGroupName = appController.getCurrentGroupName();
     final currentState = _keyMap[currentGroupName]?.currentState;
-    List<Proxy> currentProxies = currentState?.currentProxies ?? const [];
+    final currentProxies = currentState?.currentProxies ?? const <Proxy>[];
     try {
-      if (currentState != null && _isChainGroup(currentState.widget.group)) {
-        final proxyChain = appController.proxyChain;
-        if (proxyChain.isEmpty) {
-          _rejectEmptyChainDelay(currentState.testUrl);
-          currentProxies = currentProxies
-              .where((proxy) => proxy.name != internalChainProxyName)
-              .toList();
-        }
-      }
       await delayTest(currentProxies, currentState?.testUrl);
     } catch (error) {
       globalState.showNotifier(error.toString());
@@ -565,11 +546,6 @@ class ChainProxyCard extends ConsumerWidget {
 
   Future<void> _handleTestCurrentDelay() async {
     try {
-      final proxyChain = appController.proxyChain;
-      if (proxyChain.isEmpty) {
-        _rejectEmptyChainDelay(testUrl);
-        return;
-      }
       await proxyDelayTest(_chainProxy, testUrl);
     } catch (error) {
       globalState.showNotifier(error.toString());
