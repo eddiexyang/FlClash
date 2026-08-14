@@ -112,7 +112,6 @@ class CoreController {
     required DelayMap delayMap,
     required Map<String, String> selectedMap,
     required String defaultTestUrl,
-    List<String> chainProxyNames = const [],
   }) async {
     final proxiesData = await _interface.getProxies();
     final groups = await toGroupsTask(
@@ -127,8 +126,6 @@ class CoreController {
     return buildProxyChainGuiGroups(
       groups: groups,
       proxiesData: proxiesData,
-      sourceProxyNames: chainProxyNames,
-      testUrl: defaultTestUrl,
     );
   }
 

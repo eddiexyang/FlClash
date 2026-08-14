@@ -32,6 +32,7 @@ class AppController {
   final Map<int, Map<String, Map<String, dynamic>>> _proxyChainSources = {};
   final Map<int, List<String>> _proxyChainAvailableProxyNames = {};
   final Map<int, List<Map<String, dynamic>>> _proxyChainRuntimeProxies = {};
+  final ValueNotifier<int> _proxyChainRevision = ValueNotifier(0);
   int _routeConfigRevision = 0;
   int? _pendingRouteDetectionRevision;
   int? _pendingRouteDetectionCheckId;
@@ -362,12 +363,24 @@ extension LogsControllerExt on AppController {
 }
 
 extension ProxiesControllerExt on AppController {
+  ValueListenable<int> get proxyChainRevision => _proxyChainRevision;
+
   List<String> get proxyChain {
     final profileId = _ref.read(currentProfileProvider)?.id;
     if (profileId == null) {
       return const [];
     }
     return List.unmodifiable(_proxyChains[profileId] ?? const []);
+  }
+
+  Set<String> get proxyChainSourceNames {
+    final profileId = _ref.read(currentProfileProvider)?.id;
+    if (profileId == null) {
+      return const {};
+    }
+    return Set.unmodifiable(
+      _proxyChainAvailableProxyNames[profileId] ?? const [],
+    );
   }
 
   Future<String> updateProxyChain(
@@ -402,6 +415,7 @@ extension ProxiesControllerExt on AppController {
         }
         _proxyChains[profileId] = pendingChain;
         _proxyChainRuntimeProxies[profileId] = chainProxies;
+        _proxyChainRevision.value++;
         if (!await preferences.saveProxyChain(profileId, pendingChain)) {
           commonPrint.log(
             'save_proxy_chain_failed profile_id=$profileId',
@@ -457,14 +471,11 @@ extension ProxiesControllerExt on AppController {
           final selectedMap = _ref.read(
             currentProfileProvider.select((state) => state?.selectedMap ?? {}),
           );
-          final profileId = _ref.read(currentProfileProvider)?.id;
           return await coreController.getProxiesGroups(
             selectedMap: selectedMap,
             sortType: sortType,
             delayMap: delayMap,
             defaultTestUrl: testUrl,
-            chainProxyNames:
-                _proxyChainAvailableProxyNames[profileId] ?? const [],
           );
         },
         retryIf: (res) => res.isEmpty,
@@ -486,9 +497,6 @@ extension ProxiesControllerExt on AppController {
   }
 
   void updateCurrentSelectedMap(String groupName, String proxyName) {
-    if (!proxyGroupAllowsProxyInteraction(groupName)) {
-      return;
-    }
     final currentProfile = _ref.read(currentProfileProvider);
     if (currentProfile != null &&
         currentProfile.selectedMap[groupName] != proxyName) {
@@ -518,9 +526,6 @@ extension ProxiesControllerExt on AppController {
     required String groupName,
     required String proxyName,
   }) async {
-    if (!proxyGroupAllowsProxyInteraction(groupName)) {
-      return '';
-    }
     final previousProxyName = _ref
         .read(groupsProvider)
         .getGroup(groupName)

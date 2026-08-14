@@ -438,8 +438,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "proxies": MessageLookupByLibrary.simpleMessage("プロキシ"),
     "proxiesSetting": MessageLookupByLibrary.simpleMessage("プロキシ設定"),
     "proxyChains": MessageLookupByLibrary.simpleMessage("プロキシチェーン"),
-    "chainEditableOnlyInChainGroup": MessageLookupByLibrary.simpleMessage(
-      "Chain グループでのみ編集できます。",
+    "chainOnlySupportsProxies": MessageLookupByLibrary.simpleMessage(
+      "CHAIN に追加できるのはプロキシのみです。",
     ),
     "proxyGroup": MessageLookupByLibrary.simpleMessage("プロキシグループ"),
     "proxyNameserver": MessageLookupByLibrary.simpleMessage("プロキシネームサーバー"),

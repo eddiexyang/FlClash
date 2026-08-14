@@ -24,19 +24,17 @@ const _chainDropDuration = Duration(milliseconds: 80);
 
 const _chainProxy = Proxy(name: internalChainProxyName, type: 'Relay');
 
-bool _isChainGroup(Group group) {
-  return isProxyChainEditorGroup(group.name);
-}
-
 @immutable
 class _ProxyChainDragData {
   final Proxy proxy;
   final int? chainIndex;
+  final bool canAddToChain;
   final ValueNotifier<bool>? compactFeedback;
 
   const _ProxyChainDragData({
     required this.proxy,
     this.chainIndex,
+    this.canAddToChain = true,
     this.compactFeedback,
   });
 
@@ -88,17 +86,11 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
 
   void scrollToGroupSelected() {
     final currentGroupName = appController.getCurrentGroupName();
-    if (!proxyGroupAllowsProxyInteraction(currentGroupName ?? '')) {
-      return;
-    }
     _keyMap[currentGroupName]?.currentState?.scrollToSelected();
   }
 
   Future<void> delayTestCurrentGroup() async {
     final currentGroupName = appController.getCurrentGroupName();
-    if (!proxyGroupAllowsDelayTest(currentGroupName ?? '')) {
-      return;
-    }
     final currentState = _keyMap[currentGroupName]?.currentState;
     final currentProxies = currentState?.currentProxies ?? const <Proxy>[];
     try {
@@ -244,6 +236,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
                 children: [
                   TabBar(
                     controller: _tabController,
+                    mouseCursor: SystemMouseCursors.click,
                     padding: EdgeInsets.only(
                       left: 16,
                       right: 16 + (value ? 16 : 0),
@@ -306,20 +299,13 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
           ),
         ),
         if (currentGroup != null)
-          AnimatedPadding(
-            duration: midDuration,
-            curve: Curves.easeOutCubic,
+          Padding(
             padding: EdgeInsets.only(
               left: 16,
-              right: 16 +
-                  (_isChainGroup(currentGroup)
-                      ? 0
-                      : _chainBarHeight + _chainBarFabGap),
+              right: 16 + _chainBarHeight + _chainBarFabGap,
               bottom: 16,
             ),
-            child: ProxyChainEditorBar(
-              editable: _isChainGroup(currentGroup),
-            ),
+            child: const ProxyChainEditorBar(),
           ),
       ],
     );
@@ -391,12 +377,12 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
-    final isChainEditor = _isChainGroup(group);
     final proxies = group.all
         .where((proxy) => proxy.name != internalChainProxyName)
         .toList();
+    final sourceProxyNames = appController.proxyChainSourceNames;
     testUrl = group.testUrl;
-    currentProxies = isChainEditor ? const [] : [_chainProxy, ...proxies];
+    currentProxies = [_chainProxy, ...proxies];
     return CommonScrollBar(
       controller: _controller,
       child: GridView.builder(
@@ -414,9 +400,9 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
           crossAxisSpacing: 8,
           mainAxisExtent: getItemHeight(widget.cardType),
         ),
-        itemCount: isChainEditor ? proxies.length : currentProxies.length,
+        itemCount: currentProxies.length,
         itemBuilder: (_, index) {
-          if (!isChainEditor && index == 0) {
+          if (index == 0) {
             return ChainProxyCard(
               type: widget.cardType,
               groupType: group.type,
@@ -424,23 +410,23 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
               testUrl: group.testUrl,
             );
           }
-          final proxyIndex = index - (isChainEditor ? 0 : 1);
+          final proxyIndex = index - 1;
           final proxy = proxies[proxyIndex];
+          final canAddToChain = isProxyChainSourceName(
+            proxy.name,
+            sourceProxyNames,
+          );
           final card = ProxyCard(
             testUrl: group.testUrl,
             groupType: group.type,
             type: widget.cardType,
             proxy: proxy,
             groupName: group.name,
-            selectable: !isChainEditor,
-            delayTestable: !isChainEditor,
           );
-          if (!isChainEditor) {
-            return card;
-          }
           return DraggableProxyCard(
             proxy: proxy,
             cardType: widget.cardType,
+            canAddToChain: canAddToChain,
             child: card,
           );
         },
@@ -506,15 +492,18 @@ class ChainProxyCard extends ConsumerWidget {
                         },
                       ),
               )
-            : GestureDetector(
-                onTap: () {
-                  _handleTestCurrentDelay();
-                },
-                child: Text(
-                  delay > 0 ? '$delay ms' : 'Timeout',
-                  style: context.textTheme.labelSmall?.copyWith(
-                    overflow: TextOverflow.ellipsis,
-                    color: utils.getDelayColor(delay),
+            : MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () {
+                    _handleTestCurrentDelay();
+                  },
+                  child: Text(
+                    delay > 0 ? '$delay ms' : 'Timeout',
+                    style: context.textTheme.labelSmall?.copyWith(
+                      overflow: TextOverflow.ellipsis,
+                      color: utils.getDelayColor(delay),
+                    ),
                   ),
                 ),
               ),
@@ -536,7 +525,7 @@ class ChainProxyCard extends ConsumerWidget {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Chain',
+                displayProxyName(internalChainProxyName),
                 maxLines: type == ProxyCardType.min ? 1 : 2,
                 overflow: TextOverflow.ellipsis,
                 style: context.textTheme.bodyMedium,
@@ -608,12 +597,14 @@ class ChainProxyCard extends ConsumerWidget {
 class DraggableProxyCard extends StatefulWidget {
   final Proxy proxy;
   final ProxyCardType cardType;
+  final bool canAddToChain;
   final Widget child;
 
   const DraggableProxyCard({
     super.key,
     required this.proxy,
     required this.cardType,
+    required this.canAddToChain,
     required this.child,
   });
 
@@ -640,6 +631,7 @@ class _DraggableProxyCardState extends State<DraggableProxyCard> {
       builder: (context, constraints) {
         final data = _ProxyChainDragData(
           proxy: widget.proxy,
+          canAddToChain: widget.canAddToChain,
           compactFeedback: _compactFeedback,
         );
         final feedback = FractionalTranslation(
@@ -663,27 +655,30 @@ class _DraggableProxyCardState extends State<DraggableProxyCard> {
           opacity: 0.35,
           child: widget.child,
         );
-        if (system.isDesktop) {
-          return Draggable<_ProxyChainDragData>(
-            data: data,
-            feedback: feedback,
-            childWhenDragging: childWhenDragging,
-            dragAnchorStrategy: pointerDragAnchorStrategy,
-            onDragStarted: _resetFeedback,
-            onDragEnd: (_) => _resetFeedback(),
-            rootOverlay: true,
-            child: widget.child,
-          );
-        }
-        return LongPressDraggable<_ProxyChainDragData>(
-          data: data,
-          feedback: feedback,
-          childWhenDragging: childWhenDragging,
-          dragAnchorStrategy: pointerDragAnchorStrategy,
-          onDragStarted: _resetFeedback,
-          onDragEnd: (_) => _resetFeedback(),
-          rootOverlay: true,
-          child: widget.child,
+        final draggable = system.isDesktop
+            ? Draggable<_ProxyChainDragData>(
+                data: data,
+                feedback: feedback,
+                childWhenDragging: childWhenDragging,
+                dragAnchorStrategy: pointerDragAnchorStrategy,
+                onDragStarted: _resetFeedback,
+                onDragEnd: (_) => _resetFeedback(),
+                rootOverlay: true,
+                child: widget.child,
+              )
+            : LongPressDraggable<_ProxyChainDragData>(
+                data: data,
+                feedback: feedback,
+                childWhenDragging: childWhenDragging,
+                dragAnchorStrategy: pointerDragAnchorStrategy,
+                onDragStarted: _resetFeedback,
+                onDragEnd: (_) => _resetFeedback(),
+                rootOverlay: true,
+                child: widget.child,
+              );
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: draggable,
         );
       },
     );
@@ -830,7 +825,6 @@ class _ProxyDragFeedbackState extends State<_ProxyDragFeedback>
                           size: compactSize,
                           child: _ChainHopCard(
                             proxy: widget.proxy,
-                            onRemove: () {},
                           ),
                         ),
                       ),
@@ -846,7 +840,6 @@ class _ProxyDragFeedbackState extends State<_ProxyDragFeedback>
             key: _compactKey,
             child: _ChainHopCard(
               proxy: widget.proxy,
-              onRemove: () {},
             ),
           ),
         ),
@@ -856,9 +849,7 @@ class _ProxyDragFeedbackState extends State<_ProxyDragFeedback>
 }
 
 class ProxyChainEditorBar extends ConsumerStatefulWidget {
-  final bool editable;
-
-  const ProxyChainEditorBar({super.key, required this.editable});
+  const ProxyChainEditorBar({super.key});
 
   @override
   ConsumerState<ProxyChainEditorBar> createState() =>
@@ -869,6 +860,24 @@ class _ProxyChainEditorBarState extends ConsumerState<ProxyChainEditorBar> {
   final _chainBarKey = GlobalKey();
   final List<Proxy> _chain = [];
   int? _chainProfileId;
+
+  @override
+  void initState() {
+    super.initState();
+    appController.proxyChainRevision.addListener(_handleChainChanged);
+  }
+
+  @override
+  void dispose() {
+    appController.proxyChainRevision.removeListener(_handleChainChanged);
+    super.dispose();
+  }
+
+  void _handleChainChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   void _applyChain() {
     final pendingChain = _chain.map((proxy) => proxy.name).toList();
@@ -973,7 +982,6 @@ class _ProxyChainEditorBarState extends ConsumerState<ProxyChainEditorBar> {
     return _ProxyChainBar(
       key: _chainBarKey,
       proxies: _chain,
-      editable: widget.editable,
       onDrop: _insertChainNode,
       onRemove: _removeChainNode,
     );
@@ -982,14 +990,12 @@ class _ProxyChainEditorBarState extends ConsumerState<ProxyChainEditorBar> {
 
 class _ProxyChainBar extends StatefulWidget {
   final List<Proxy> proxies;
-  final bool editable;
   final void Function(_ProxyChainDragData data, int index) onDrop;
   final void Function(int index) onRemove;
 
   const _ProxyChainBar({
     super.key,
     required this.proxies,
-    required this.editable,
     required this.onDrop,
     required this.onRemove,
   });
@@ -1076,6 +1082,12 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
   }
 
   void _handleBarAccept(DragTargetDetails<_ProxyChainDragData> details) {
+    if (!details.data.canAddToChain) {
+      details.data.setCompactFeedback(false);
+      _finishDrag(() {});
+      globalState.showNotifier(appLocalizations.chainOnlySupportsProxies);
+      return;
+    }
     final targetIndex = _targetIndexForX(
       details.data,
       details.offset.dx,
@@ -1234,26 +1246,17 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
                         animationDuration: animationDuration,
                       ),
                       if (index < widget.proxies.length)
-                        if (widget.editable)
-                          _ChainHop(
-                            key: _hopKeys[index],
-                            proxy: widget.proxies[index],
-                            index: index,
-                            animationDuration: animationDuration,
-                            landingAnimationId: _landingIndex == index
-                                ? _landingAnimationId
-                                : null,
-                            onDragStarted: _handleDragStarted,
-                            onDragEnd: _handleDragEnd,
-                            onRemove: () => widget.onRemove(index),
-                          )
-                        else
-                          KeyedSubtree(
-                            key: _hopKeys[index],
-                            child: _ChainHopCard(
-                              proxy: widget.proxies[index],
-                            ),
-                          ),
+                        _ChainHop(
+                          key: _hopKeys[index],
+                          proxy: widget.proxies[index],
+                          index: index,
+                          animationDuration: animationDuration,
+                          landingAnimationId: _landingIndex == index
+                              ? _landingAnimationId
+                              : null,
+                          onDragStarted: _handleDragStarted,
+                          onDragEnd: _handleDragEnd,
+                        ),
                     ],
                   ],
                 ),
@@ -1264,12 +1267,6 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
       );
     }
 
-    if (!widget.editable) {
-      return Tooltip(
-        message: appLocalizations.chainEditableOnlyInChainGroup,
-        child: buildBar(false),
-      );
-    }
     return DragTarget<_ProxyChainDragData>(
       onWillAcceptWithDetails: (_) => true,
       onMove: _handleBarMove,
@@ -1331,7 +1328,6 @@ class _ChainInsertTarget extends StatelessWidget {
                       opacity: 0,
                       child: _ChainHopCard(
                         proxy: previewProxy!,
-                        onRemove: () {},
                       ),
                     ),
                   ),
@@ -1357,53 +1353,76 @@ class _ChainInsertTarget extends StatelessWidget {
   }
 }
 
-class _ChainHopCard extends StatelessWidget {
+class _ChainHopCard extends StatefulWidget {
   final Proxy proxy;
-  final VoidCallback? onRemove;
+  final bool hoverable;
 
   const _ChainHopCard({
     required this.proxy,
-    this.onRemove,
+    this.hoverable = false,
   });
 
   @override
+  State<_ChainHopCard> createState() => _ChainHopCardState();
+}
+
+class _ChainHopCardState extends State<_ChainHopCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 96, maxWidth: 220),
-      height: 40,
-      decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHigh,
-        border: Border.all(color: Colors.transparent),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(width: 12),
-          Flexible(
-            child: EmojiText(
-              displayProxyName(proxy.name),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: context.textTheme.bodyMedium,
-            ),
+    final card = AnimatedScale(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOutCubic,
+      scale: _hovered ? 1.02 : 1,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        constraints: const BoxConstraints(minWidth: 96, maxWidth: 220),
+        height: 40,
+        decoration: BoxDecoration(
+          color: context.colorScheme.surfaceContainerHigh,
+          border: Border.all(
+            color: _hovered
+                ? context.colorScheme.primary.opacity40
+                : Colors.transparent,
           ),
-          if (onRemove != null)
-            IconButton(
-              tooltip: appLocalizations.remove,
-              onPressed: onRemove,
-              icon: const Icon(Icons.close),
-              iconSize: 18,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(
-                width: 36,
-                height: 40,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: _hovered
+              ? [
+                  BoxShadow(
+                    color: context.colorScheme.shadow.withValues(alpha: 0.18),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : const [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 12),
+            Flexible(
+              child: EmojiText(
+                displayProxyName(widget.proxy.name),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.textTheme.bodyMedium,
               ),
-              visualDensity: VisualDensity.compact,
             ),
-          if (onRemove == null) const SizedBox(width: 12),
-        ],
+            const SizedBox(width: 12),
+          ],
+        ),
       ),
+    );
+    if (!widget.hoverable) {
+      return card;
+    }
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: card,
     );
   }
 }
@@ -1416,7 +1435,6 @@ class _ChainHop extends StatelessWidget {
   final ValueChanged<_ProxyChainDragData> onDragStarted;
   final void Function(_ProxyChainDragData data, DraggableDetails details)
       onDragEnd;
-  final VoidCallback onRemove;
 
   const _ChainHop({
     super.key,
@@ -1426,7 +1444,6 @@ class _ChainHop extends StatelessWidget {
     required this.landingAnimationId,
     required this.onDragStarted,
     required this.onDragEnd,
-    required this.onRemove,
   });
 
   @override
@@ -1436,10 +1453,10 @@ class _ChainHop extends StatelessWidget {
       translation: const Offset(-0.5, -0.5),
       child: Material(
         color: Colors.transparent,
-        child: _ChainHopCard(proxy: proxy, onRemove: onRemove),
+        child: _ChainHopCard(proxy: proxy),
       ),
     );
-    final child = _ChainHopCard(proxy: proxy, onRemove: onRemove);
+    final child = _ChainHopCard(proxy: proxy, hoverable: true);
     final landedChild = landingAnimationId == null
         ? child
         : TweenAnimationBuilder<double>(

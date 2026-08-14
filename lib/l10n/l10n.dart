@@ -2919,11 +2919,11 @@ class AppLocalizations {
     );
   }
 
-  /// `Editable only in the Chain group.`
-  String get chainEditableOnlyInChainGroup {
+  /// `Only proxies can be added to CHAIN.`
+  String get chainOnlySupportsProxies {
     return Intl.message(
-      'Editable only in the Chain group.',
-      name: 'chainEditableOnlyInChainGroup',
+      'Only proxies can be added to CHAIN.',
+      name: 'chainOnlySupportsProxies',
       desc: '',
       args: [],
     );

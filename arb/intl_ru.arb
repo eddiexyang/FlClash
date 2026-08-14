@@ -385,7 +385,7 @@
   "remoteDestination": "Удалённое назначение",
   "networkType": "Тип сети",
   "proxyChains": "Цепочки прокси",
-  "chainEditableOnlyInChainGroup": "Редактирование возможно только в группе Chain.",
+  "chainOnlySupportsProxies": "В CHAIN можно добавлять только прокси.",
   "log": "Журнал",
   "connection": "Соединение",
   "request": "Запрос",

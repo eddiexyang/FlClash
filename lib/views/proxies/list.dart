@@ -20,9 +20,7 @@ typedef GroupNameProxiesMap = Map<String, List<Proxy>>;
 const _chainListBarHeight = 64.0;
 
 class _ProxyChainListBar extends StatelessWidget {
-  final bool editable;
-
-  const _ProxyChainListBar({required this.editable});
+  const _ProxyChainListBar();
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +28,7 @@ class _ProxyChainListBar extends StatelessWidget {
       height: _chainListBarHeight,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: ProxyChainEditorBar(editable: editable),
+        child: const ProxyChainEditorBar(),
       ),
     );
   }
@@ -143,9 +141,9 @@ class _ProxiesListViewState extends State<ProxiesListView> {
     required ProxyCardType cardType,
   }) {
     final items = <Widget>[];
+    final sourceProxyNames = appController.proxyChainSourceNames;
     for (final group in groups) {
       final groupName = group.name;
-      final isChainEditor = isProxyChainEditorGroup(groupName);
       final isExpand = currentUnfoldSet.contains(groupName);
       items.addAll([
         ListHeader(
@@ -165,8 +163,8 @@ class _ProxiesListViewState extends State<ProxiesListView> {
             .map<Widget>((proxies) {
               final children = proxies
                   .map<Widget>((proxy) {
-                    final card = proxy.name == internalChainProxyName &&
-                            !isChainEditor
+                    final isChain = proxy.name == internalChainProxyName;
+                    final card = isChain
                         ? ChainProxyCard(
                             type: cardType,
                             groupType: group.type,
@@ -179,13 +177,15 @@ class _ProxiesListViewState extends State<ProxiesListView> {
                             groupType: group.type,
                             proxy: proxy,
                             groupName: groupName,
-                            selectable: !isChainEditor,
-                            delayTestable: !isChainEditor,
                           );
-                    final visibleCard = isChainEditor
+                    final visibleCard = !isChain
                         ? DraggableProxyCard(
                             proxy: proxy,
                             cardType: cardType,
+                            canAddToChain: isProxyChainSourceName(
+                              proxy.name,
+                              sourceProxyNames,
+                            ),
                             child: card,
                           )
                         : card;
@@ -208,7 +208,7 @@ class _ProxiesListViewState extends State<ProxiesListView> {
             .separated(const SizedBox(height: 8));
         items.addAll([
           ...rows,
-          _ProxyChainListBar(editable: isChainEditor),
+          const _ProxyChainListBar(),
           const SizedBox(height: 8),
         ]);
       }
@@ -454,7 +454,7 @@ class _ListHeaderState extends State<ListHeader> {
   bool get isExpand => widget.isExpand;
 
   Future<void> _delayTest() async {
-    if (isLock || !proxyGroupAllowsDelayTest(groupName)) return;
+    if (isLock) return;
     isLock = true;
     await delayTest(widget.group.all, widget.group.testUrl);
     isLock = false;
@@ -598,8 +598,7 @@ class _ListHeaderState extends State<ListHeader> {
             ),
             Row(
               children: [
-                if (isExpand &&
-                    proxyGroupAllowsProxyInteraction(groupName)) ...[
+                if (isExpand) ...[
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.all(2),

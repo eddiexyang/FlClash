@@ -145,9 +145,7 @@ TrayState trayState(Ref ref) {
     isStart: isStart,
     locale: appSettingVm3.b,
     brightness: brightness,
-    groups: groups
-        .where((group) => !isProxyChainEditorGroup(group.name))
-        .toList(),
+    groups: groups,
     selectedMap: selectedMap,
     showTrayTitle: appSettingVm3.c,
   );

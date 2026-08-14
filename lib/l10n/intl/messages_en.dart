@@ -565,8 +565,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "proxies": MessageLookupByLibrary.simpleMessage("Proxies"),
     "proxiesSetting": MessageLookupByLibrary.simpleMessage("Proxies setting"),
     "proxyChains": MessageLookupByLibrary.simpleMessage("Proxy chains"),
-    "chainEditableOnlyInChainGroup": MessageLookupByLibrary.simpleMessage(
-      "Editable only in the Chain group.",
+    "chainOnlySupportsProxies": MessageLookupByLibrary.simpleMessage(
+      "Only proxies can be added to CHAIN.",
     ),
     "proxyGroup": MessageLookupByLibrary.simpleMessage("Proxy group"),
     "proxyNameserver": MessageLookupByLibrary.simpleMessage("Proxy nameserver"),

@@ -15,8 +15,6 @@ class ProxyCard extends StatelessWidget {
   final GroupType groupType;
   final ProxyCardType type;
   final String? testUrl;
-  final bool selectable;
-  final bool delayTestable;
 
   const ProxyCard({
     super.key,
@@ -25,8 +23,6 @@ class ProxyCard extends StatelessWidget {
     required this.proxy,
     required this.groupType,
     required this.type,
-    this.selectable = true,
-    this.delayTestable = true,
   });
 
   Measure get measure => globalState.measure;
@@ -36,9 +32,6 @@ class ProxyCard extends StatelessWidget {
   }
 
   Widget _buildDelayText() {
-    if (!delayTestable) {
-      return SizedBox(height: measure.labelSmallHeight);
-    }
     return SizedBox(
       height: measure.labelSmallHeight,
       child: Consumer(
@@ -63,13 +56,16 @@ class ProxyCard extends StatelessWidget {
                             onPressed: _handleTestCurrentDelay,
                           ),
                   )
-                : GestureDetector(
-                    onTap: _handleTestCurrentDelay,
-                    child: Text(
-                      delay > 0 ? '$delay ms' : 'Timeout',
-                      style: context.textTheme.labelSmall?.copyWith(
-                        overflow: TextOverflow.ellipsis,
-                        color: utils.getDelayColor(delay),
+                : MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: _handleTestCurrentDelay,
+                      child: Text(
+                        delay > 0 ? '$delay ms' : 'Timeout',
+                        style: context.textTheme.labelSmall?.copyWith(
+                          overflow: TextOverflow.ellipsis,
+                          color: utils.getDelayColor(delay),
+                        ),
                       ),
                     ),
                   ),
@@ -128,9 +124,6 @@ class ProxyCard extends StatelessWidget {
       children: [
         Consumer(
           builder: (_, ref, child) {
-            if (!selectable) {
-              return CommonCard(key: key, onPressed: () {}, child: child!);
-            }
             final selectedProxyName = ref.watch(
               getSelectedProxyNameProvider(groupName),
             );

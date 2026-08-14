@@ -26,13 +26,8 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
   bool _isTab = false;
 
   List<Widget> _buildActions() {
-    final isChainGroup = ref.watch(
-      currentProfileProvider.select(
-        (state) => isProxyChainEditorGroup(state?.currentGroupName ?? ''),
-      ),
-    );
     return [
-      if (_isTab && !isChainGroup)
+      if (_isTab)
         IconButton(
           onPressed: () {
             _proxiesTabKey.currentState?.scrollToGroupSelected();
@@ -88,12 +83,7 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
   }
 
   Widget? _buildFAB() {
-    final isChainGroup = ref.watch(
-      currentProfileProvider.select(
-        (state) => isProxyChainEditorGroup(state?.currentGroupName ?? ''),
-      ),
-    );
-    return _isTab && !isChainGroup
+    return _isTab
         ? DelayTestButton(
             onClick: () async {
               await _proxiesTabKey.currentState?.delayTestCurrentGroup();

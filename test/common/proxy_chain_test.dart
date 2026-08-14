@@ -7,10 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('maps the internal chain proxy wherever GUI text contains it', () {
-    expect(displayProxyName(internalChainProxyName), 'Chain');
+    expect(displayProxyName(internalChainProxyName), 'CHAIN');
     expect(
       displayProxyText('Selector($internalChainProxyName)'),
-      'Selector(Chain)',
+      'Selector(CHAIN)',
     );
   });
 
@@ -390,16 +390,21 @@ void main() {
     );
   });
 
-  test('only the Chain editor group blocks proxy interaction and tests', () {
-    expect(proxyGroupAllowsDelayTest(internalChainProxyName), isFalse);
-    expect(proxyGroupAllowsProxyInteraction(internalChainProxyName), isFalse);
+  test('only configured top-level proxies can be added to CHAIN', () {
+    const sourceProxyNames = {'node-a', 'hop-only'};
 
-    expect(proxyGroupAllowsDelayTest('PROXY'), isTrue);
-    expect(proxyGroupAllowsProxyInteraction('PROXY'), isTrue);
-    expect(proxyGroupAllowsDelayTest('Any configured name'), isTrue);
+    expect(isProxyChainSourceName('node-a', sourceProxyNames), isTrue);
+    expect(
+      isProxyChainSourceName('Configured group', sourceProxyNames),
+      isFalse,
+    );
+    expect(
+      isProxyChainSourceName(internalChainProxyName, sourceProxyNames),
+      isFalse,
+    );
   });
 
-  test('builds a first GUI-only Chain group without changing group semantics', () {
+  test('prepends CHAIN to every configured GUI group', () {
     const nodeA = Proxy(name: 'node-a', type: 'Shadowsocks');
     const nodeB = Proxy(name: 'hop-only', type: 'Trojan');
     const groups = [
@@ -433,27 +438,24 @@ void main() {
     final result = buildProxyChainGuiGroups(
       groups: groups,
       proxiesData: proxiesData,
-      sourceProxyNames: const ['node-a', 'hop-only'],
-      testUrl: defaultTestUrl,
     );
 
     expect(result.map((group) => group.name), [
-      internalChainProxyName,
       'PROXY',
       'Automatic',
     ]);
     expect(result.first.all.map((proxy) => proxy.name), [
+      internalChainProxyName,
       'node-a',
-      'hop-only',
     ]);
     expect(result[1].all.map((proxy) => proxy.name), [
       internalChainProxyName,
       'node-a',
     ]);
-    expect(result[1].type, GroupType.Selector);
-    expect(result[1].now, 'node-a');
-    expect(result[1].testUrl, 'https://selector.test');
-    expect(result[2].type, GroupType.URLTest);
+    expect(result.first.type, GroupType.Selector);
+    expect(result.first.now, 'node-a');
+    expect(result.first.testUrl, 'https://selector.test');
+    expect(result[1].type, GroupType.URLTest);
     expect(groups.first.all, [nodeA]);
   });
 }

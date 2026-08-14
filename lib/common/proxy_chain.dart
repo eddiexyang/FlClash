@@ -30,21 +30,13 @@ bool isInternalChainHopName(String name) {
   return name.startsWith(internalChainHopPrefix);
 }
 
-bool isProxyChainEditorGroup(String groupName) {
-  return groupName == internalChainProxyName;
-}
-
-bool proxyGroupAllowsDelayTest(String groupName) {
-  return !isProxyChainEditorGroup(groupName);
-}
-
-bool proxyGroupAllowsProxyInteraction(String groupName) {
-  return !isProxyChainEditorGroup(groupName);
+bool isProxyChainSourceName(String name, Set<String> sourceProxyNames) {
+  return !isInternalChainProxyName(name) && sourceProxyNames.contains(name);
 }
 
 String displayProxyName(String name) {
   if (name == internalChainProxyName) {
-    return 'Chain';
+    return 'CHAIN';
   }
   if (!name.startsWith(internalChainHopPrefix)) {
     return name;
@@ -52,14 +44,14 @@ String displayProxyName(String name) {
   final value = name.substring(internalChainHopPrefix.length);
   final separator = value.indexOf('_');
   if (separator == -1 || separator == value.length - 1) {
-    return 'Chain';
+    return 'CHAIN';
   }
   try {
     final encodedName = value.substring(separator + 1);
     final normalizedName = base64Url.normalize(encodedName);
     return utf8.decode(base64Url.decode(normalizedName));
   } catch (_) {
-    return 'Chain';
+    return 'CHAIN';
   }
 }
 

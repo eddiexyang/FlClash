@@ -1,4 +1,3 @@
-import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 
 import 'constant.dart';
@@ -24,18 +23,11 @@ Proxy? _proxyFromData(
 List<Group> buildProxyChainGuiGroups({
   required List<Group> groups,
   required ProxiesData proxiesData,
-  required List<String> sourceProxyNames,
-  required String testUrl,
 }) {
-  final chainProxies = sourceProxyNames
-      .map((name) => _proxyFromData(proxiesData.proxies, name))
-      .whereType<Proxy>()
-      .toList();
   final chainProxy =
       _proxyFromData(proxiesData.proxies, internalChainProxyName) ??
       const Proxy(name: internalChainProxyName, type: 'Relay');
-  final regularGroups = groups
-      .where((group) => !isProxyChainEditorGroup(group.name))
+  return groups
       .map(
         (group) => group.copyWith(
           all: [
@@ -45,15 +37,6 @@ List<Group> buildProxyChainGuiGroups({
             ),
           ],
         ),
-      );
-  return [
-    Group(
-      type: GroupType.Selector,
-      all: chainProxies,
-      hidden: false,
-      testUrl: testUrl,
-      name: internalChainProxyName,
-    ),
-    ...regularGroups,
-  ];
+      )
+      .toList();
 }
