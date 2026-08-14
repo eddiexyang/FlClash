@@ -352,7 +352,7 @@ extension LogsControllerExt on AppController {
 
 extension ProxiesControllerExt on AppController {
   List<String> get proxyChain {
-    final profileId = currentProfile?.id;
+    final profileId = _ref.read(currentProfileProvider)?.id;
     if (profileId == null) {
       return const [];
     }
@@ -361,14 +361,14 @@ extension ProxiesControllerExt on AppController {
 
   Future<String> updateProxyChain(List<String> proxyNames) async {
     final pendingChain = List<String>.from(proxyNames);
-    final profileId = currentProfile?.id;
+    final profileId = _ref.read(currentProfileProvider)?.id;
     if (profileId == null) {
       return '';
     }
     _proxyChains[profileId] = pendingChain;
     var message = '';
     final apply = _proxyChainApplyQueue.then((_) async {
-      if (profileId != currentProfile?.id) {
+      if (profileId != _ref.read(currentProfileProvider)?.id) {
         return;
       }
       message = await coreController.updateProxyChain(pendingChain);
