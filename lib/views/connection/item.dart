@@ -102,7 +102,7 @@ class TrackerInfoItem extends ConsumerWidget {
                   onPressed: () {
                     if (onClickKeyword == null) return;
                     onClickKeyword!(displayName);
-                  ),
+                  },
                 );
               },
             ),
