@@ -19,6 +19,7 @@ typedef ProxyGroupViewKeyMap =
 const _chainBarHeight = 56.0;
 const _chainBarFabGap = 12.0;
 const _chainDragDuration = Duration(milliseconds: 180);
+const _chainFeedbackDuration = Duration(milliseconds: 240);
 const _chainDropDuration = Duration(milliseconds: 80);
 
 const _chainProxy = Proxy(name: internalChainProxyName, type: 'Relay');
@@ -737,30 +738,12 @@ class _DraggableProxyCardState extends State<DraggableProxyCard> {
             color: Colors.transparent,
             child: IgnorePointer(
               child: ExcludeSemantics(
-                child: ValueListenableBuilder(
-                  valueListenable: _compactFeedback,
-                  builder: (context, compact, _) {
-                    return AnimatedCrossFade(
-                      duration: _chainDragDuration,
-                      sizeCurve: Curves.easeOutCubic,
-                      alignment: Alignment.center,
-                      crossFadeState: compact
-                          ? CrossFadeState.showSecond
-                          : CrossFadeState.showFirst,
-                      firstChild: SizedBox(
-                        width: constraints.maxWidth,
-                        height: getItemHeight(widget.cardType),
-                        child: Opacity(
-                          opacity: 0.92,
-                          child: widget.child,
-                        ),
-                      ),
-                      secondChild: _ChainHopCard(
-                        proxy: widget.proxy,
-                        onRemove: () {},
-                      ),
-                    );
-                  },
+                child: _ProxyDragFeedback(
+                  compactFeedback: _compactFeedback,
+                  fullWidth: constraints.maxWidth,
+                  fullHeight: getItemHeight(widget.cardType),
+                  proxy: widget.proxy,
+                  fullChild: widget.child,
                 ),
               ),
             ),
@@ -793,6 +776,171 @@ class _DraggableProxyCardState extends State<DraggableProxyCard> {
           child: widget.child,
         );
       },
+    );
+  }
+}
+
+class _ProxyDragFeedback extends StatefulWidget {
+  final ValueNotifier<bool> compactFeedback;
+  final double fullWidth;
+  final double fullHeight;
+  final Proxy proxy;
+  final Widget fullChild;
+
+  const _ProxyDragFeedback({
+    required this.compactFeedback,
+    required this.fullWidth,
+    required this.fullHeight,
+    required this.proxy,
+    required this.fullChild,
+  });
+
+  @override
+  State<_ProxyDragFeedback> createState() => _ProxyDragFeedbackState();
+}
+
+class _ProxyDragFeedbackState extends State<_ProxyDragFeedback>
+    with SingleTickerProviderStateMixin {
+  final GlobalKey _compactKey = GlobalKey();
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+  Size? _compactSize;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: _chainFeedbackDuration,
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInOutCubic,
+    );
+    widget.compactFeedback.addListener(_handleFeedbackModeChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProxyDragFeedback oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.compactFeedback == widget.compactFeedback) {
+      return;
+    }
+    oldWidget.compactFeedback.removeListener(_handleFeedbackModeChanged);
+    widget.compactFeedback.addListener(_handleFeedbackModeChanged);
+    _handleFeedbackModeChanged();
+  }
+
+  @override
+  void dispose() {
+    widget.compactFeedback.removeListener(_handleFeedbackModeChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleFeedbackModeChanged() {
+    if (widget.compactFeedback.value) {
+      if (_compactSize != null) {
+        _controller.forward();
+      }
+      return;
+    }
+    _controller.reverse();
+  }
+
+  void _measureCompactNode() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final renderObject =
+          _compactKey.currentContext?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) {
+        return;
+      }
+      final nextSize = renderObject.size;
+      if (_compactSize == nextSize) {
+        return;
+      }
+      setState(() {
+        _compactSize = nextSize;
+      });
+      if (widget.compactFeedback.value) {
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _measureCompactNode();
+    final fullSize = Size(widget.fullWidth, widget.fullHeight);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedBuilder(
+          animation: _animation,
+          builder: (context, _) {
+            final progress = _animation.value;
+            final compactSize = _compactSize ?? fullSize;
+            final currentSize = Size.lerp(
+              fullSize,
+              compactSize,
+              progress,
+            )!;
+            final fullOpacity =
+                (1 - progress / 0.7).clamp(0.0, 1.0).toDouble();
+            final compactOpacity =
+                ((progress - 0.15) / 0.65).clamp(0.0, 1.0).toDouble();
+            return SizedBox(
+              width: currentSize.width,
+              height: currentSize.height,
+              child: ClipRect(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Positioned.fill(
+                      child: Opacity(
+                        opacity: 0.92 * fullOpacity,
+                        child: FittedBox(
+                          fit: BoxFit.fill,
+                          child: SizedBox.fromSize(
+                            size: fullSize,
+                            child: widget.fullChild,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Opacity(
+                      opacity: compactOpacity,
+                      child: Transform.scale(
+                        scale: 0.96 + compactOpacity * 0.04,
+                        child: SizedBox.fromSize(
+                          size: compactSize,
+                          child: _ChainHopCard(
+                            proxy: widget.proxy,
+                            onRemove: () {},
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        Offstage(
+          child: KeyedSubtree(
+            key: _compactKey,
+            child: _ChainHopCard(
+              proxy: widget.proxy,
+              onRemove: () {},
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
