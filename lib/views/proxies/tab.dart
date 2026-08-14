@@ -767,14 +767,17 @@ class _ProxyChainBar extends StatelessWidget {
               Tooltip(
                 message: appLocalizations.proxyChains,
                 child: const SizedBox(
-                  width: 52,
-                  child: Icon(Icons.account_tree),
+                  width: 40,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Icon(Icons.account_tree),
+                  ),
                 ),
               ),
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.only(right: 8),
                   child: Row(
                     children: [
                       for (var index = 0; index <= proxies.length; index++) ...[
