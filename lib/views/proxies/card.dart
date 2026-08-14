@@ -129,7 +129,7 @@ class ProxyCard extends StatelessWidget {
         Consumer(
           builder: (_, ref, child) {
             if (!selectable) {
-              return CommonCard(child: child!);
+              return CommonCard(key: key, onPressed: () {}, child: child!);
             }
             final selectedProxyName = ref.watch(
               getSelectedProxyNameProvider(groupName),

@@ -306,7 +306,9 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
           ),
         ),
         if (currentGroup != null)
-          Padding(
+          AnimatedPadding(
+            duration: midDuration,
+            curve: Curves.easeOutCubic,
             padding: EdgeInsets.only(
               left: 16,
               right: 16 +
