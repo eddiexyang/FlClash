@@ -50,8 +50,12 @@ enum ConnectionColumn {
       case ConnectionColumn.process:
         return a.metadata.process.compareTo(b.metadata.process);
       case ConnectionColumn.chains:
-        final chainA = a.chains.isEmpty ? '' : a.chains.last;
-        final chainB = b.chains.isEmpty ? '' : b.chains.last;
+        final chainA = a.chains.isEmpty
+            ? ''
+            : displayProxyName(a.chains.last);
+        final chainB = b.chains.isEmpty
+            ? ''
+            : displayProxyName(b.chains.last);
         return chainA.compareTo(chainB);
       case ConnectionColumn.upload:
         return a.upload.compareTo(b.upload);
@@ -223,7 +227,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView> {
           info.metadata.nextHop,
         ).toLowerCase();
         final rule = info.rule.toLowerCase();
-        final chains = info.chains.join(' ').toLowerCase();
+        final chains = displayProxyChain(info.chains).toLowerCase();
         final time = info.start.toString().toLowerCase();
         final hostOrIp = host.isEmpty ? ip : host;
         final hostWithPort = '$hostOrIp:$port';
@@ -688,7 +692,7 @@ class _ConnectionRow extends StatelessWidget {
         return Text('$host:$port', style: style);
       case ConnectionColumn.chains:
         return Text(
-          info.chains.reversed.join(' → '),
+          displayProxyChain(info.chains.reversed),
           style: style?.copyWith(color: colorScheme.secondary),
         );
       case ConnectionColumn.upload:
@@ -776,7 +780,7 @@ class TrackerInfoDetailView extends StatelessWidget {
           Text(appLocalizations.proxyChains),
           Flexible(
             child: Text(
-              trackerInfo.chains.reversed.join(' → '),
+              displayProxyChain(trackerInfo.chains.reversed),
               textAlign: TextAlign.end,
               style: context.textTheme.bodyMedium?.copyWith(
                 color: context.colorScheme.secondary,

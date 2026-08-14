@@ -77,6 +77,7 @@ class TrackerInfoItem extends ConsumerWidget {
         ),
       ],
     );
+    final chains = trackerInfo.chains.reversed.toList();
     final subTitle = SizedBox(
       height: subTitleHeight,
       child: Row(
@@ -89,17 +90,18 @@ class TrackerInfoItem extends ConsumerWidget {
               separatorBuilder: (_, _) => SizedBox(width: 6),
               padding: EdgeInsets.zero,
               scrollDirection: Axis.horizontal,
-              itemCount: trackerInfo.chains.length,
+              itemCount: chains.length,
               itemBuilder: (_, index) {
-                final chain = trackerInfo.chains[index];
+                final chain = chains[index];
+                final displayName = displayProxyName(chain);
                 return CommonChip(
-                  label: chain,
+                  label: displayName,
                   labelStyle: context.textTheme.bodySmall?.copyWith(
                     color: context.colorScheme.onSurfaceVariant,
                   ),
                   onPressed: () {
                     if (onClickKeyword == null) return;
-                    onClickKeyword!(chain);
+                    onClickKeyword!(displayName);
                   },
                 );
               },
@@ -231,7 +233,7 @@ class TrackerInfoDetailView extends StatelessWidget {
           Text(appLocalizations.proxyChains),
           Flexible(
             child: Text(
-              trackerInfo.chains.reversed.join(' → '),
+              displayProxyChain(trackerInfo.chains.reversed),
               textAlign: TextAlign.end,
               style: context.textTheme.bodyMedium?.copyWith(
                 color: context.colorScheme.secondary,

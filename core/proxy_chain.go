@@ -28,6 +28,11 @@ type proxyChainProvider struct {
 	version  uint32
 }
 
+var proxyChainState = struct {
+	sync.RWMutex
+	proxyNames []string
+}{}
+
 func newProxyChainProvider(delegate P.ProxyProvider, proxies []C.Proxy) *proxyChainProvider {
 	return &proxyChainProvider{
 		delegate: delegate,
@@ -99,6 +104,51 @@ func (p *proxyChainProvider) HealthCheckURL() string {
 
 func isFlClashChainProxy(name string) bool {
 	return name == flClashChainName || strings.HasPrefix(name, flClashChainHopPrefix)
+}
+
+func setProxyChainNames(proxyNames []string) {
+	proxyChainState.Lock()
+	proxyChainState.proxyNames = append([]string(nil), proxyNames...)
+	proxyChainState.Unlock()
+}
+
+func isProxyChainInnerTracker(info *statistic.TrackerInfo) bool {
+	if info == nil || info.Metadata == nil || info.Metadata.Type != C.INNER {
+		return false
+	}
+	for _, name := range info.Chain {
+		if strings.HasPrefix(name, flClashChainHopPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func prepareProxyChainTracker(tracker statistic.Tracker) bool {
+	info := tracker.Info()
+	if isProxyChainInnerTracker(info) {
+		return false
+	}
+	usesChain := false
+	for _, name := range tracker.Chains() {
+		if name == flClashChainName {
+			usesChain = true
+			break
+		}
+	}
+	if !usesChain {
+		return true
+	}
+
+	proxyChainState.RLock()
+	proxyNames := append([]string(nil), proxyChainState.proxyNames...)
+	proxyChainState.RUnlock()
+	chain := make(C.Chain, 0, len(proxyNames)+len(info.Chain))
+	for index := len(proxyNames) - 1; index >= 0; index-- {
+		chain = append(chain, proxyNames[index])
+	}
+	info.Chain = append(chain, info.Chain...)
+	return true
 }
 
 func parseProxyChain(configs []map[string]interface{}) (map[string]C.Proxy, C.Proxy, error) {
@@ -222,6 +272,7 @@ func handleUpdateProxyChain(data []byte) string {
 	if err := updateProxyChain(params.Proxies); err != nil {
 		return err.Error()
 	}
+	setProxyChainNames(params.ProxyNames)
 	if params.CloseConnections {
 		closeTrackedConnections(affectedConnections)
 	}

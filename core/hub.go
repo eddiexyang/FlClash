@@ -293,6 +293,13 @@ func handleGetConnections() string {
 	runLock.Lock()
 	defer runLock.Unlock()
 	snapshot := statistic.DefaultManager.Snapshot()
+	connections := snapshot.Connections[:0]
+	for _, connection := range snapshot.Connections {
+		if !isProxyChainInnerTracker(connection) {
+			connections = append(connections, connection)
+		}
+	}
+	snapshot.Connections = connections
 	data, err := json.Marshal(snapshot)
 	if err != nil {
 		log.Errorln("Error: %s", err)
@@ -607,6 +614,9 @@ func init() {
 		})
 	}
 	statistic.DefaultRequestNotify = func(c statistic.Tracker) {
+		if !prepareProxyChainTracker(c) {
+			return
+		}
 		sendMessage(Message{
 			Type: RequestMessage,
 			Data: c,

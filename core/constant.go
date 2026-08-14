@@ -52,6 +52,7 @@ type ChangeProxyParams struct {
 }
 
 type UpdateProxyChainParams struct {
+	ProxyNames       []string                 `json:"proxy-names"`
 	Proxies          []map[string]interface{} `json:"proxies"`
 	CloseConnections bool                     `json:"close-connections"`
 }

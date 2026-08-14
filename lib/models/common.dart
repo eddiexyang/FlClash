@@ -245,6 +245,7 @@ extension TrackerInfosStateExt on TrackerInfosState {
     final lowQuery = query.toLowerCase();
     return trackerInfos.where((trackerInfo) {
       final chains = trackerInfo.chains;
+      final displayChains = chains.map(displayProxyName).toList();
       final process = trackerInfo.metadata.process;
       final networkText = trackerInfo.metadata.network.toLowerCase();
       final hostText = trackerInfo.metadata.host.toLowerCase();
@@ -252,8 +253,8 @@ extension TrackerInfosStateExt on TrackerInfosState {
       final destinationIPText = trackerInfo.metadata.destinationIP
           .toLowerCase();
       final processText = trackerInfo.metadata.process.toLowerCase();
-      final chainsText = chains.join('').toLowerCase();
-      return {...chains, process}.containsAll(keywords) &&
+      final chainsText = displayChains.join('').toLowerCase();
+      return {...displayChains, process}.containsAll(keywords) &&
           (networkText.contains(lowerQuery) ||
               hostText.contains(lowerQuery) ||
               sniffHostText.contains(lowerQuery) ||

@@ -2,10 +2,6 @@ import 'dart:convert';
 
 import 'package:fl_clash/common/constant.dart';
 
-final _internalChainHopPattern = RegExp(
-  '${RegExp.escape(internalChainHopPrefix)}[0-9]+_[A-Za-z0-9_-]+',
-);
-
 class ProxyChainOverlay {
   final Map<String, Map<String, dynamic>> sourceProxies;
   final List<Map<String, dynamic>> chainProxies;
@@ -49,13 +45,8 @@ String displayProxyName(String name) {
   }
 }
 
-String displayProxyText(String text) {
-  return text
-      .replaceAll(internalChainProxyName, 'Chain')
-      .replaceAllMapped(
-        _internalChainHopPattern,
-        (match) => displayProxyName(match.group(0)!),
-      );
+String displayProxyChain(Iterable<String> proxyNames) {
+  return proxyNames.map(displayProxyName).join(' → ');
 }
 
 Map<String, dynamic>? _toStringMap(Object? value) {

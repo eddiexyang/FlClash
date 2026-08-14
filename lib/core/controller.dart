@@ -130,10 +130,12 @@ class CoreController {
   }
 
   Future<String> updateProxyChain(
+    List<String> proxyNames,
     List<Map<String, dynamic>> proxies, {
     required bool closeConnections,
   }) async {
     return await _interface.updateProxyChain(
+      proxyNames,
       proxies,
       closeConnections: closeConnections,
     );

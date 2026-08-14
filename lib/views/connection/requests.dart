@@ -48,8 +48,12 @@ enum RequestColumn {
       case RequestColumn.rule:
         return a.rule.compareTo(b.rule);
       case RequestColumn.chains:
-        final chainA = a.chains.isEmpty ? '' : a.chains.last;
-        final chainB = b.chains.isEmpty ? '' : b.chains.last;
+        final chainA = a.chains.isEmpty
+            ? ''
+            : displayProxyName(a.chains.last);
+        final chainB = b.chains.isEmpty
+            ? ''
+            : displayProxyName(b.chains.last);
         return chainA.compareTo(chainB);
     }
   }
@@ -230,7 +234,7 @@ class _RequestsViewState extends ConsumerState<RequestsView> {
         final ip = info.metadata.destinationIP.toLowerCase();
         final process = info.metadata.process.toLowerCase();
         final rule = info.rule.toLowerCase();
-        final chains = info.chains.join(' ').toLowerCase();
+        final chains = displayProxyChain(info.chains).toLowerCase();
         final time = DateFormat(
           'yyyy-MM-dd HH:mm:ss',
         ).format(info.start.toLocal()).toLowerCase();
@@ -643,11 +647,12 @@ class _RequestRow extends StatelessWidget {
       case RequestColumn.rule:
         return Text(info.rule, style: style);
       case RequestColumn.chains:
+        final chains = displayProxyChain(info.chains.reversed);
         return Tooltip(
-          message: info.chains.reversed.join(' → '),
+          message: chains,
           waitDuration: const Duration(milliseconds: 500),
           child: Text(
-            info.chains.reversed.join(' → '),
+            chains,
             style: style?.copyWith(color: colorScheme.secondary),
           ),
         );

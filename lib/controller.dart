@@ -384,6 +384,7 @@ extension ProxiesControllerExt on AppController {
           _proxyChainSources[profileId] ?? const {},
         );
         final message = await coreController.updateProxyChain(
+          pendingChain,
           chainProxies,
           closeConnections: closeConnections,
         );
@@ -817,6 +818,7 @@ extension SetupControllerExt on AppController {
       return '';
     }
     return await coreController.updateProxyChain(
+      _proxyChains[profileId] ?? const [],
       chainProxies,
       closeConnections: false,
     );
