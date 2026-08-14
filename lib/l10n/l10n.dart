@@ -2919,6 +2919,16 @@ class AppLocalizations {
     );
   }
 
+  /// `Editable only in the Chain group.`
+  String get chainEditableOnlyInChainGroup {
+    return Intl.message(
+      'Editable only in the Chain group.',
+      name: 'chainEditableOnlyInChainGroup',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Log`
   String get log {
     return Intl.message('Log', name: 'log', desc: '', args: []);

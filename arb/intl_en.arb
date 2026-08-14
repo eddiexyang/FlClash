@@ -378,6 +378,7 @@
   "remoteDestination": "Remote destination",
   "networkType": "Network type",
   "proxyChains": "Proxy chains",
+  "chainEditableOnlyInChainGroup": "Editable only in the Chain group.",
   "log": "Log",
   "connection": "Connection",
   "request": "Request",

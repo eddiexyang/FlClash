@@ -25,10 +25,7 @@ const _chainDropDuration = Duration(milliseconds: 80);
 const _chainProxy = Proxy(name: internalChainProxyName, type: 'Relay');
 
 bool _isChainGroup(Group group) {
-  final isSelectable =
-      group.type == GroupType.Selector || group.type.isComputedSelected;
-  return isSelectable &&
-      group.name.toLowerCase() == GroupName.Proxy.name.toLowerCase();
+  return isProxyChainEditorGroup(group.name);
 }
 
 @immutable
@@ -64,9 +61,6 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     with TickerProviderStateMixin {
   TabController? _tabController;
   final _hasMoreButtonNotifier = ValueNotifier<bool>(false);
-  final _chainBarKey = GlobalKey();
-  final List<Proxy> _chain = [];
-  int? _chainProfileId;
   ProxyGroupViewKeyMap _keyMap = {};
 
   @override
@@ -94,11 +88,17 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
 
   void scrollToGroupSelected() {
     final currentGroupName = appController.getCurrentGroupName();
+    if (!proxyGroupAllowsProxyInteraction(currentGroupName ?? '')) {
+      return;
+    }
     _keyMap[currentGroupName]?.currentState?.scrollToSelected();
   }
 
   Future<void> delayTestCurrentGroup() async {
     final currentGroupName = appController.getCurrentGroupName();
+    if (!proxyGroupAllowsDelayTest(currentGroupName ?? '')) {
+      return;
+    }
     final currentState = _keyMap[currentGroupName]?.currentState;
     final currentProxies = currentState?.currentProxies ?? const <Proxy>[];
     try {
@@ -106,102 +106,6 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     } catch (error) {
       globalState.showNotifier(error.toString());
     }
-  }
-
-  void _applyChain() {
-    final pendingChain = _chain.map((proxy) => proxy.name).toList();
-    appController
-        .updateProxyChain(
-          pendingChain,
-          closeConnections: true,
-        )
-        .then((message) {
-          if (message.isNotEmpty) {
-            globalState.showNotifier(message);
-            _restoreChain(pendingChain);
-          }
-        })
-        .catchError((Object error, StackTrace stackTrace) {
-          globalState.showNotifier(error.toString());
-          _restoreChain(pendingChain);
-        });
-  }
-
-  void _restoreChain(List<String> failedChain) {
-    if (!mounted ||
-        !stringListEquality.equals(
-          _chain.map((proxy) => proxy.name).toList(),
-          failedChain,
-        )) {
-      return;
-    }
-    final proxiesByName = {
-      for (final group in appController.getCurrentGroups())
-        for (final proxy in group.all) proxy.name: proxy,
-    };
-    setState(() {
-      _chain
-        ..clear()
-        ..addAll(
-          appController.proxyChain.map(
-            (name) => proxiesByName[name] ?? Proxy(name: name, type: ''),
-          ),
-        );
-    });
-  }
-
-  void _insertChainNode(_ProxyChainDragData data, int targetIndex) {
-    setState(() {
-      var insertIndex = targetIndex;
-      if (insertIndex < 0) {
-        insertIndex = 0;
-      } else if (insertIndex > _chain.length) {
-        insertIndex = _chain.length;
-      }
-      final sourceIndex = data.chainIndex;
-      if (sourceIndex != null &&
-          sourceIndex >= 0 &&
-          sourceIndex < _chain.length) {
-        _chain.removeAt(sourceIndex);
-        if (sourceIndex < insertIndex) {
-          insertIndex--;
-        }
-      }
-      _chain.insert(insertIndex, data.proxy);
-    });
-    _applyChain();
-  }
-
-  void _removeChainNode(int index) {
-    if (index < 0 || index >= _chain.length) {
-      return;
-    }
-    setState(() {
-      _chain.removeAt(index);
-    });
-    _applyChain();
-  }
-
-  void _syncChainProfile(List<Group> groups) {
-    final profileId = appController.currentProfile?.id;
-    final chainNames = appController.proxyChain;
-    final currentNames = _chain.map((proxy) => proxy.name).toList();
-    if (_chainProfileId == profileId &&
-        stringListEquality.equals(currentNames, chainNames)) {
-      return;
-    }
-    final proxiesByName = {
-      for (final group in groups)
-        for (final proxy in group.all) proxy.name: proxy,
-    };
-    _chainProfileId = profileId;
-    _chain
-      ..clear()
-      ..addAll(
-        chainNames.map(
-          (name) => proxiesByName[name] ?? Proxy(name: name, type: ''),
-        ),
-      );
   }
 
   Widget _buildMoreButton() {
@@ -241,7 +145,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
                     children: [
                       for (final groupName in groupNames)
                         SettingTextCard(
-                          groupName,
+                          displayProxyName(groupName),
                           onPressed: () {
                             final index = groupNames.indexWhere(
                               (item) => item == groupName,
@@ -310,10 +214,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     ref.watch(themeSettingProvider.select((state) => state.textScale));
     final state = ref.watch(proxiesTabStateProvider.select((state) => state));
     final groups = state.groups;
-    final allGroups = ref.watch(
-      currentGroupsStateProvider.select((state) => state.value),
-    );
-    _syncChainProfile(allGroups);
+    ref.watch(currentGroupsStateProvider.select((state) => state.value));
     if (groups.isEmpty || _tabController == null) {
       return NullStatus(
         illustration: ProxyEmptyIllustration(),
@@ -325,7 +226,6 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     final currentGroup = currentIndex >= 0 && currentIndex < groups.length
         ? groups[currentIndex]
         : null;
-    final showChainBar = currentGroup != null && _isChainGroup(currentGroup);
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,7 +260,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
                           child: Builder(
                             builder: (context) {
                               return EmojiText(
-                                group.name,
+                                displayProxyName(group.name),
                                 style: DefaultTextStyle.of(context).style,
                               );
                             },
@@ -405,19 +305,18 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
             ],
           ),
         ),
-        if (showChainBar)
+        if (currentGroup != null)
           Padding(
             padding: const EdgeInsets.only(
               left: 16,
-              right:
-                  16 + _chainBarHeight + _chainBarFabGap,
+              right: 16 +
+                  (_isChainGroup(currentGroup)
+                      ? 0
+                      : _chainBarHeight + _chainBarFabGap),
               bottom: 16,
             ),
-            child: _ProxyChainBar(
-              key: _chainBarKey,
-              proxies: _chain,
-              onDrop: _insertChainNode,
-              onRemove: _removeChainNode,
+            child: ProxyChainEditorBar(
+              editable: _isChainGroup(currentGroup),
             ),
           ),
       ],
@@ -490,12 +389,12 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
-    final hasChainNode = _isChainGroup(group);
+    final isChainEditor = _isChainGroup(group);
     final proxies = group.all
         .where((proxy) => proxy.name != internalChainProxyName)
         .toList();
     testUrl = group.testUrl;
-    currentProxies = hasChainNode ? [_chainProxy, ...proxies] : proxies;
+    currentProxies = isChainEditor ? const [] : [_chainProxy, ...proxies];
     return CommonScrollBar(
       controller: _controller,
       child: GridView.builder(
@@ -513,16 +412,17 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
           crossAxisSpacing: 8,
           mainAxisExtent: getItemHeight(widget.cardType),
         ),
-        itemCount: currentProxies.length,
+        itemCount: isChainEditor ? proxies.length : currentProxies.length,
         itemBuilder: (_, index) {
-          if (hasChainNode && index == 0) {
+          if (!isChainEditor && index == 0) {
             return ChainProxyCard(
               type: widget.cardType,
+              groupType: group.type,
               groupName: group.name,
               testUrl: group.testUrl,
             );
           }
-          final proxyIndex = index - (hasChainNode ? 1 : 0);
+          final proxyIndex = index - (isChainEditor ? 0 : 1);
           final proxy = proxies[proxyIndex];
           final card = ProxyCard(
             testUrl: group.testUrl,
@@ -530,8 +430,10 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
             type: widget.cardType,
             proxy: proxy,
             groupName: group.name,
+            selectable: !isChainEditor,
+            delayTestable: !isChainEditor,
           );
-          if (!hasChainNode) {
+          if (!isChainEditor) {
             return card;
           }
           return DraggableProxyCard(
@@ -547,12 +449,14 @@ class _ProxyGroupViewState extends ConsumerState<ProxyGroupView> {
 
 class ChainProxyCard extends ConsumerWidget {
   final ProxyCardType type;
+  final GroupType groupType;
   final String groupName;
   final String? testUrl;
 
   const ChainProxyCard({
     super.key,
     required this.type,
+    required this.groupType,
     required this.groupName,
     required this.testUrl,
   });
@@ -566,6 +470,10 @@ class ChainProxyCard extends ConsumerWidget {
   }
 
   void _selectChain() {
+    if (groupType != GroupType.Selector) {
+      globalState.showNotifier(appLocalizations.notSelectedTip);
+      return;
+    }
     appController.updateCurrentSelectedMap(groupName, internalChainProxyName);
     appController.changeProxyDebounce(groupName, internalChainProxyName);
   }
@@ -945,14 +853,141 @@ class _ProxyDragFeedbackState extends State<_ProxyDragFeedback>
   }
 }
 
+class ProxyChainEditorBar extends ConsumerStatefulWidget {
+  final bool editable;
+
+  const ProxyChainEditorBar({super.key, required this.editable});
+
+  @override
+  ConsumerState<ProxyChainEditorBar> createState() =>
+      _ProxyChainEditorBarState();
+}
+
+class _ProxyChainEditorBarState extends ConsumerState<ProxyChainEditorBar> {
+  final _chainBarKey = GlobalKey();
+  final List<Proxy> _chain = [];
+  int? _chainProfileId;
+
+  void _applyChain() {
+    final pendingChain = _chain.map((proxy) => proxy.name).toList();
+    appController
+        .updateProxyChain(
+          pendingChain,
+          closeConnections: true,
+        )
+        .then((message) {
+          if (message.isNotEmpty) {
+            globalState.showNotifier(message);
+            _restoreChain(pendingChain);
+          }
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          globalState.showNotifier(error.toString());
+          _restoreChain(pendingChain);
+        });
+  }
+
+  void _restoreChain(List<String> failedChain) {
+    if (!mounted ||
+        !stringListEquality.equals(
+          _chain.map((proxy) => proxy.name).toList(),
+          failedChain,
+        )) {
+      return;
+    }
+    final proxiesByName = {
+      for (final group in appController.getCurrentGroups())
+        for (final proxy in group.all) proxy.name: proxy,
+    };
+    setState(() {
+      _chain
+        ..clear()
+        ..addAll(
+          appController.proxyChain.map(
+            (name) => proxiesByName[name] ?? Proxy(name: name, type: ''),
+          ),
+        );
+    });
+  }
+
+  void _insertChainNode(_ProxyChainDragData data, int targetIndex) {
+    setState(() {
+      var insertIndex = targetIndex;
+      if (insertIndex < 0) {
+        insertIndex = 0;
+      } else if (insertIndex > _chain.length) {
+        insertIndex = _chain.length;
+      }
+      final sourceIndex = data.chainIndex;
+      if (sourceIndex != null &&
+          sourceIndex >= 0 &&
+          sourceIndex < _chain.length) {
+        _chain.removeAt(sourceIndex);
+        if (sourceIndex < insertIndex) {
+          insertIndex--;
+        }
+      }
+      _chain.insert(insertIndex, data.proxy);
+    });
+    _applyChain();
+  }
+
+  void _removeChainNode(int index) {
+    if (index < 0 || index >= _chain.length) {
+      return;
+    }
+    setState(() {
+      _chain.removeAt(index);
+    });
+    _applyChain();
+  }
+
+  void _syncChainProfile(List<Group> groups) {
+    final profileId = appController.currentProfile?.id;
+    final chainNames = appController.proxyChain;
+    final currentNames = _chain.map((proxy) => proxy.name).toList();
+    if (_chainProfileId == profileId &&
+        stringListEquality.equals(currentNames, chainNames)) {
+      return;
+    }
+    final proxiesByName = {
+      for (final group in groups)
+        for (final proxy in group.all) proxy.name: proxy,
+    };
+    _chainProfileId = profileId;
+    _chain
+      ..clear()
+      ..addAll(
+        chainNames.map(
+          (name) => proxiesByName[name] ?? Proxy(name: name, type: ''),
+        ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = ref.watch(currentGroupsStateProvider).value;
+    _syncChainProfile(groups);
+    return _ProxyChainBar(
+      key: _chainBarKey,
+      proxies: _chain,
+      editable: widget.editable,
+      onDrop: _insertChainNode,
+      onRemove: _removeChainNode,
+    );
+  }
+}
+
 class _ProxyChainBar extends StatefulWidget {
   final List<Proxy> proxies;
+  final bool editable;
   final void Function(_ProxyChainDragData data, int index) onDrop;
   final void Function(int index) onRemove;
 
   const _ProxyChainBar({
     super.key,
     required this.proxies,
+    required this.editable,
     required this.onDrop,
     required this.onRemove,
   });
@@ -1145,64 +1180,59 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
   @override
   Widget build(BuildContext context) {
     _syncHopKeys();
-    return DragTarget<_ProxyChainDragData>(
-      onWillAcceptWithDetails: (_) => true,
-      onMove: _handleBarMove,
-      onAcceptWithDetails: _handleBarAccept,
-      onLeave: _handleBarLeave,
-      builder: (context, candidateData, _) {
-        final isHovering = candidateData.isNotEmpty;
-        final animationDuration = _settleImmediately
-            ? Duration.zero
-            : _chainDragDuration;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: _chainBarHeight,
-          decoration: BoxDecoration(
+    Widget buildBar(bool isHovering) {
+      final animationDuration = _settleImmediately
+          ? Duration.zero
+          : _chainDragDuration;
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        height: _chainBarHeight,
+        decoration: BoxDecoration(
+          color: isHovering
+              ? context.colorScheme.secondaryContainer
+              : context.colorScheme.surfaceContainerLow,
+          border: Border.all(
             color: isHovering
-                ? context.colorScheme.secondaryContainer
-                : context.colorScheme.surfaceContainerLow,
-            border: Border.all(
-              color: isHovering
-                  ? context.colorScheme.primary
-                  : context.colorScheme.outlineVariant,
-              width: isHovering ? 2 : 1,
-            ),
-            borderRadius: BorderRadius.circular(16),
+                ? context.colorScheme.primary
+                : context.colorScheme.outlineVariant,
+            width: isHovering ? 2 : 1,
           ),
-          child: Row(
-            children: [
-              Tooltip(
-                message: appLocalizations.proxyChains,
-                child: const SizedBox(
-                  width: 40,
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Icon(Icons.account_tree),
-                  ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Tooltip(
+              message: appLocalizations.proxyChains,
+              child: const SizedBox(
+                width: 40,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Icon(Icons.account_tree),
                 ),
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Row(
-                    children: [
-                      for (
-                        var index = 0;
-                        index <= widget.proxies.length;
-                        index++
-                      ) ...[
-                        _ChainInsertTarget(
-                          showLeadingArrow: _showLeadingArrow(index),
-                          showTrailingArrow: _showTrailingArrow(index),
-                          isTerminal: index == widget.proxies.length,
-                          previewProxy: _previewTargetIndex == index
-                              ? _activeDrag?.proxy
-                              : null,
-                          animationDuration: animationDuration,
-                        ),
-                        if (index < widget.proxies.length)
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(right: 8),
+                child: Row(
+                  children: [
+                    for (
+                      var index = 0;
+                      index <= widget.proxies.length;
+                      index++
+                    ) ...[
+                      _ChainInsertTarget(
+                        showLeadingArrow: _showLeadingArrow(index),
+                        showTrailingArrow: _showTrailingArrow(index),
+                        isTerminal: index == widget.proxies.length,
+                        previewProxy: _previewTargetIndex == index
+                            ? _activeDrag?.proxy
+                            : null,
+                        animationDuration: animationDuration,
+                      ),
+                      if (index < widget.proxies.length)
+                        if (widget.editable)
                           _ChainHop(
                             key: _hopKeys[index],
                             proxy: widget.proxies[index],
@@ -1214,15 +1244,37 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
                             onDragStarted: _handleDragStarted,
                             onDragEnd: _handleDragEnd,
                             onRemove: () => widget.onRemove(index),
+                          )
+                        else
+                          KeyedSubtree(
+                            key: _hopKeys[index],
+                            child: _ChainHopCard(
+                              proxy: widget.proxies[index],
+                            ),
                           ),
-                      ],
                     ],
-                  ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        );
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!widget.editable) {
+      return Tooltip(
+        message: appLocalizations.chainEditableOnlyInChainGroup,
+        child: buildBar(false),
+      );
+    }
+    return DragTarget<_ProxyChainDragData>(
+      onWillAcceptWithDetails: (_) => true,
+      onMove: _handleBarMove,
+      onAcceptWithDetails: _handleBarAccept,
+      onLeave: _handleBarLeave,
+      builder: (context, candidateData, _) {
+        return buildBar(candidateData.isNotEmpty);
       },
     );
   }
@@ -1305,11 +1357,11 @@ class _ChainInsertTarget extends StatelessWidget {
 
 class _ChainHopCard extends StatelessWidget {
   final Proxy proxy;
-  final VoidCallback onRemove;
+  final VoidCallback? onRemove;
 
   const _ChainHopCard({
     required this.proxy,
-    required this.onRemove,
+    this.onRemove,
   });
 
   @override
@@ -1334,18 +1386,20 @@ class _ChainHopCard extends StatelessWidget {
               style: context.textTheme.bodyMedium,
             ),
           ),
-          IconButton(
-            tooltip: appLocalizations.remove,
-            onPressed: onRemove,
-            icon: const Icon(Icons.close),
-            iconSize: 18,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(
-              width: 36,
-              height: 40,
+          if (onRemove != null)
+            IconButton(
+              tooltip: appLocalizations.remove,
+              onPressed: onRemove,
+              icon: const Icon(Icons.close),
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(
+                width: 36,
+                height: 40,
+              ),
+              visualDensity: VisualDensity.compact,
             ),
-            visualDensity: VisualDensity.compact,
-          ),
+          if (onRemove == null) const SizedBox(width: 12),
         ],
       ),
     );

@@ -379,6 +379,7 @@
   "remoteDestination": "リモート宛先",
   "networkType": "ネットワーク種別",
   "proxyChains": "プロキシチェーン",
+  "chainEditableOnlyInChainGroup": "Chain グループでのみ編集できます。",
   "log": "ログ",
   "connection": "接続",
   "request": "リクエスト",

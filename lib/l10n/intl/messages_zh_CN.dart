@@ -384,6 +384,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "proxies": MessageLookupByLibrary.simpleMessage("代理"),
     "proxiesSetting": MessageLookupByLibrary.simpleMessage("代理设置"),
     "proxyChains": MessageLookupByLibrary.simpleMessage("代理链"),
+    "chainEditableOnlyInChainGroup": MessageLookupByLibrary.simpleMessage(
+      "仅可在 Chain 组中编辑",
+    ),
     "proxyGroup": MessageLookupByLibrary.simpleMessage("代理组"),
     "proxyNameserver": MessageLookupByLibrary.simpleMessage("代理域名服务器"),
     "proxyNameserverDesc": MessageLookupByLibrary.simpleMessage("用于解析代理节点的域名"),

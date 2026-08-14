@@ -600,6 +600,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "proxies": MessageLookupByLibrary.simpleMessage("Прокси"),
     "proxiesSetting": MessageLookupByLibrary.simpleMessage("Настройка прокси"),
     "proxyChains": MessageLookupByLibrary.simpleMessage("Цепочки прокси"),
+    "chainEditableOnlyInChainGroup": MessageLookupByLibrary.simpleMessage(
+      "Редактирование возможно только в группе Chain.",
+    ),
     "proxyGroup": MessageLookupByLibrary.simpleMessage("Группа прокси"),
     "proxyNameserver": MessageLookupByLibrary.simpleMessage(
       "Прокси-сервер имен",

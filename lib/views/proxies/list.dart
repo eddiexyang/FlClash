@@ -12,8 +12,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'card.dart';
 import 'common.dart';
+import 'tab.dart'
+    show ChainProxyCard, DraggableProxyCard, ProxyChainEditorBar;
 
 typedef GroupNameProxiesMap = Map<String, List<Proxy>>;
+
+const _chainListBarHeight = 64.0;
+
+class _ProxyChainListBar extends StatelessWidget {
+  final bool editable;
+
+  const _ProxyChainListBar({required this.editable});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _chainListBarHeight,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: ProxyChainEditorBar(editable: editable),
+      ),
+    );
+  }
+}
 
 class ProxiesListView extends StatefulWidget {
   const ProxiesListView({super.key});
@@ -68,6 +89,7 @@ class _ProxiesListViewState extends State<ProxiesListView> {
     return switch (type) {
       const (SizedBox) => 8,
       const (ListHeader) => listHeaderHeight,
+      const (_ProxyChainListBar) => _chainListBarHeight,
       Type() => getItemHeight(proxyCardType),
     };
   }
@@ -123,6 +145,7 @@ class _ProxiesListViewState extends State<ProxiesListView> {
     final items = <Widget>[];
     for (final group in groups) {
       final groupName = group.name;
+      final isChainEditor = isProxyChainEditorGroup(groupName);
       final isExpand = currentUnfoldSet.contains(groupName);
       items.addAll([
         ListHeader(
@@ -141,21 +164,39 @@ class _ProxiesListViewState extends State<ProxiesListView> {
         final rows = chunks
             .map<Widget>((proxies) {
               final children = proxies
-                  .map<Widget>(
-                    (proxy) => Flexible(
+                  .map<Widget>((proxy) {
+                    final card = proxy.name == internalChainProxyName &&
+                            !isChainEditor
+                        ? ChainProxyCard(
+                            type: cardType,
+                            groupType: group.type,
+                            groupName: groupName,
+                            testUrl: group.testUrl,
+                          )
+                        : ProxyCard(
+                            testUrl: group.testUrl,
+                            type: cardType,
+                            groupType: group.type,
+                            proxy: proxy,
+                            groupName: groupName,
+                            selectable: !isChainEditor,
+                            delayTestable: !isChainEditor,
+                          );
+                    final visibleCard = isChainEditor
+                        ? DraggableProxyCard(
+                            proxy: proxy,
+                            cardType: cardType,
+                            child: card,
+                          )
+                        : card;
+                    return Flexible(
                       child: SizedBox(
+                        key: ValueKey('$groupName.${proxy.name}'),
                         height: getItemHeight(cardType),
-                        child: ProxyCard(
-                          testUrl: group.testUrl,
-                          type: cardType,
-                          groupType: group.type,
-                          key: ValueKey('$groupName.${proxy.name}'),
-                          proxy: proxy,
-                          groupName: groupName,
-                        ),
+                        child: visibleCard,
                       ),
-                    ),
-                  )
+                    );
+                  })
                   .fill(
                     columns,
                     filler: (_) => const Flexible(child: SizedBox()),
@@ -165,7 +206,11 @@ class _ProxiesListViewState extends State<ProxiesListView> {
               return Row(children: children.toList());
             })
             .separated(const SizedBox(height: 8));
-        items.addAll([...rows, const SizedBox(height: 8)]);
+        items.addAll([
+          ...rows,
+          _ProxyChainListBar(editable: isChainEditor),
+          const SizedBox(height: 8),
+        ]);
       }
     }
     return items;
@@ -409,7 +454,7 @@ class _ListHeaderState extends State<ListHeader> {
   bool get isExpand => widget.isExpand;
 
   Future<void> _delayTest() async {
-    if (isLock) return;
+    if (isLock || !proxyGroupAllowsDelayTest(groupName)) return;
     isLock = true;
     await delayTest(widget.group.all, widget.group.testUrl);
     isLock = false;
@@ -490,7 +535,7 @@ class _ListHeaderState extends State<ListHeader> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         EmojiText(
-                          groupName,
+                          displayProxyName(groupName),
                           style: context.textTheme.titleMedium,
                         ),
                         const SizedBox(height: 4),
@@ -553,7 +598,8 @@ class _ListHeaderState extends State<ListHeader> {
             ),
             Row(
               children: [
-                if (isExpand) ...[
+                if (isExpand &&
+                    proxyGroupAllowsProxyInteraction(groupName)) ...[
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.all(2),

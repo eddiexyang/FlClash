@@ -379,6 +379,7 @@
   "remoteDestination": "远程目标",
   "networkType": "网络类型",
   "proxyChains": "代理链",
+  "chainEditableOnlyInChainGroup": "仅可在 Chain 组中编辑",
   "log": "日志",
   "connection": "连接",
   "request": "请求",
