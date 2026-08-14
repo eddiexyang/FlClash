@@ -307,7 +307,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
         ),
         if (currentGroup != null)
           Padding(
-            padding: const EdgeInsets.only(
+            padding: EdgeInsets.only(
               left: 16,
               right: 16 +
                   (_isChainGroup(currentGroup)
