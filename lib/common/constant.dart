@@ -59,6 +59,7 @@ const maxMobileWidth = 600;
 const maxLaptopWidth = 840;
 const defaultTestUrl = 'https://www.gstatic.com/generate_204';
 const internalChainProxyName = '__FLCLASH_INTERNAL_CHAIN__';
+const internalChainHopPrefix = '__FLCLASH_INTERNAL_CHAIN_HOP_';
 final commonFilter = ImageFilter.blur(
   sigmaX: 5,
   sigmaY: 5,

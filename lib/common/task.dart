@@ -57,6 +57,10 @@ Future<List<Group>> _toGroupsTask(ComputeGroupsState state) async {
       .map((groupName) {
         final group = proxies[groupName];
         group['all'] = ((group['all'] ?? []) as List)
+            .where(
+              (name) =>
+                  name is! String || !isInternalChainProxyName(name),
+            )
             .map((name) => proxies[name])
             .where((proxy) => proxy != null)
             .toList();

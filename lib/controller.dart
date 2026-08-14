@@ -730,7 +730,7 @@ extension SetupControllerExt on AppController {
       rawConfig = await globalState.handleEvaluate(scriptContent!, rawConfig);
     }
     final directory = await appPath.profilesPath;
-    final res = makeRealProfileTask(
+    final res = await makeRealProfileTask(
       MakeRealProfileState(
         profilesPath: directory,
         profileId: profileId,
@@ -742,6 +742,11 @@ extension SetupControllerExt on AppController {
         defaultUA: defaultUA,
       ),
     );
+    final effectiveProxyNames = applyProxyChainOverlay(
+      res,
+      _proxyChains[profileId] ?? const [],
+    );
+    _proxyChains[profileId] = List<String>.from(effectiveProxyNames);
     return res;
   }
 

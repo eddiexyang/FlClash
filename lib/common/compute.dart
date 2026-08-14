@@ -84,8 +84,7 @@ SelectedProxyState computeRealSelectedProxyState(
   required List<Group> groups,
   required Map<String, String> selectedMap,
 }) {
-  // The chain is a runtime leaf proxy and is intentionally absent from the
-  // persisted group list used by this resolver.
+  // Internal chain adapters are intentionally hidden from the group list.
   if (proxyName == internalChainProxyName) {
     return SelectedProxyState(proxyName: proxyName);
   }
