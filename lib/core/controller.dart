@@ -129,6 +129,16 @@ class CoreController {
     return await _interface.changeProxy(changeProxyParams);
   }
 
+  Future<String> updateProxyChain(
+    List<Map<String, dynamic>> proxies, {
+    required bool closeConnections,
+  }) async {
+    return await _interface.updateProxyChain(
+      proxies,
+      closeConnections: closeConnections,
+    );
+  }
+
   Future<List<TrackerInfo>> getConnections() async {
     final res = await _interface.getConnections();
     final connectionsData = json.decode(res) as Map;

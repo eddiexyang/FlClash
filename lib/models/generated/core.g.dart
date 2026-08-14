@@ -269,6 +269,7 @@ const _$ActionMethodEnumMap = {
   ActionMethod.updateConfig: 'updateConfig',
   ActionMethod.getConfig: 'getConfig',
   ActionMethod.getProxies: 'getProxies',
+  ActionMethod.updateProxyChain: 'updateProxyChain',
   ActionMethod.changeProxy: 'changeProxy',
   ActionMethod.getTraffic: 'getTraffic',
   ActionMethod.getTotalTraffic: 'getTotalTraffic',

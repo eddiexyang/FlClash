@@ -6,6 +6,16 @@ final _internalChainHopPattern = RegExp(
   '${RegExp.escape(internalChainHopPrefix)}[0-9]+_[A-Za-z0-9_-]+',
 );
 
+class ProxyChainOverlay {
+  final Map<String, Map<String, dynamic>> sourceProxies;
+  final List<Map<String, dynamic>> chainProxies;
+
+  const ProxyChainOverlay({
+    required this.sourceProxies,
+    required this.chainProxies,
+  });
+}
+
 String internalChainHopName(int index, String proxyName) {
   final encodedName = base64Url
       .encode(utf8.encode(proxyName))
@@ -65,14 +75,56 @@ Map<String, dynamic>? _builtInProxy(String name) {
   };
 }
 
+List<Map<String, dynamic>> buildProxyChainProxies(
+  List<String> proxyNames,
+  Map<String, Map<String, dynamic>> sourceProxies,
+) {
+  final chainSources = <Map<String, dynamic>>[];
+  for (final name in proxyNames) {
+    if (isInternalChainProxyName(name)) {
+      throw ArgumentError.value(name, 'proxyNames', 'Invalid proxy name');
+    }
+    final source = sourceProxies[name] ?? _builtInProxy(name);
+    if (source == null) {
+      throw StateError('Proxy "$name" is unavailable in the current profile');
+    }
+    chainSources.add(source);
+  }
+
+  final chainProxies = <Map<String, dynamic>>[];
+  String? previousProxyName;
+  for (var index = 0; index < chainSources.length; index++) {
+    final isLast = index == chainSources.length - 1;
+    final internalName = isLast
+        ? internalChainProxyName
+        : internalChainHopName(index, proxyNames[index]);
+    final proxy = Map<String, dynamic>.from(chainSources[index])
+      ..['name'] = internalName
+      ..remove('dialer-proxy');
+    if (previousProxyName != null) {
+      proxy['dialer-proxy'] = previousProxyName;
+    }
+    chainProxies.add(proxy);
+    previousProxyName = internalName;
+  }
+  if (chainProxies.isEmpty) {
+    chainProxies.add({
+      'name': internalChainProxyName,
+      'type': 'reject',
+    });
+  }
+  return chainProxies;
+}
+
 /// Adds a GUI-managed proxy chain to a regular mihomo configuration.
 ///
 /// Every hop is a copy of its profile proxy and uses mihomo's native
-/// `dialer-proxy` option. The core receives no Chain-specific runtime state.
-List<String> applyProxyChainOverlay(
+/// `dialer-proxy` option. No Chain-specific mihomo adapter is required.
+ProxyChainOverlay applyProxyChainOverlay(
   Map<String, dynamic> config,
-  List<String> requestedProxyNames,
-) {
+  List<String> requestedProxyNames, {
+  Map<String, Map<String, dynamic>> fallbackSourceProxies = const {},
+}) {
   final sourceProxies = <String, Map<String, dynamic>>{};
   final cleanProxies = <Object?>[];
   final rawProxies = config['proxies'];
@@ -120,45 +172,27 @@ List<String> applyProxyChainOverlay(
   final targetGroup = proxyGroup;
   if (targetGroup == null) {
     config['proxies'] = cleanProxies;
-    return const [];
+    if (requestedProxyNames.isNotEmpty) {
+      throw StateError('PROXY group is unavailable in the current profile');
+    }
+    return ProxyChainOverlay(
+      sourceProxies: sourceProxies,
+      chainProxies: const [],
+    );
   }
 
-  final effectiveProxyNames = <String>[];
-  final chainSources = <Map<String, dynamic>>[];
   for (final name in requestedProxyNames) {
-    if (isInternalChainProxyName(name)) {
-      continue;
+    if (!sourceProxies.containsKey(name) &&
+        fallbackSourceProxies.containsKey(name)) {
+      sourceProxies[name] = Map<String, dynamic>.from(
+        fallbackSourceProxies[name]!,
+      );
     }
-    final source = sourceProxies[name] ?? _builtInProxy(name);
-    if (source == null) {
-      continue;
-    }
-    effectiveProxyNames.add(name);
-    chainSources.add(source);
   }
-
-  final chainProxies = <Map<String, dynamic>>[];
-  String? previousProxyName;
-  for (var index = 0; index < chainSources.length; index++) {
-    final isLast = index == chainSources.length - 1;
-    final internalName = isLast
-        ? internalChainProxyName
-        : internalChainHopName(index, effectiveProxyNames[index]);
-    final proxy = Map<String, dynamic>.from(chainSources[index])
-      ..['name'] = internalName
-      ..remove('dialer-proxy');
-    if (previousProxyName != null) {
-      proxy['dialer-proxy'] = previousProxyName;
-    }
-    chainProxies.add(proxy);
-    previousProxyName = internalName;
-  }
-  if (chainProxies.isEmpty) {
-    chainProxies.add({
-      'name': internalChainProxyName,
-      'type': 'reject',
-    });
-  }
+  final chainProxies = buildProxyChainProxies(
+    requestedProxyNames,
+    sourceProxies,
+  );
 
   config['proxies'] = [...cleanProxies, ...chainProxies];
   final rawGroupProxies = targetGroup['proxies'];
@@ -166,5 +200,8 @@ List<String> applyProxyChainOverlay(
       ? List<Object?>.from(rawGroupProxies)
       : <Object?>[];
   targetGroup['proxies'] = [internalChainProxyName, ...groupProxies];
-  return effectiveProxyNames;
+  return ProxyChainOverlay(
+    sourceProxies: sourceProxies,
+    chainProxies: chainProxies,
+  );
 }

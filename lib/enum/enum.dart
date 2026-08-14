@@ -191,6 +191,7 @@ enum ActionMethod {
   updateConfig,
   getConfig,
   getProxies,
+  updateProxyChain,
   changeProxy,
   getTraffic,
   getTotalTraffic,

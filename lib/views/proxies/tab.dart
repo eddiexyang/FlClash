@@ -123,19 +123,46 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
   }
 
   void _applyChain() {
+    final pendingChain = _chain.map((proxy) => proxy.name).toList();
     appController
         .updateProxyChain(
-          _chain.map((proxy) => proxy.name).toList(),
+          pendingChain,
           closeConnections: true,
         )
         .then((message) {
           if (message.isNotEmpty) {
             globalState.showNotifier(message);
+            _restoreChain(pendingChain);
           }
         })
         .catchError((Object error, StackTrace stackTrace) {
           globalState.showNotifier(error.toString());
+          _restoreChain(pendingChain);
+          return '';
         });
+  }
+
+  void _restoreChain(List<String> failedChain) {
+    if (!mounted ||
+        !stringListEquality.equals(
+          _chain.map((proxy) => proxy.name).toList(),
+          failedChain,
+        )) {
+      return;
+    }
+    final proxiesByName = {
+      for (final group in appController.getCurrentGroups())
+        for (final proxy in group.all) proxy.name: proxy,
+    };
+    setState(() {
+      _chain
+        ..clear()
+        ..addAll(
+          appController.proxyChain.map(
+            (name) => proxiesByName[name] ?? Proxy(name: name, type: ''),
+          ),
+        );
+    });
   }
 
   void _insertChainNode(_ProxyChainDragData data, int targetIndex) {
@@ -186,9 +213,9 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
     _chain
       ..clear()
       ..addAll(
-        chainNames
-            .map((name) => proxiesByName[name])
-            .whereType<Proxy>(),
+        chainNames.map(
+          (name) => proxiesByName[name] ?? Proxy(name: name, type: ''),
+        ),
       );
   }
 

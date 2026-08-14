@@ -51,6 +51,11 @@ type ChangeProxyParams struct {
 	CloseConnections bool    `json:"close-connections"`
 }
 
+type UpdateProxyChainParams struct {
+	Proxies          []map[string]interface{} `json:"proxies"`
+	CloseConnections bool                     `json:"close-connections"`
+}
+
 type TestDelayParams struct {
 	ProxyName string `json:"proxy-name"`
 	TestUrl   string `json:"test-url"`
@@ -81,6 +86,7 @@ const (
 	validateConfigMethod           Method = "validateConfig"
 	updateConfigMethod             Method = "updateConfig"
 	getProxiesMethod               Method = "getProxies"
+	updateProxyChainMethod         Method = "updateProxyChain"
 	changeProxyMethod              Method = "changeProxy"
 	getTrafficMethod               Method = "getTraffic"
 	getTotalTrafficMethod          Method = "getTotalTraffic"

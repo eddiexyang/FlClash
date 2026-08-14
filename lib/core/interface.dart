@@ -29,6 +29,11 @@ mixin CoreInterface {
 
   Future<ProxiesData> getProxies();
 
+  Future<String> updateProxyChain(
+    List<Map<String, dynamic>> proxies, {
+    required bool closeConnections,
+  });
+
   Future<String> changeProxy(ChangeProxyParams changeProxyParams);
 
   Future<bool> startListener();
@@ -206,6 +211,21 @@ abstract class CoreHandlerInterface with CoreInterface {
     return data != null
         ? ProxiesData.fromJson(data)
         : ProxiesData(proxies: {}, all: []);
+  }
+
+  @override
+  Future<String> updateProxyChain(
+    List<Map<String, dynamic>> proxies, {
+    required bool closeConnections,
+  }) async {
+    return await _invoke<String>(
+          method: ActionMethod.updateProxyChain,
+          data: json.encode({
+            'proxies': proxies,
+            'close-connections': closeConnections,
+          }),
+        ) ??
+        '';
   }
 
   @override

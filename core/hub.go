@@ -109,6 +109,9 @@ func handleGetProxies() ProxiesData {
 	}
 	for _, p := range tunnel.Providers() {
 		for _, proxy := range p.Proxies() {
+			if isFlClashChainProxy(proxy.Name()) {
+				continue
+			}
 			proxies[proxy.Name()] = proxy
 		}
 	}
@@ -248,8 +251,10 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(params.Timeout))
 		defer cancel()
 
-		proxies := tunnel.AllProxies()
-		proxy := proxies[params.ProxyName]
+		proxy := tunnel.AllProxies()[params.ProxyName]
+		if isFlClashChainProxy(params.ProxyName) {
+			proxy = tunnel.Proxies()[params.ProxyName]
+		}
 
 		delayData := &Delay{
 			Name: params.ProxyName,

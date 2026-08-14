@@ -27,7 +27,10 @@ class AppController {
   bool _healthRecoveryRequested = false;
   DateTime? _lastCoreHealthCheck;
   Future<void> _configApplyQueue = Future.value();
+  Future<void> _proxyChainApplyQueue = Future.value();
   final Map<int, List<String>> _proxyChains = {};
+  final Map<int, Map<String, Map<String, dynamic>>> _proxyChainSources = {};
+  final Map<int, List<Map<String, dynamic>>> _proxyChainRuntimeProxies = {};
   int _routeConfigRevision = 0;
   int? _pendingRouteDetectionRevision;
   int? _pendingRouteDetectionCheckId;
@@ -362,12 +365,50 @@ extension ProxiesControllerExt on AppController {
     List<String> proxyNames, {
     required bool closeConnections,
   }) async {
+    final pendingChain = List<String>.from(proxyNames);
     final profileId = _ref.read(currentProfileProvider)?.id;
     if (profileId == null) {
       return '';
     }
-    _proxyChains[profileId] = List<String>.from(proxyNames);
-    return '';
+    final currentChain = _proxyChains[profileId] ?? const <String>[];
+    if (stringListEquality.equals(currentChain, pendingChain)) {
+      return '';
+    }
+    final apply = _proxyChainApplyQueue.then<String>((_) async {
+      if (profileId != _ref.read(currentProfileProvider)?.id) {
+        return '';
+      }
+      try {
+        final chainProxies = buildProxyChainProxies(
+          pendingChain,
+          _proxyChainSources[profileId] ?? const {},
+        );
+        final message = await coreController.updateProxyChain(
+          chainProxies,
+          closeConnections: closeConnections,
+        );
+        if (message.isNotEmpty) {
+          return message;
+        }
+        _proxyChains[profileId] = pendingChain;
+        return '';
+      } catch (error, stackTrace) {
+        commonPrint.log(
+          'update_proxy_chain_failed error=$error stack=$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+        return error.toString();
+      }
+    });
+    _proxyChainApplyQueue = apply.then<void>((_) {}).catchError(
+      (Object error, StackTrace stackTrace) {
+        commonPrint.log(
+          'update_proxy_chain_queue_failed error=$error stack=$stackTrace',
+          logLevel: LogLevel.warning,
+        );
+      },
+    );
+    return await apply;
   }
 
   void updateGroupsDebounce([Duration? duration]) {
@@ -742,11 +783,13 @@ extension SetupControllerExt on AppController {
         defaultUA: defaultUA,
       ),
     );
-    final effectiveProxyNames = applyProxyChainOverlay(
+    final overlay = applyProxyChainOverlay(
       res,
       _proxyChains[profileId] ?? const [],
+      fallbackSourceProxies: _proxyChainSources[profileId] ?? const {},
     );
-    _proxyChains[profileId] = List<String>.from(effectiveProxyNames);
+    _proxyChainSources[profileId] = overlay.sourceProxies;
+    _proxyChainRuntimeProxies[profileId] = overlay.chainProxies;
     return res;
   }
 
@@ -763,6 +806,20 @@ extension SetupControllerExt on AppController {
       globalState.showNotifier(e.toString());
     }
     return res;
+  }
+
+  Future<String> _syncProxyChainRuntime(int? profileId) async {
+    if (profileId == null) {
+      return '';
+    }
+    final chainProxies = _proxyChainRuntimeProxies[profileId];
+    if (chainProxies == null || chainProxies.isEmpty) {
+      return '';
+    }
+    return await coreController.updateProxyChain(
+      chainProxies,
+      closeConnections: false,
+    );
   }
 
   Future<void> _setupConfig({
@@ -808,11 +865,14 @@ extension SetupControllerExt on AppController {
     final configFilePath = await appPath.configFilePath;
     final yamlString = await encodeYamlTask(config);
     await File(configFilePath).safeWriteAsString(yamlString);
-    final message = await coreController.setupConfig(
+    var message = await coreController.setupConfig(
       setupState: setupState,
       params: setupParams,
       preloadInvoke: preloadInvoke,
     );
+    if (message.isEmpty) {
+      message = await _syncProxyChainRuntime(profile?.id);
+    }
     var hasShownDialog = false;
     if (message.isNotEmpty) {
       final result = await _handleSetupConfigForMacOSSshAuthorization(
@@ -924,8 +984,11 @@ extension SetupControllerExt on AppController {
         setupState: setupState,
         params: setupParams,
       );
+      final restoredMessage = retryMessage.isEmpty
+          ? await _syncProxyChainRuntime(setupState.profileId)
+          : retryMessage;
       return _SetupConfigMessageResult(
-        message: retryMessage,
+        message: restoredMessage,
         hasShownDialog: true,
       );
     }
