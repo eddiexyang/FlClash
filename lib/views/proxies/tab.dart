@@ -19,6 +19,7 @@ typedef ProxyGroupViewKeyMap =
 const _chainBarHeight = 56.0;
 const _chainBarFabGap = 12.0;
 const _chainDragDuration = Duration(milliseconds: 180);
+const _chainDropDuration = Duration(milliseconds: 80);
 
 const _chainProxy = Proxy(name: internalChainProxyName, type: 'Relay');
 
@@ -750,42 +751,73 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
   _ProxyChainDragData? _activeDrag;
   int? _previewTargetIndex;
   int? _acceptedTargetIndex;
-  double _draggedWidth = 0;
+  bool _settleImmediately = false;
+  int? _landingIndex;
+  int _landingAnimationId = 0;
 
   int _clampTargetIndex(int index) {
     return min(max(index, 0), widget.proxies.length);
   }
 
-  void _handleDragStarted(_ProxyChainDragData data, double width) {
+  void _handleDragStarted(_ProxyChainDragData data) {
     setState(() {
       _activeDrag = data;
-      _previewTargetIndex = data.chainIndex;
+      _previewTargetIndex = null;
       _acceptedTargetIndex = null;
-      _draggedWidth = max(width, 96.0);
     });
   }
 
   void _handleDragMove(_ProxyChainDragData data, int targetIndex) {
-    if (!identical(data, _activeDrag) || data.chainIndex == null) {
-      return;
-    }
     final nextTargetIndex = _clampTargetIndex(targetIndex);
-    if (_previewTargetIndex == nextTargetIndex) {
+    final sourceIndex = data.chainIndex;
+    final nextPreviewTargetIndex = sourceIndex != null &&
+            nextTargetIndex == sourceIndex
+        ? null
+        : nextTargetIndex;
+    if (identical(data, _activeDrag) &&
+        _previewTargetIndex == nextPreviewTargetIndex) {
       return;
     }
     setState(() {
-      _previewTargetIndex = nextTargetIndex;
+      _activeDrag = data;
+      _previewTargetIndex = nextPreviewTargetIndex;
+      _acceptedTargetIndex = null;
+    });
+  }
+
+  void _finishDrag(VoidCallback commit, {int? landingIndex}) {
+    setState(() {
+      _activeDrag = null;
+      _previewTargetIndex = null;
+      _acceptedTargetIndex = null;
+      _settleImmediately = true;
+      _landingIndex = landingIndex;
+      if (landingIndex != null) {
+        _landingAnimationId++;
+      }
+    });
+    commit();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _settleImmediately = false;
+      });
     });
   }
 
   void _handleAccept(_ProxyChainDragData data, int targetIndex) {
     final nextTargetIndex = _clampTargetIndex(targetIndex);
     if (data.chainIndex == null) {
-      widget.onDrop(data, nextTargetIndex);
+      _finishDrag(
+        () => widget.onDrop(data, nextTargetIndex),
+        landingIndex: nextTargetIndex,
+      );
       return;
     }
-    _acceptedTargetIndex = nextTargetIndex;
     _handleDragMove(data, nextTargetIndex);
+    _acceptedTargetIndex = nextTargetIndex;
   }
 
   void _handleDragEnd(
@@ -794,20 +826,20 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
   ) {
     final sourceIndex = data.chainIndex;
     final targetIndex = _acceptedTargetIndex;
-    setState(() {
-      _activeDrag = null;
-      _previewTargetIndex = null;
-      _acceptedTargetIndex = null;
-      _draggedWidth = 0;
-    });
     if (sourceIndex == null) {
       return;
     }
     if (details.wasAccepted && targetIndex != null) {
-      widget.onDrop(data, targetIndex);
+      final landingIndex = sourceIndex < targetIndex
+          ? targetIndex - 1
+          : targetIndex;
+      _finishDrag(
+        () => widget.onDrop(data, targetIndex),
+        landingIndex: landingIndex,
+      );
       return;
     }
-    widget.onRemove(sourceIndex);
+    _finishDrag(() => widget.onRemove(sourceIndex));
   }
 
   void _handleBarLeave(_ProxyChainDragData? data) {
@@ -816,6 +848,9 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
     }
     setState(() {
       _previewTargetIndex = null;
+      if (data?.chainIndex == null) {
+        _activeDrag = null;
+      }
     });
   }
 
@@ -829,16 +864,45 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
         : hopIndex + 1;
   }
 
+  bool _showLeadingArrow(int index) {
+    if (index == 0) {
+      return true;
+    }
+    if (_activeDrag?.chainIndex == 0 && index == 1) {
+      return false;
+    }
+    if (_previewTargetIndex == index) {
+      return true;
+    }
+    if (index >= widget.proxies.length ||
+        _activeDrag?.chainIndex == index) {
+      return false;
+    }
+    return true;
+  }
+
+  bool _showTrailingArrow(int index) {
+    return _previewTargetIndex == index &&
+        index < widget.proxies.length &&
+        _activeDrag?.chainIndex != index;
+  }
+
   @override
   Widget build(BuildContext context) {
     return DragTarget<_ProxyChainDragData>(
       onWillAcceptWithDetails: (_) => true,
+      onMove: (details) {
+        _handleDragMove(details.data, widget.proxies.length);
+      },
       onAcceptWithDetails: (details) {
         _handleAccept(details.data, widget.proxies.length);
       },
       onLeave: _handleBarLeave,
       builder: (context, candidateData, _) {
         final isHovering = candidateData.isNotEmpty;
+        final animationDuration = _settleImmediately
+            ? Duration.zero
+            : _chainDragDuration;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           height: _chainBarHeight,
@@ -878,9 +942,13 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
                         index++
                       ) ...[
                         _ChainInsertTarget(
-                          previewWidth: _previewTargetIndex == index
-                              ? _draggedWidth
-                              : 0,
+                          showLeadingArrow: _showLeadingArrow(index),
+                          showTrailingArrow: _showTrailingArrow(index),
+                          isTerminal: index == widget.proxies.length,
+                          previewProxy: _previewTargetIndex == index
+                              ? _activeDrag?.proxy
+                              : null,
+                          animationDuration: animationDuration,
                           onMove: (data) => _handleDragMove(data, index),
                           onAccept: (data) => _handleAccept(data, index),
                         ),
@@ -888,6 +956,10 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
                           _ChainHop(
                             proxy: widget.proxies[index],
                             index: index,
+                            animationDuration: animationDuration,
+                            landingAnimationId: _landingIndex == index
+                                ? _landingAnimationId
+                                : null,
                             onDragStarted: _handleDragStarted,
                             onDragEnd: _handleDragEnd,
                             onMove: (data) {
@@ -918,12 +990,20 @@ class _ProxyChainBarState extends State<_ProxyChainBar> {
 }
 
 class _ChainInsertTarget extends StatelessWidget {
-  final double previewWidth;
+  final bool showLeadingArrow;
+  final bool showTrailingArrow;
+  final bool isTerminal;
+  final Proxy? previewProxy;
+  final Duration animationDuration;
   final ValueChanged<_ProxyChainDragData> onMove;
   final ValueChanged<_ProxyChainDragData> onAccept;
 
   const _ChainInsertTarget({
-    required this.previewWidth,
+    required this.showLeadingArrow,
+    required this.showTrailingArrow,
+    required this.isTerminal,
+    required this.previewProxy,
+    required this.animationDuration,
     required this.onMove,
     required this.onAccept,
   });
@@ -934,36 +1014,61 @@ class _ChainInsertTarget extends StatelessWidget {
       onWillAcceptWithDetails: (_) => true,
       onMove: (details) => onMove(details.data),
       onAcceptWithDetails: (details) => onAccept(details.data),
-      builder: (context, candidateData, _) {
-        final isHovering = candidateData.isNotEmpty;
+      builder: (context, _, _) {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 28,
+            AnimatedContainer(
+              duration: animationDuration,
+              curve: Curves.easeOutCubic,
+              width: showLeadingArrow
+                  ? 28
+                  : (isTerminal && previewProxy == null ? 12 : 0),
               height: 40,
               child: Center(
-                child: AnimatedSwitcher(
-                  duration: _chainDragDuration,
-                  transitionBuilder: (child, animation) {
-                    return ScaleTransition(scale: animation, child: child);
-                  },
-                  child: Icon(
-                    isHovering ? Icons.add_circle : Icons.chevron_right,
-                    key: ValueKey(isHovering),
-                    size: isHovering ? 24 : 18,
-                    color: isHovering
-                        ? context.colorScheme.primary
-                        : context.colorScheme.onSurfaceVariant.opacity60,
-                  ),
-                ),
+                child: showLeadingArrow
+                    ? Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color:
+                            context.colorScheme.onSurfaceVariant.opacity60,
+                      )
+                    : null,
               ),
             ),
-            AnimatedContainer(
-              duration: _chainDragDuration,
+            AnimatedSize(
+              duration: animationDuration,
               curve: Curves.easeOutCubic,
-              width: previewWidth,
+              alignment: Alignment.centerLeft,
+              child: previewProxy == null
+                  ? const SizedBox.shrink()
+                  : IgnorePointer(
+                      child: ExcludeSemantics(
+                        child: Opacity(
+                          opacity: 0,
+                          child: _ChainHopCard(
+                            proxy: previewProxy!,
+                            onRemove: () {},
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+            AnimatedContainer(
+              duration: animationDuration,
+              curve: Curves.easeOutCubic,
+              width: showTrailingArrow ? 28 : 0,
               height: 40,
+              child: Center(
+                child: showTrailingArrow
+                    ? Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color:
+                            context.colorScheme.onSurfaceVariant.opacity60,
+                      )
+                    : null,
+              ),
             ),
           ],
         );
@@ -972,30 +1077,19 @@ class _ChainInsertTarget extends StatelessWidget {
   }
 }
 
-class _ChainHop extends StatelessWidget {
+class _ChainHopCard extends StatelessWidget {
   final Proxy proxy;
-  final int index;
-  final void Function(_ProxyChainDragData data, double width) onDragStarted;
-  final void Function(_ProxyChainDragData data, DraggableDetails details)
-      onDragEnd;
-  final ValueChanged<_ProxyChainDragData> onMove;
-  final ValueChanged<_ProxyChainDragData> onAccept;
+  final bool isDropTarget;
   final VoidCallback onRemove;
 
-  const _ChainHop({
+  const _ChainHopCard({
     required this.proxy,
-    required this.index,
-    required this.onDragStarted,
-    required this.onDragEnd,
-    required this.onMove,
-    required this.onAccept,
     required this.onRemove,
+    this.isDropTarget = false,
   });
 
-  Widget _buildHop(
-    BuildContext context, {
-    bool isDropTarget = false,
-  }) {
+  @override
+  Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
       constraints: const BoxConstraints(minWidth: 96, maxWidth: 220),
@@ -1039,49 +1133,87 @@ class _ChainHop extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ChainHop extends StatelessWidget {
+  final Proxy proxy;
+  final int index;
+  final Duration animationDuration;
+  final int? landingAnimationId;
+  final ValueChanged<_ProxyChainDragData> onDragStarted;
+  final void Function(_ProxyChainDragData data, DraggableDetails details)
+      onDragEnd;
+  final ValueChanged<_ProxyChainDragData> onMove;
+  final ValueChanged<_ProxyChainDragData> onAccept;
+  final VoidCallback onRemove;
+
+  const _ChainHop({
+    required this.proxy,
+    required this.index,
+    required this.animationDuration,
+    required this.landingAnimationId,
+    required this.onDragStarted,
+    required this.onDragEnd,
+    required this.onMove,
+    required this.onAccept,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
     final data = _ProxyChainDragData(proxy: proxy, chainIndex: index);
     final feedback = Material(
       color: Colors.transparent,
-      child: _buildHop(context),
+      child: _ChainHopCard(proxy: proxy, onRemove: onRemove),
     );
     return DragTarget<_ProxyChainDragData>(
       onWillAcceptWithDetails: (_) => true,
       onMove: (details) => onMove(details.data),
       onAcceptWithDetails: (details) => onAccept(details.data),
       builder: (context, candidateData, _) {
-        final child = _buildHop(
-          context,
+        final child = _ChainHopCard(
+          proxy: proxy,
           isDropTarget: candidateData.isNotEmpty,
+          onRemove: onRemove,
         );
+        final landedChild = landingAnimationId == null
+            ? child
+            : TweenAnimationBuilder<double>(
+                key: ValueKey(landingAnimationId),
+                duration: _chainDropDuration,
+                curve: Curves.easeOutCubic,
+                tween: Tween(begin: 0.0, end: 1.0),
+                child: child,
+                builder: (context, value, child) {
+                  return Opacity(
+                    opacity: value,
+                    child: Transform.scale(
+                      alignment: Alignment.centerLeft,
+                      scale: 0.98 + value * 0.02,
+                      child: child,
+                    ),
+                  );
+                },
+              );
         final visibleChild = AnimatedSize(
-          duration: _chainDragDuration,
+          duration: animationDuration,
           curve: Curves.easeOutCubic,
           alignment: Alignment.centerLeft,
-          child: child,
+          child: landedChild,
         );
         final childWhenDragging = AnimatedSize(
-          duration: _chainDragDuration,
+          duration: animationDuration,
           curve: Curves.easeOutCubic,
           alignment: Alignment.centerLeft,
           child: const SizedBox.shrink(),
         );
-        void handleDragStarted() {
-          final renderObject = context.findRenderObject();
-          final width = renderObject is RenderBox
-              ? renderObject.size.width
-              : 0.0;
-          onDragStarted(data, width);
-        }
 
         if (system.isDesktop) {
           return Draggable<_ProxyChainDragData>(
             data: data,
             feedback: feedback,
             childWhenDragging: childWhenDragging,
-            onDragStarted: handleDragStarted,
+            onDragStarted: () => onDragStarted(data),
             onDragEnd: (details) => onDragEnd(data, details),
             rootOverlay: true,
             child: visibleChild,
@@ -1091,7 +1223,7 @@ class _ChainHop extends StatelessWidget {
           data: data,
           feedback: feedback,
           childWhenDragging: childWhenDragging,
-          onDragStarted: handleDragStarted,
+          onDragStarted: () => onDragStarted(data),
           onDragEnd: (details) => onDragEnd(data, details),
           rootOverlay: true,
           child: visibleChild,
