@@ -694,7 +694,7 @@ class ChainProxyCard extends ConsumerWidget {
   }
 }
 
-class DraggableProxyCard extends StatelessWidget {
+class DraggableProxyCard extends StatefulWidget {
   final Proxy proxy;
   final ProxyCardType cardType;
   final Widget child;
@@ -707,32 +707,79 @@ class DraggableProxyCard extends StatelessWidget {
   });
 
   @override
+  State<DraggableProxyCard> createState() => _DraggableProxyCardState();
+}
+
+class _DraggableProxyCardState extends State<DraggableProxyCard> {
+  final ValueNotifier<bool> _compactFeedback = ValueNotifier(false);
+
+  @override
+  void dispose() {
+    _compactFeedback.dispose();
+    super.dispose();
+  }
+
+  void _resetFeedback() {
+    _compactFeedback.value = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final data = _ProxyChainDragData(proxy: proxy);
+        final data = _ProxyChainDragData(
+          proxy: widget.proxy,
+          compactFeedback: _compactFeedback,
+        );
         final feedback = FractionalTranslation(
           translation: const Offset(-0.5, -0.5),
           child: Material(
             color: Colors.transparent,
-            child: SizedBox(
-              width: constraints.maxWidth,
-              height: getItemHeight(cardType),
-              child: IgnorePointer(
-                child: Opacity(opacity: 0.92, child: child),
+            child: IgnorePointer(
+              child: ExcludeSemantics(
+                child: ValueListenableBuilder(
+                  valueListenable: _compactFeedback,
+                  builder: (context, compact, _) {
+                    return AnimatedCrossFade(
+                      duration: _chainDragDuration,
+                      sizeCurve: Curves.easeOutCubic,
+                      alignment: Alignment.center,
+                      crossFadeState: compact
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+                      firstChild: SizedBox(
+                        width: constraints.maxWidth,
+                        height: getItemHeight(widget.cardType),
+                        child: Opacity(
+                          opacity: 0.92,
+                          child: widget.child,
+                        ),
+                      ),
+                      secondChild: _ChainHopCard(
+                        proxy: widget.proxy,
+                        onRemove: () {},
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
         );
-        final childWhenDragging = Opacity(opacity: 0.35, child: child);
+        final childWhenDragging = Opacity(
+          opacity: 0.35,
+          child: widget.child,
+        );
         if (system.isDesktop) {
           return Draggable<_ProxyChainDragData>(
             data: data,
             feedback: feedback,
             childWhenDragging: childWhenDragging,
             dragAnchorStrategy: pointerDragAnchorStrategy,
+            onDragStarted: _resetFeedback,
+            onDragEnd: (_) => _resetFeedback(),
             rootOverlay: true,
-            child: child,
+            child: widget.child,
           );
         }
         return LongPressDraggable<_ProxyChainDragData>(
@@ -740,8 +787,10 @@ class DraggableProxyCard extends StatelessWidget {
           feedback: feedback,
           childWhenDragging: childWhenDragging,
           dragAnchorStrategy: pointerDragAnchorStrategy,
+          onDragStarted: _resetFeedback,
+          onDragEnd: (_) => _resetFeedback(),
           rootOverlay: true,
-          child: child,
+          child: widget.child,
         );
       },
     );
