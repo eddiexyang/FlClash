@@ -476,6 +476,7 @@ func prepareProxyChainConfigLocked(
 	selectedMap map[string]string,
 ) (*preparedProxyChainConfig, error) {
 	staged := proxyChainRuntimeState.staged
+	proxyChainRuntimeState.staged = nil
 	if staged == nil {
 		return nil, nil
 	}
@@ -520,6 +521,7 @@ func activatePreparedProxyChainLocked(prepared *preparedProxyChainConfig) {
 }
 
 func stageProxyChainLocked(params UpdateProxyChainParams) error {
+	proxyChainRuntimeState.staged = nil
 	proxies, _, err := parseProxyChain(params.Proxies)
 	if err != nil {
 		return err

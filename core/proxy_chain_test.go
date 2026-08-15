@@ -9,6 +9,7 @@ import (
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
 	"github.com/metacubex/mihomo/common/utils"
+	"github.com/metacubex/mihomo/config"
 	C "github.com/metacubex/mihomo/constant"
 	P "github.com/metacubex/mihomo/constant/provider"
 	"github.com/metacubex/mihomo/tunnel"
@@ -77,6 +78,42 @@ func installProxyChainTestRuntime(
 		tunnel.UpdateProxies(previousProxies, previousProviders)
 	})
 	return overlays
+}
+
+func TestProxyChainStageFailureClearsPreviousState(t *testing.T) {
+	proxyChainRuntimeState.Lock()
+	previousStaged := proxyChainRuntimeState.staged
+	proxyChainRuntimeState.staged = &proxyChainRuntimeConfig{
+		proxyNames: []string{"old"},
+	}
+	err := stageProxyChainLocked(UpdateProxyChainParams{})
+	staged := proxyChainRuntimeState.staged
+	proxyChainRuntimeState.staged = previousStaged
+	proxyChainRuntimeState.Unlock()
+
+	if err == nil {
+		t.Fatal("empty Chain stage unexpectedly succeeded")
+	}
+	if staged != nil {
+		t.Fatal("failed Chain stage retained previous state")
+	}
+}
+
+func TestProxyChainPrepareFailureConsumesStagedState(t *testing.T) {
+	proxyChainRuntimeState.Lock()
+	previousStaged := proxyChainRuntimeState.staged
+	proxyChainRuntimeState.staged = &proxyChainRuntimeConfig{}
+	_, err := prepareProxyChainConfigLocked(&config.Config{}, nil)
+	staged := proxyChainRuntimeState.staged
+	proxyChainRuntimeState.staged = previousStaged
+	proxyChainRuntimeState.Unlock()
+
+	if err == nil {
+		t.Fatal("empty staged Chain unexpectedly prepared")
+	}
+	if staged != nil {
+		t.Fatal("failed Chain preparation retained staged state")
+	}
 }
 
 func TestProxyChainSelectorOverlayBypassesGroupExclusions(t *testing.T) {

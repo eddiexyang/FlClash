@@ -393,12 +393,12 @@ extension ProxiesControllerExt on AppController {
     if (profileId == null) {
       return '';
     }
-    final currentChain = _proxyChains[profileId] ?? const <String>[];
-    if (stringListEquality.equals(currentChain, pendingChain)) {
-      return '';
-    }
     final apply = _proxyChainApplyQueue.then<String>((_) async {
       if (profileId != _ref.read(currentProfileProvider)?.id) {
+        return '';
+      }
+      final currentChain = _proxyChains[profileId] ?? const <String>[];
+      if (stringListEquality.equals(currentChain, pendingChain)) {
         return '';
       }
       try {
