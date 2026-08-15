@@ -230,6 +230,20 @@ jobs:
           files: ./dist/**/*
           fail_on_unmatched_files: true
 
+      - name: Remove stale dev release assets
+        if: steps.release.outputs.eligible == 'true' && github.ref == 'refs/heads/dev'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find ./dist -type f -printf '%f\n' | sort -u > "$RUNNER_TEMP/dev-release-assets"
+          gh release view dev --json assets --jq '.assets[].name' |
+            while IFS= read -r asset; do
+              if ! grep -Fqx -- "$asset" "$RUNNER_TEMP/dev-release-assets"; then
+                gh release delete-asset dev "$asset" --yes
+              fi
+            done
+
       - name: Release main
         if: steps.release.outputs.eligible == 'true' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
