@@ -835,11 +835,22 @@ extension SetupControllerExt on AppController {
         defaultUA: defaultUA,
       ),
     );
+    final requestedProxyNames = _proxyChains[profileId] ?? const <String>[];
     final overlay = applyProxyChainOverlay(
       res,
-      _proxyChains[profileId] ?? const [],
+      requestedProxyNames,
       fallbackSourceProxies: _proxyChainSources[profileId] ?? const {},
     );
+    if (overlay.resetReason != null) {
+      _proxyChains.remove(profileId);
+      _proxyChainRevision.value++;
+      final didClear = await preferences.clearProxyChain(profileId);
+      commonPrint.log(
+        'proxy_chain_overlay_cleared profile_id=$profileId '
+        'persisted=$didClear reason=${overlay.resetReason}',
+        logLevel: LogLevel.warning,
+      );
+    }
     _proxyChainSources[profileId] = overlay.sourceProxies;
     _proxyChainAvailableProxyNames[profileId] = overlay.availableProxyNames;
     _proxyChainRuntimeProxies[profileId] = overlay.chainProxies;

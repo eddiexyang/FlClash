@@ -55,6 +55,8 @@ void main() {
     expect(configuredProxyNames, ['node-a', 'hop-only']);
     expect(overlay.sourceProxies.keys, containsAll(['node-a', 'hop-only']));
     expect(overlay.availableProxyNames, ['node-a', 'hop-only']);
+    expect(overlay.proxyNames, ['hop-only']);
+    expect(overlay.resetReason, isNull);
     expect(overlay.chainProxies.single['name'], internalChainProxyName);
   });
 
@@ -308,7 +310,43 @@ void main() {
 
     expect(overlay.sourceProxies.keys, containsAll(['entry', 'exit']));
     expect(overlay.availableProxyNames, isEmpty);
+    expect(overlay.proxyNames, ['exit']);
+    expect(overlay.resetReason, isNull);
     expect(overlay.chainProxies, hasLength(2));
+  });
+
+  test('clears the whole persisted Chain when one hop is unavailable', () {
+    final config = <String, dynamic>{
+      'proxies': [
+        {'name': 'node-a', 'type': 'ss'},
+      ],
+    };
+
+    final overlay = applyProxyChainOverlay(config, ['node-a', 'removed']);
+
+    expect(overlay.proxyNames, isEmpty);
+    expect(overlay.resetReason, contains('removed'));
+    expect(overlay.sourceProxies.keys.toList(), ['node-a']);
+    expect(overlay.chainProxies, [
+      {'name': internalChainProxyName, 'type': 'reject'},
+    ]);
+  });
+
+  test('clears an unavailable persisted Chain and keeps the profile usable', () {
+    final config = <String, dynamic>{
+      'proxies': [
+        {'name': 'node-a', 'type': 'ss'},
+      ],
+    };
+
+    final overlay = applyProxyChainOverlay(config, ['removed']);
+
+    expect(overlay.proxyNames, isEmpty);
+    expect(overlay.resetReason, contains('removed'));
+    expect(overlay.availableProxyNames, ['node-a']);
+    expect(overlay.chainProxies, [
+      {'name': internalChainProxyName, 'type': 'reject'},
+    ]);
   });
 
   test('does not restore an old proxy over a current dialer group name', () {

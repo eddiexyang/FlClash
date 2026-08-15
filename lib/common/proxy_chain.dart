@@ -5,12 +5,16 @@ import 'package:fl_clash/common/constant.dart';
 class ProxyChainOverlay {
   final Map<String, Map<String, dynamic>> sourceProxies;
   final List<String> availableProxyNames;
+  final List<String> proxyNames;
   final List<Map<String, dynamic>> chainProxies;
+  final String? resetReason;
 
   const ProxyChainOverlay({
     required this.sourceProxies,
     required this.availableProxyNames,
+    required this.proxyNames,
     required this.chainProxies,
+    this.resetReason,
   });
 }
 
@@ -272,6 +276,9 @@ ProxyChainOverlay applyProxyChainOverlay(
     }
   }
 
+  final configuredSourceProxies = Map<String, Map<String, dynamic>>.from(
+    sourceProxies,
+  );
   final restoredSourceNames = <String>{};
   for (final name in requestedProxyNames) {
     _restoreUnavailableProxyChainSourceClosure(
@@ -282,10 +289,22 @@ ProxyChainOverlay applyProxyChainOverlay(
       restoredSourceNames,
     );
   }
-  final chainProxies = buildProxyChainProxies(
-    requestedProxyNames,
-    sourceProxies,
-  );
+  var proxyNames = List<String>.from(requestedProxyNames);
+  late List<Map<String, dynamic>> chainProxies;
+  String? resetReason;
+  try {
+    chainProxies = buildProxyChainProxies(proxyNames, sourceProxies);
+  } catch (error) {
+    if (error is! ArgumentError && error is! StateError) {
+      rethrow;
+    }
+    resetReason = error.toString();
+    proxyNames = [];
+    sourceProxies
+      ..clear()
+      ..addAll(configuredSourceProxies);
+    chainProxies = buildProxyChainProxies(const [], sourceProxies);
+  }
 
   if (rawProxies is List && removedInternalProxy) {
     config['proxies'] = cleanProxies;
@@ -296,6 +315,8 @@ ProxyChainOverlay applyProxyChainOverlay(
   return ProxyChainOverlay(
     sourceProxies: sourceProxies,
     availableProxyNames: availableProxyNames,
+    proxyNames: proxyNames,
     chainProxies: chainProxies,
+    resetReason: resetReason,
   );
 }
