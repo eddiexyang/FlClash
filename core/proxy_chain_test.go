@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/metacubex/mihomo/adapter"
@@ -288,5 +291,229 @@ func TestProxyChainInnerTrackerIsHiddenForSingleHopChain(t *testing.T) {
 
 	if prepareProxyChainTracker(tracker) {
 		t.Fatal("inner single-hop Chain tracker was exposed")
+	}
+}
+
+type proxyChainRuntimeTestConn struct {
+	C.Conn
+	closeCalls    atomic.Int32
+	closeFailures int32
+}
+
+func (c *proxyChainRuntimeTestConn) Close() error {
+	call := c.closeCalls.Add(1)
+	if call <= c.closeFailures {
+		return errors.New("temporary close failure")
+	}
+	return nil
+}
+
+type proxyChainRuntimeTestPacketConn struct {
+	C.PacketConn
+	closeCalls atomic.Int32
+}
+
+func (c *proxyChainRuntimeTestPacketConn) Close() error {
+	c.closeCalls.Add(1)
+	return nil
+}
+
+type proxyChainRuntimeTestProxy struct {
+	C.Proxy
+	dial         func(context.Context) (C.Conn, error)
+	listenPacket func(context.Context) (C.PacketConn, error)
+	closeCalls   atomic.Int32
+}
+
+func (p *proxyChainRuntimeTestProxy) Name() string {
+	return flClashChainName
+}
+
+func (p *proxyChainRuntimeTestProxy) DialContext(
+	ctx context.Context,
+	_ *C.Metadata,
+) (C.Conn, error) {
+	return p.dial(ctx)
+}
+
+func (p *proxyChainRuntimeTestProxy) ListenPacketContext(
+	ctx context.Context,
+	_ *C.Metadata,
+) (C.PacketConn, error) {
+	return p.listenPacket(ctx)
+}
+
+func (p *proxyChainRuntimeTestProxy) Close() error {
+	p.closeCalls.Add(1)
+	return nil
+}
+
+func newProxyChainTestRuntime(proxy C.Proxy) *proxyChainRuntime {
+	return newProxyChainRuntime(
+		map[string]C.Proxy{flClashChainName: proxy},
+		proxy,
+	)
+}
+
+func TestProxyChainRuntimeRetireClosesTCPAndUDPConnections(t *testing.T) {
+	tcpConn := &proxyChainRuntimeTestConn{}
+	packetConn := &proxyChainRuntimeTestPacketConn{}
+	proxy := &proxyChainRuntimeTestProxy{
+		dial: func(context.Context) (C.Conn, error) {
+			return tcpConn, nil
+		},
+		listenPacket: func(context.Context) (C.PacketConn, error) {
+			return packetConn, nil
+		},
+	}
+	runtime := newProxyChainTestRuntime(proxy)
+
+	if _, err := runtime.DialContext(context.Background(), &C.Metadata{}); err != nil {
+		t.Fatalf("dial Chain runtime: %v", err)
+	}
+	if _, err := runtime.ListenPacketContext(
+		context.Background(),
+		&C.Metadata{},
+	); err != nil {
+		t.Fatalf("listen Chain runtime packet: %v", err)
+	}
+	runtime.retire(true)
+
+	if tcpConn.closeCalls.Load() != 1 {
+		t.Fatalf("TCP close calls = %d, want 1", tcpConn.closeCalls.Load())
+	}
+	if packetConn.closeCalls.Load() != 1 {
+		t.Fatalf(
+			"UDP close calls = %d, want 1",
+			packetConn.closeCalls.Load(),
+		)
+	}
+	if proxy.closeCalls.Load() != 1 {
+		t.Fatalf("proxy close calls = %d, want 1", proxy.closeCalls.Load())
+	}
+	if _, err := runtime.DialContext(
+		context.Background(),
+		&C.Metadata{},
+	); !errors.Is(err, errProxyChainRuntimeRetired) {
+		t.Fatalf("dial retired runtime error = %v", err)
+	}
+}
+
+func TestProxyChainRuntimeRetireCancelsInFlightDial(t *testing.T) {
+	dialStarted := make(chan struct{})
+	proxy := &proxyChainRuntimeTestProxy{
+		dial: func(ctx context.Context) (C.Conn, error) {
+			close(dialStarted)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+	runtime := newProxyChainTestRuntime(proxy)
+	dialResult := make(chan error, 1)
+	go func() {
+		_, err := runtime.DialContext(context.Background(), &C.Metadata{})
+		dialResult <- err
+	}()
+	<-dialStarted
+
+	runtime.retire(true)
+
+	if err := <-dialResult; !errors.Is(err, context.Canceled) {
+		t.Fatalf("in-flight dial error = %v, want context canceled", err)
+	}
+	if proxy.closeCalls.Load() != 1 {
+		t.Fatalf("proxy close calls = %d, want 1", proxy.closeCalls.Load())
+	}
+}
+
+func TestProxyChainRuntimeClosesConnectionReturnedAfterRetirement(t *testing.T) {
+	dialStarted := make(chan struct{})
+	runtimeCanceled := make(chan struct{})
+	releaseDial := make(chan struct{})
+	conn := &proxyChainRuntimeTestConn{}
+	proxy := &proxyChainRuntimeTestProxy{
+		dial: func(ctx context.Context) (C.Conn, error) {
+			close(dialStarted)
+			<-ctx.Done()
+			close(runtimeCanceled)
+			<-releaseDial
+			return conn, nil
+		},
+	}
+	runtime := newProxyChainTestRuntime(proxy)
+	dialResult := make(chan error, 1)
+	go func() {
+		_, err := runtime.DialContext(context.Background(), &C.Metadata{})
+		dialResult <- err
+	}()
+	<-dialStarted
+	retireDone := make(chan struct{})
+	go func() {
+		runtime.retire(true)
+		close(retireDone)
+	}()
+	<-runtimeCanceled
+	close(releaseDial)
+
+	if err := <-dialResult; !errors.Is(err, errProxyChainRuntimeRetired) {
+		t.Fatalf("late dial error = %v, want retired runtime", err)
+	}
+	<-retireDone
+	if conn.closeCalls.Load() != 1 {
+		t.Fatalf("late connection close calls = %d, want 1", conn.closeCalls.Load())
+	}
+	if proxy.closeCalls.Load() != 1 {
+		t.Fatalf("proxy close calls = %d, want 1", proxy.closeCalls.Load())
+	}
+}
+
+func TestProxyChainRuntimeRetriesConnectionClose(t *testing.T) {
+	conn := &proxyChainRuntimeTestConn{closeFailures: 2}
+	proxy := &proxyChainRuntimeTestProxy{
+		dial: func(context.Context) (C.Conn, error) {
+			return conn, nil
+		},
+	}
+	runtime := newProxyChainTestRuntime(proxy)
+	if _, err := runtime.DialContext(context.Background(), &C.Metadata{}); err != nil {
+		t.Fatalf("dial Chain runtime: %v", err)
+	}
+
+	runtime.retire(true)
+
+	if conn.closeCalls.Load() != proxyChainCloseAttempts {
+		t.Fatalf(
+			"connection close calls = %d, want %d",
+			conn.closeCalls.Load(),
+			proxyChainCloseAttempts,
+		)
+	}
+}
+
+func TestProxyChainRuntimePreservesConnectionsUntilNaturalClose(t *testing.T) {
+	conn := &proxyChainRuntimeTestConn{}
+	proxy := &proxyChainRuntimeTestProxy{
+		dial: func(context.Context) (C.Conn, error) {
+			return conn, nil
+		},
+	}
+	runtime := newProxyChainTestRuntime(proxy)
+	tracked, err := runtime.DialContext(context.Background(), &C.Metadata{})
+	if err != nil {
+		t.Fatalf("dial Chain runtime: %v", err)
+	}
+
+	runtime.retire(false)
+	if conn.closeCalls.Load() != 0 {
+		t.Fatalf("preserved connection close calls = %d", conn.closeCalls.Load())
+	}
+	if proxy.closeCalls.Load() != 0 {
+		t.Fatalf("preserved proxy close calls = %d", proxy.closeCalls.Load())
+	}
+	if err := tracked.Close(); err != nil {
+		t.Fatalf("close preserved connection: %v", err)
+	}
+	if proxy.closeCalls.Load() != 1 {
+		t.Fatalf("proxy close calls = %d, want 1", proxy.closeCalls.Load())
 	}
 }

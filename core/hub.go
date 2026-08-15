@@ -251,8 +251,12 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(params.Timeout))
 		defer cancel()
 
+		var chainRuntime *proxyChainRuntime
 		proxy := tunnel.AllProxies()[params.ProxyName]
-		if isFlClashChainProxy(params.ProxyName) {
+		if params.ProxyName == flClashChainName {
+			chainRuntime = currentProxyChainRuntime()
+			proxy = nil
+		} else if isFlClashChainProxy(params.ProxyName) {
 			proxy = tunnel.Proxies()[params.ProxyName]
 		}
 
@@ -260,7 +264,7 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 			Name: params.ProxyName,
 		}
 
-		if proxy == nil {
+		if proxy == nil && chainRuntime == nil {
 			delayData.Value = -1
 			data, _ := json.Marshal(delayData)
 			fn(string(data))
@@ -274,7 +278,12 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 		}
 		delayData.Url = testUrl
 
-		delay, err := proxy.URLTest(ctx, testUrl, expectedStatus)
+		var delay uint16
+		if chainRuntime != nil {
+			delay, err = chainRuntime.URLTest(ctx, testUrl, expectedStatus)
+		} else {
+			delay, err = proxy.URLTest(ctx, testUrl, expectedStatus)
+		}
 		if err != nil || delay == 0 {
 			delayData.Value = -1
 			data, _ := json.Marshal(delayData)

@@ -3,16 +3,20 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
+	"github.com/metacubex/mihomo/common/callback"
 	"github.com/metacubex/mihomo/common/utils"
 	"github.com/metacubex/mihomo/config"
 	C "github.com/metacubex/mihomo/constant"
 	P "github.com/metacubex/mihomo/constant/provider"
+	"github.com/metacubex/mihomo/log"
 	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
@@ -34,8 +38,244 @@ type proxyChainRuntimeConfig struct {
 
 var proxyChainRuntimeState = struct {
 	sync.RWMutex
-	staged *proxyChainRuntimeConfig
+	staged  *proxyChainRuntimeConfig
+	current *proxyChainRuntime
 }{}
+
+var errProxyChainRuntimeRetired = errors.New(
+	"proxy chain changed during connection setup",
+)
+
+const proxyChainCloseAttempts = 3
+
+type proxyChainConnection interface {
+	Close() error
+}
+
+// proxyChainRuntime only owns one parsed dialer-proxy graph and its lifetime.
+// Mihomo's native adapters still perform all proxy chaining.
+type proxyChainRuntime struct {
+	entry   C.Proxy
+	proxies map[string]C.Proxy
+
+	mutex            sync.Mutex
+	context          context.Context
+	cancel           context.CancelFunc
+	retired          bool
+	closeConnections bool
+	inFlight         int
+	inFlightWait     sync.WaitGroup
+	connections      map[proxyChainConnection]struct{}
+	closeOnce        sync.Once
+}
+
+func newProxyChainRuntime(
+	proxies map[string]C.Proxy,
+	entry C.Proxy,
+) *proxyChainRuntime {
+	runtimeContext, cancel := context.WithCancel(context.Background())
+	return &proxyChainRuntime{
+		entry:       entry,
+		proxies:     proxies,
+		context:     runtimeContext,
+		cancel:      cancel,
+		connections: map[proxyChainConnection]struct{}{},
+	}
+}
+
+func (r *proxyChainRuntime) beginOperation(
+	ctx context.Context,
+) (context.Context, func(), error) {
+	r.mutex.Lock()
+	if r.retired {
+		r.mutex.Unlock()
+		return nil, nil, errProxyChainRuntimeRetired
+	}
+	r.inFlight++
+	r.inFlightWait.Add(1)
+	runtimeContext := r.context
+	r.mutex.Unlock()
+
+	operationContext, cancel := context.WithCancel(ctx)
+	stopRuntimeCancel := make(chan struct{})
+	go func() {
+		select {
+		case <-runtimeContext.Done():
+			cancel()
+		case <-stopRuntimeCancel:
+		}
+	}()
+	return operationContext, func() {
+		close(stopRuntimeCancel)
+		cancel()
+		r.finishOperation()
+	}, nil
+}
+
+func (r *proxyChainRuntime) finishOperation() {
+	r.mutex.Lock()
+	r.inFlight--
+	closeRuntime := r.retired && !r.closeConnections &&
+		r.inFlight == 0 && len(r.connections) == 0
+	r.mutex.Unlock()
+	r.inFlightWait.Done()
+	if closeRuntime {
+		r.closeProxies()
+	}
+}
+
+func (r *proxyChainRuntime) trackConn(conn C.Conn) (C.Conn, error) {
+	var tracked C.Conn
+	tracked = callback.NewCloseCallbackConn(conn, func() {
+		r.removeConnection(tracked)
+	})
+	r.mutex.Lock()
+	closeConnection := r.retired && r.closeConnections
+	if !closeConnection {
+		r.connections[tracked] = struct{}{}
+	}
+	r.mutex.Unlock()
+	if closeConnection {
+		closeProxyChainConnection(tracked)
+		return nil, errProxyChainRuntimeRetired
+	}
+	return tracked, nil
+}
+
+func (r *proxyChainRuntime) trackPacketConn(
+	packetConn C.PacketConn,
+) (C.PacketConn, error) {
+	var tracked C.PacketConn
+	tracked = callback.NewCloseCallbackPacketConn(packetConn, func() {
+		r.removeConnection(tracked)
+	})
+	r.mutex.Lock()
+	closeConnection := r.retired && r.closeConnections
+	if !closeConnection {
+		r.connections[tracked] = struct{}{}
+	}
+	r.mutex.Unlock()
+	if closeConnection {
+		closeProxyChainConnection(tracked)
+		return nil, errProxyChainRuntimeRetired
+	}
+	return tracked, nil
+}
+
+func (r *proxyChainRuntime) removeConnection(connection proxyChainConnection) {
+	r.mutex.Lock()
+	delete(r.connections, connection)
+	closeRuntime := r.retired && !r.closeConnections &&
+		r.inFlight == 0 && len(r.connections) == 0
+	r.mutex.Unlock()
+	if closeRuntime {
+		r.closeProxies()
+	}
+}
+
+func (r *proxyChainRuntime) DialContext(
+	ctx context.Context,
+	metadata *C.Metadata,
+) (C.Conn, error) {
+	operationContext, finish, err := r.beginOperation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	conn, err := r.entry.DialContext(operationContext, metadata)
+	if err != nil {
+		return nil, err
+	}
+	return r.trackConn(conn)
+}
+
+func (r *proxyChainRuntime) ListenPacketContext(
+	ctx context.Context,
+	metadata *C.Metadata,
+) (C.PacketConn, error) {
+	operationContext, finish, err := r.beginOperation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer finish()
+	packetConn, err := r.entry.ListenPacketContext(
+		operationContext,
+		metadata,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return r.trackPacketConn(packetConn)
+}
+
+func (r *proxyChainRuntime) URLTest(
+	ctx context.Context,
+	url string,
+	expectedStatus utils.IntRanges[uint16],
+) (uint16, error) {
+	operationContext, finish, err := r.beginOperation(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer finish()
+	return r.entry.URLTest(operationContext, url, expectedStatus)
+}
+
+func (r *proxyChainRuntime) retire(closeConnections bool) {
+	if r == nil {
+		return
+	}
+	r.mutex.Lock()
+	if closeConnections {
+		r.closeConnections = true
+	}
+	r.retired = true
+	connections := make([]proxyChainConnection, 0, len(r.connections))
+	if r.closeConnections {
+		for connection := range r.connections {
+			connections = append(connections, connection)
+		}
+	}
+	closeRuntime := !r.closeConnections &&
+		r.inFlight == 0 && len(r.connections) == 0
+	r.mutex.Unlock()
+
+	if r.closeConnections {
+		r.cancel()
+		for _, connection := range connections {
+			closeProxyChainConnection(connection)
+		}
+		r.inFlightWait.Wait()
+		r.closeProxies()
+		return
+	}
+	if closeRuntime {
+		r.closeProxies()
+	}
+}
+
+func (r *proxyChainRuntime) closeProxies() {
+	r.closeOnce.Do(func() {
+		r.cancel()
+		closeProxyChainProxies(r.proxies)
+	})
+}
+
+func closeProxyChainConnection(connection proxyChainConnection) bool {
+	var err error
+	for attempt := 0; attempt < proxyChainCloseAttempts; attempt++ {
+		err = connection.Close()
+		if err == nil || errors.Is(err, net.ErrClosed) {
+			return true
+		}
+	}
+	log.Warnln(
+		"[APP] close retired proxy chain connection failed after %d attempts: %v",
+		proxyChainCloseAttempts,
+		err,
+	)
+	return false
+}
 
 // proxyChainSelectorOverlay lets a native selector choose the runtime Chain
 // without changing its provider list or the subscription's filter settings.
@@ -117,10 +357,10 @@ func (p *proxyChainSelectorOverlay) ForceSet(name string) {
 	_ = p.setTargetLocked(name, true)
 }
 
-func currentProxyChain() C.Proxy {
+func currentProxyChainRuntime() *proxyChainRuntime {
 	proxyChainRuntimeState.RLock()
 	defer proxyChainRuntimeState.RUnlock()
-	return tunnel.Proxies()[flClashChainName]
+	return proxyChainRuntimeState.current
 }
 
 func (p *proxyChainSelectorOverlay) DialContext(
@@ -130,11 +370,11 @@ func (p *proxyChainSelectorOverlay) DialContext(
 	if !p.usesChain() {
 		return p.ProxyGroup.DialContext(ctx, metadata)
 	}
-	chainProxy := currentProxyChain()
-	if chainProxy == nil {
+	runtime := currentProxyChainRuntime()
+	if runtime == nil {
 		return nil, fmt.Errorf("proxy chain is unavailable")
 	}
-	conn, err := chainProxy.DialContext(ctx, metadata)
+	conn, err := runtime.DialContext(ctx, metadata)
 	if err == nil {
 		conn.AppendToChains(p)
 	}
@@ -148,11 +388,11 @@ func (p *proxyChainSelectorOverlay) ListenPacketContext(
 	if !p.usesChain() {
 		return p.ProxyGroup.ListenPacketContext(ctx, metadata)
 	}
-	chainProxy := currentProxyChain()
-	if chainProxy == nil {
+	runtime := currentProxyChainRuntime()
+	if runtime == nil {
 		return nil, fmt.Errorf("proxy chain is unavailable")
 	}
-	packetConn, err := chainProxy.ListenPacketContext(ctx, metadata)
+	packetConn, err := runtime.ListenPacketContext(ctx, metadata)
 	if err == nil {
 		packetConn.AppendToChains(p)
 	}
@@ -163,16 +403,16 @@ func (p *proxyChainSelectorOverlay) SupportUDP() bool {
 	if !p.usesChain() {
 		return p.ProxyGroup.SupportUDP()
 	}
-	chainProxy := currentProxyChain()
-	return chainProxy != nil && chainProxy.SupportUDP()
+	runtime := currentProxyChainRuntime()
+	return runtime != nil && runtime.entry.SupportUDP()
 }
 
 func (p *proxyChainSelectorOverlay) IsL3Protocol(metadata *C.Metadata) bool {
 	if !p.usesChain() {
 		return p.ProxyGroup.IsL3Protocol(metadata)
 	}
-	chainProxy := currentProxyChain()
-	return chainProxy != nil && chainProxy.IsL3Protocol(metadata)
+	runtime := currentProxyChainRuntime()
+	return runtime != nil && runtime.entry.IsL3Protocol(metadata)
 }
 
 func (p *proxyChainSelectorOverlay) Unwrap(
@@ -182,7 +422,11 @@ func (p *proxyChainSelectorOverlay) Unwrap(
 	if !p.usesChain() {
 		return p.ProxyGroup.Unwrap(metadata, touch)
 	}
-	return currentProxyChain()
+	runtime := currentProxyChainRuntime()
+	if runtime == nil {
+		return nil
+	}
+	return runtime.entry
 }
 
 func (p *proxyChainSelectorOverlay) Now() string {
@@ -211,11 +455,11 @@ func (p *proxyChainSelectorOverlay) MarshalJSON() ([]byte, error) {
 
 func (p *proxyChainSelectorOverlay) Proxies() []C.Proxy {
 	proxies := append([]C.Proxy(nil), p.ProxyGroup.Proxies()...)
-	chainProxy := currentProxyChain()
-	if chainProxy == nil {
+	runtime := currentProxyChainRuntime()
+	if runtime == nil {
 		return proxies
 	}
-	return append([]C.Proxy{chainProxy}, proxies...)
+	return append([]C.Proxy{runtime.entry}, proxies...)
 }
 
 func (p *proxyChainSelectorOverlay) URLTest(
@@ -233,14 +477,14 @@ func (p *proxyChainSelectorOverlay) URLTest(
 		groupResult <- groupURLTestResult{delays: delays, err: err}
 	}()
 
-	chainProxy := currentProxyChain()
+	runtime := currentProxyChainRuntime()
 	var chainDelay uint16
 	var chainErr error
-	if chainProxy != nil {
-		chainDelay, chainErr = chainProxy.URLTest(ctx, url, expectedStatus)
+	if runtime != nil {
+		chainDelay, chainErr = runtime.URLTest(ctx, url, expectedStatus)
 	}
 	result := <-groupResult
-	if chainErr == nil && chainProxy != nil {
+	if chainErr == nil && runtime != nil {
 		if result.delays == nil {
 			result.delays = map[string]uint16{}
 		}
@@ -345,7 +589,13 @@ func parseProxyChain(
 
 func closeProxyChainProxies(proxies map[string]C.Proxy) {
 	for _, proxy := range proxies {
-		_ = proxy.Close()
+		if err := proxy.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			log.Warnln(
+				"[APP] close retired proxy chain adapter %s failed: %v",
+				proxy.Name(),
+				err,
+			)
+		}
 	}
 }
 
@@ -469,6 +719,7 @@ func validateProxyChainRuntimeGraph(
 
 type preparedProxyChainConfig struct {
 	proxyNames []string
+	runtime    *proxyChainRuntime
 }
 
 func prepareProxyChainConfigLocked(
@@ -480,10 +731,11 @@ func prepareProxyChainConfigLocked(
 	if staged == nil {
 		return nil, nil
 	}
-	chainProxies, _, err := parseProxyChain(staged.configs)
+	chainProxies, chainProxy, err := parseProxyChain(staged.configs)
 	if err != nil {
 		return nil, err
 	}
+	runtime := newProxyChainRuntime(chainProxies, chainProxy)
 	current.Proxies = buildProxyChainProxyMap(current.Proxies, chainProxies)
 	overlays := installProxyChainSelectorOverlays(current.Proxies)
 	for groupName, selected := range selectedMap {
@@ -503,21 +755,28 @@ func prepareProxyChainConfigLocked(
 		}
 	}
 	if err := validateProxyChainRuntimeGraph(current.Proxies, nil); err != nil {
-		closeProxyChainProxies(chainProxies)
+		runtime.closeProxies()
 		return nil, err
 	}
 	return &preparedProxyChainConfig{
 		proxyNames: append([]string(nil), staged.proxyNames...),
+		runtime:    runtime,
 	}, nil
 }
 
-func activatePreparedProxyChainLocked(prepared *preparedProxyChainConfig) {
+func activatePreparedProxyChainLocked(
+	prepared *preparedProxyChainConfig,
+) *proxyChainRuntime {
 	proxyChainRuntimeState.staged = nil
+	previous := proxyChainRuntimeState.current
 	if prepared == nil {
+		proxyChainRuntimeState.current = nil
 		setProxyChainNames(nil)
-		return
+		return previous
 	}
+	proxyChainRuntimeState.current = prepared.runtime
 	setProxyChainNames(prepared.proxyNames)
+	return previous
 }
 
 func stageProxyChainLocked(params UpdateProxyChainParams) error {
@@ -534,23 +793,28 @@ func stageProxyChainLocked(params UpdateProxyChainParams) error {
 	return nil
 }
 
-func updateProxyChainLocked(params UpdateProxyChainParams) error {
-	chainProxies, _, err := parseProxyChain(params.Proxies)
+func updateProxyChainLocked(
+	params UpdateProxyChainParams,
+) (*proxyChainRuntime, error) {
+	chainProxies, chainProxy, err := parseProxyChain(params.Proxies)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	runtime := newProxyChainRuntime(chainProxies, chainProxy)
 	proxies := buildProxyChainProxyMap(tunnel.Proxies(), chainProxies)
 	if err := validateProxyChainRuntimeGraph(proxies, nil); err != nil {
-		closeProxyChainProxies(chainProxies)
-		return err
+		runtime.closeProxies()
+		return nil, err
 	}
 	providers := make(map[string]P.ProxyProvider, len(tunnel.Providers()))
 	for name, provider := range tunnel.Providers() {
 		providers[name] = provider
 	}
+	previous := proxyChainRuntimeState.current
 	tunnel.UpdateProxies(proxies, providers)
+	proxyChainRuntimeState.current = runtime
 	setProxyChainNames(params.ProxyNames)
-	return nil
+	return previous, nil
 }
 
 func handleUpdateProxyChain(data []byte) string {
@@ -561,22 +825,19 @@ func handleUpdateProxyChain(data []byte) string {
 		return err.Error()
 	}
 	proxyChainRuntimeState.Lock()
-	defer proxyChainRuntimeState.Unlock()
 	if params.StageOnly {
 		if err := stageProxyChainLocked(params); err != nil {
+			proxyChainRuntimeState.Unlock()
 			return err.Error()
 		}
+		proxyChainRuntimeState.Unlock()
 		return ""
 	}
-	var affectedConnections []statistic.Tracker
-	if params.CloseConnections {
-		affectedConnections = connectionsUsingGroup(flClashChainName)
-	}
-	if err := updateProxyChainLocked(params); err != nil {
+	previous, err := updateProxyChainLocked(params)
+	proxyChainRuntimeState.Unlock()
+	if err != nil {
 		return err.Error()
 	}
-	if params.CloseConnections {
-		closeTrackedConnections(affectedConnections)
-	}
+	previous.retire(params.CloseConnections)
 	return ""
 }

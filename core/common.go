@@ -314,8 +314,9 @@ func applyConfig(params *SetupParams) error {
 		return chainErr
 	}
 	hub.ApplyConfig(nextConfig)
-	activatePreparedProxyChainLocked(prepared)
+	previousProxyChainRuntime := activatePreparedProxyChainLocked(prepared)
 	proxyChainRuntimeState.Unlock()
+	previousProxyChainRuntime.retire(false)
 	currentConfig = nextConfig
 	if prepared == nil {
 		patchSelectGroup(params.SelectedMap)
