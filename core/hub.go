@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
 	"github.com/metacubex/mihomo/common/observable"
@@ -367,9 +368,9 @@ func connectionsUsingGroup(groupName string) []statistic.Tracker {
 func closeTrackedConnections(connections []statistic.Tracker) bool {
 	success := true
 	for _, c := range connections {
-		if err := c.Close(); err != nil {
+		if err := c.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
 			success = false
-			log.Warnln("[APP] close connection %s failed: %v", c.ID(), err)
+			log.Errorln("[APP] close connection %s failed: %v", c.ID(), err)
 		}
 	}
 	return success

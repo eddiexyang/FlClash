@@ -508,6 +508,20 @@ func isFlClashChainProxy(name string) bool {
 	return name == flClashChainName || strings.HasPrefix(name, flClashChainHopPrefix)
 }
 
+func connectionsUsingProxyChain() []statistic.Tracker {
+	connections := make([]statistic.Tracker, 0)
+	statistic.DefaultManager.Range(func(connection statistic.Tracker) bool {
+		for _, name := range connection.Chains() {
+			if isFlClashChainProxy(name) {
+				connections = append(connections, connection)
+				break
+			}
+		}
+		return true
+	})
+	return connections
+}
+
 func setProxyChainNames(proxyNames []string) {
 	proxyChainState.Lock()
 	proxyChainState.proxyNames = append([]string(nil), proxyNames...)
@@ -858,6 +872,10 @@ func handleUpdateProxyChain(data []byte) string {
 		log.Errorln("[APP] decode proxy chain update failed: %v", err)
 		return err.Error()
 	}
+	var affectedConnections []statistic.Tracker
+	if !params.StageOnly && params.CloseConnections {
+		affectedConnections = connectionsUsingProxyChain()
+	}
 	proxyChainRuntimeState.Lock()
 	if params.StageOnly {
 		if err := stageProxyChainLocked(params); err != nil {
@@ -873,6 +891,9 @@ func handleUpdateProxyChain(data []byte) string {
 	if err != nil {
 		log.Errorln("[APP] apply proxy chain update failed: %v", err)
 		return err.Error()
+	}
+	if params.CloseConnections {
+		closeTrackedConnections(affectedConnections)
 	}
 	previous.retire(params.CloseConnections)
 	return ""

@@ -284,6 +284,85 @@ func TestProxyChainSelectorOverlayRejectsGroupCycle(t *testing.T) {
 	}
 }
 
+func TestProxyChainUpdateClosesExistingTrackers(t *testing.T) {
+	chain := parseProxyChainTestProxy(t, map[string]any{
+		"name": flClashChainName,
+		"type": "reject",
+	})
+	installProxyChainTestRuntime(
+		t,
+		map[string]C.Proxy{flClashChainName: chain},
+		map[string]P.ProxyProvider{},
+	)
+
+	previousManager := statistic.DefaultManager
+	statistic.DefaultManager = &statistic.Manager{}
+	t.Cleanup(func() {
+		statistic.DefaultManager = previousManager
+	})
+	trackers := []*chainTracker{
+		{
+			id:      "outer-chain-connection",
+			chain:   C.Chain{flClashChainName, "Configured selector"},
+			manager: statistic.DefaultManager,
+		},
+		{
+			id:      "inner-chain-connection",
+			chain:   C.Chain{flClashChainHopPrefix + "0_node"},
+			manager: statistic.DefaultManager,
+		},
+		{
+			id:      "unrelated-connection",
+			chain:   C.Chain{"node-a", "Configured selector"},
+			manager: statistic.DefaultManager,
+		},
+	}
+	for _, tracker := range trackers {
+		statistic.DefaultManager.Join(tracker)
+	}
+
+	params, err := json.Marshal(UpdateProxyChainParams{
+		Proxies: []map[string]any{{
+			"name": flClashChainName,
+			"type": "reject",
+		}},
+		CloseConnections: true,
+	})
+	if err != nil {
+		t.Fatalf("marshal proxy chain update: %v", err)
+	}
+	if message := handleUpdateProxyChain(params); message != "" {
+		t.Fatalf("update proxy chain: %s", message)
+	}
+	updatedRuntime := currentProxyChainRuntime()
+	t.Cleanup(func() {
+		updatedRuntime.retire(true)
+	})
+
+	for index, tracker := range trackers {
+		wantCloseCalls := 0
+		if index < 2 {
+			wantCloseCalls = 1
+		}
+		if tracker.closeCalls != wantCloseCalls {
+			t.Fatalf(
+				"tracker %q close calls = %d, want %d",
+				tracker.id,
+				tracker.closeCalls,
+				wantCloseCalls,
+			)
+		}
+	}
+	for _, tracker := range trackers[:2] {
+		if statistic.DefaultManager.Get(tracker.id) != nil {
+			t.Fatalf("old Chain tracker %q remains in the manager", tracker.id)
+		}
+	}
+	if statistic.DefaultManager.Get(trackers[2].id) == nil {
+		t.Fatal("unrelated tracker was removed from the manager")
+	}
+}
+
 type proxyChainTestTracker struct {
 	statistic.Tracker
 	info *statistic.TrackerInfo
