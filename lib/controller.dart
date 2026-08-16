@@ -387,6 +387,7 @@ extension ProxiesControllerExt on AppController {
   Future<String> updateProxyChain(
     List<String> proxyNames, {
     required bool closeConnections,
+    bool force = false,
   }) async {
     final pendingChain = List<String>.from(proxyNames);
     final profileId = _ref.read(currentProfileProvider)?.id;
@@ -398,7 +399,7 @@ extension ProxiesControllerExt on AppController {
         return '';
       }
       final currentChain = _proxyChains[profileId] ?? const <String>[];
-      if (stringListEquality.equals(currentChain, pendingChain)) {
+      if (!force && stringListEquality.equals(currentChain, pendingChain)) {
         return '';
       }
       try {
@@ -412,22 +413,29 @@ extension ProxiesControllerExt on AppController {
           closeConnections: closeConnections,
         );
         if (message.isNotEmpty) {
+          commonPrint.log(
+            'update_proxy_chain_failed profile_id=$profileId error=$message',
+            logLevel: LogLevel.error,
+          );
           return message;
         }
         _proxyChains[profileId] = pendingChain;
         _proxyChainRuntimeProxies[profileId] = chainProxies;
         _proxyChainRevision.value++;
-        if (!await preferences.saveProxyChain(profileId, pendingChain)) {
+        final persisted = pendingChain.isEmpty
+            ? await preferences.clearProxyChain(profileId)
+            : await preferences.saveProxyChain(profileId, pendingChain);
+        if (!persisted) {
           commonPrint.log(
             'save_proxy_chain_failed profile_id=$profileId',
-            logLevel: LogLevel.warning,
+            logLevel: LogLevel.error,
           );
         }
         return '';
       } catch (error, stackTrace) {
         commonPrint.log(
           'update_proxy_chain_failed error=$error stack=$stackTrace',
-          logLevel: LogLevel.warning,
+          logLevel: LogLevel.error,
         );
         return error.toString();
       }
@@ -436,7 +444,7 @@ extension ProxiesControllerExt on AppController {
       (Object error, StackTrace stackTrace) {
         commonPrint.log(
           'update_proxy_chain_queue_failed error=$error stack=$stackTrace',
-          logLevel: LogLevel.warning,
+          logLevel: LogLevel.error,
         );
       },
     );
@@ -532,13 +540,62 @@ extension ProxiesControllerExt on AppController {
         .getGroup(groupName)
         ?.realNow;
     final closeConnections = _ref.read(appSettingProvider).closeConnections;
-    final message = await coreController.changeProxy(
-      ChangeProxyParams(
-        groupName: groupName,
-        proxyName: proxyName,
-        closeConnections: closeConnections,
-      ),
+    final params = ChangeProxyParams(
+      groupName: groupName,
+      proxyName: proxyName,
+      closeConnections: closeConnections,
     );
+    Future<String> applySelection() async {
+      try {
+        return await coreController.changeProxy(params);
+      } catch (error, stackTrace) {
+        if (proxyName != internalChainProxyName) {
+          rethrow;
+        }
+        commonPrint.log(
+          'select_proxy_chain_exception group=$groupName error=$error '
+          'stack=$stackTrace',
+          logLevel: LogLevel.error,
+        );
+        return error.toString();
+      }
+    }
+
+    var message = await applySelection();
+    if (message.isNotEmpty && proxyName == internalChainProxyName) {
+      final initialMessage = message;
+      commonPrint.log(
+        'select_proxy_chain_failed group=$groupName error=$initialMessage',
+        logLevel: LogLevel.error,
+      );
+      await _proxyChainApplyQueue;
+      message = await applySelection();
+      var didReset = false;
+      var resetMessage = '';
+      if (message.isNotEmpty) {
+        didReset = true;
+        resetMessage = await updateProxyChain(
+          const [],
+          closeConnections: true,
+          force: true,
+        );
+        message = resetMessage.isEmpty
+            ? await applySelection()
+            : resetMessage;
+      }
+      if (message.isEmpty) {
+        commonPrint.log(
+          'select_proxy_chain_recovered group=$groupName reset=$didReset',
+        );
+      } else {
+        commonPrint.log(
+          'select_proxy_chain_recovery_failed group=$groupName '
+          'initial_error=$initialMessage reset_error=$resetMessage '
+          'retry_error=$message',
+          logLevel: LogLevel.error,
+        );
+      }
+    }
     if (message.isNotEmpty) {
       final currentProfile = _ref.read(currentProfileProvider);
       if (currentProfile != null &&
@@ -551,7 +608,9 @@ extension ProxiesControllerExt on AppController {
             .read(profilesProvider.notifier)
             .put(currentProfile.copyWith(selectedMap: selectedMap));
       }
-      globalState.showNotifier(message);
+      if (proxyName != internalChainProxyName) {
+        globalState.showNotifier(message);
+      }
       return message;
     }
     if (!closeConnections) {
@@ -848,7 +907,7 @@ extension SetupControllerExt on AppController {
       commonPrint.log(
         'proxy_chain_overlay_cleared profile_id=$profileId '
         'persisted=$didClear reason=${overlay.resetReason}',
-        logLevel: LogLevel.warning,
+        logLevel: LogLevel.error,
       );
     }
     _proxyChainSources[profileId] = overlay.sourceProxies;

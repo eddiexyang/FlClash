@@ -159,16 +159,36 @@ func handleChangeProxy(data string, fn func(string string)) {
 		}
 		groupName := *params.GroupName
 		proxyName := *params.ProxyName
-		proxies := tunnel.AllProxies()
+		fail := func(message string) {
+			if proxyName == flClashChainName {
+				log.Errorln(
+					"[APP] select proxy chain for group %q failed: %s",
+					groupName,
+					message,
+				)
+			}
+			fn(message)
+		}
+		proxies := tunnel.Proxies()
 		group, ok := proxies[groupName]
 		if !ok {
-			fn("Not found group")
+			fail("Not found group")
 			return
 		}
-		adapterProxy := group.(*adapter.Proxy)
+		adapterProxy, ok := group.(*adapter.Proxy)
+		if !ok {
+			fail("Group is not selectable")
+			return
+		}
+		if proxyName == flClashChainName {
+			if err = ensureProxyChainSelectorOverlay(groupName); err != nil {
+				fail(err.Error())
+				return
+			}
+		}
 		selector, ok := adapterProxy.ProxyAdapter.(outboundgroup.SelectAble)
 		if !ok {
-			fn("Group is not selectable")
+			fail("Group is not selectable")
 			return
 		}
 		var affectedConnections []statistic.Tracker
@@ -188,7 +208,7 @@ func handleChangeProxy(data string, fn func(string string)) {
 			err = selector.Set(proxyName)
 		}
 		if err != nil {
-			fn(err.Error())
+			fail(err.Error())
 			return
 		}
 		if params.CloseConnections &&

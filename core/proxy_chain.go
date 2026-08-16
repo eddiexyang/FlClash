@@ -269,7 +269,7 @@ func closeProxyChainConnection(connection proxyChainConnection) bool {
 			return true
 		}
 	}
-	log.Warnln(
+	log.Errorln(
 		"[APP] close retired proxy chain connection failed after %d attempts: %v",
 		proxyChainCloseAttempts,
 		err,
@@ -331,13 +331,16 @@ func (p *proxyChainSelectorOverlay) setTargetLocked(name string, force bool) err
 func (p *proxyChainSelectorOverlay) Set(name string) error {
 	proxyChainRuntimeState.Lock()
 	defer proxyChainRuntimeState.Unlock()
-	if name == flClashChainName {
-		if _, exists := tunnel.Proxies()[flClashChainName]; !exists {
-			return fmt.Errorf("proxy chain is unavailable")
-		}
+	runtime := proxyChainRuntimeState.current
+	if name == flClashChainName && runtime == nil {
+		return fmt.Errorf("proxy chain is unavailable")
+	}
+	proxies := tunnel.Proxies()
+	if runtime != nil {
+		proxies = buildProxyChainProxyMap(proxies, runtime.proxies)
 	}
 	if err := validateProxyChainRuntimeGraph(
-		tunnel.Proxies(),
+		proxies,
 		map[string]string{p.Name(): name},
 	); err != nil {
 		return err
@@ -348,8 +351,16 @@ func (p *proxyChainSelectorOverlay) Set(name string) error {
 func (p *proxyChainSelectorOverlay) ForceSet(name string) {
 	proxyChainRuntimeState.Lock()
 	defer proxyChainRuntimeState.Unlock()
+	runtime := proxyChainRuntimeState.current
+	if name == flClashChainName && runtime == nil {
+		return
+	}
+	proxies := tunnel.Proxies()
+	if runtime != nil {
+		proxies = buildProxyChainProxyMap(proxies, runtime.proxies)
+	}
 	if validateProxyChainRuntimeGraph(
-		tunnel.Proxies(),
+		proxies,
 		map[string]string{p.Name(): name},
 	) != nil {
 		return
@@ -590,7 +601,7 @@ func parseProxyChain(
 func closeProxyChainProxies(proxies map[string]C.Proxy) {
 	for _, proxy := range proxies {
 		if err := proxy.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			log.Warnln(
+			log.Errorln(
 				"[APP] close retired proxy chain adapter %s failed: %v",
 				proxy.Name(),
 				err,
@@ -658,6 +669,28 @@ func installProxyChainSelectorOverlays(
 		overlays[name] = overlay
 	}
 	return overlays
+}
+
+func ensureProxyChainSelectorOverlay(groupName string) error {
+	proxyChainRuntimeState.Lock()
+	defer proxyChainRuntimeState.Unlock()
+	runtime := proxyChainRuntimeState.current
+	if runtime == nil {
+		return fmt.Errorf("proxy chain is unavailable")
+	}
+	proxies := buildProxyChainProxyMap(tunnel.Proxies(), runtime.proxies)
+	tunnel.UpdateProxies(proxies, tunnel.Providers())
+	group, exists := proxies[groupName]
+	if !exists {
+		return fmt.Errorf("proxy group %q is unavailable", groupName)
+	}
+	overlays := installProxyChainSelectorOverlays(map[string]C.Proxy{
+		groupName: group,
+	})
+	if _, exists := overlays[groupName]; !exists {
+		return fmt.Errorf("proxy group %q is not selectable", groupName)
+	}
+	return nil
 }
 
 func proxyChainDependencies(
@@ -822,12 +855,14 @@ func handleUpdateProxyChain(data []byte) string {
 	defer runLock.Unlock()
 	var params UpdateProxyChainParams
 	if err := json.Unmarshal(data, &params); err != nil {
+		log.Errorln("[APP] decode proxy chain update failed: %v", err)
 		return err.Error()
 	}
 	proxyChainRuntimeState.Lock()
 	if params.StageOnly {
 		if err := stageProxyChainLocked(params); err != nil {
 			proxyChainRuntimeState.Unlock()
+			log.Errorln("[APP] stage proxy chain update failed: %v", err)
 			return err.Error()
 		}
 		proxyChainRuntimeState.Unlock()
@@ -836,6 +871,7 @@ func handleUpdateProxyChain(data []byte) string {
 	previous, err := updateProxyChainLocked(params)
 	proxyChainRuntimeState.Unlock()
 	if err != nil {
+		log.Errorln("[APP] apply proxy chain update failed: %v", err)
 		return err.Error()
 	}
 	previous.retire(params.CloseConnections)

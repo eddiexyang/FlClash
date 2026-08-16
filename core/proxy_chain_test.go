@@ -64,23 +64,42 @@ func installProxyChainTestRuntime(
 	t *testing.T,
 	proxies map[string]C.Proxy,
 	providers map[string]P.ProxyProvider,
-) map[string]*proxyChainSelectorOverlay {
+) {
 	t.Helper()
 	previousProxies := tunnel.Proxies()
 	previousProviders := tunnel.Providers()
 	proxyChainRuntimeState.Lock()
 	previousStaged := proxyChainRuntimeState.staged
+	previousRuntime := proxyChainRuntimeState.current
 	proxyChainRuntimeState.staged = nil
-	overlays := installProxyChainSelectorOverlays(proxies)
+	chainProxies := map[string]C.Proxy{}
+	var chainProxy C.Proxy
+	for name, proxy := range proxies {
+		if !isFlClashChainProxy(name) {
+			continue
+		}
+		chainProxies[name] = proxy
+		if name == flClashChainName {
+			chainProxy = proxy
+		}
+	}
+	var runtime *proxyChainRuntime
+	if chainProxy != nil {
+		runtime = newProxyChainRuntime(chainProxies, chainProxy)
+	}
+	proxyChainRuntimeState.current = runtime
 	proxyChainRuntimeState.Unlock()
 	tunnel.UpdateProxies(proxies, providers)
 	t.Cleanup(func() {
 		proxyChainRuntimeState.Lock()
 		proxyChainRuntimeState.staged = previousStaged
+		proxyChainRuntimeState.current = previousRuntime
 		proxyChainRuntimeState.Unlock()
+		if runtime != nil {
+			runtime.cancel()
+		}
 		tunnel.UpdateProxies(previousProxies, previousProviders)
 	})
-	return overlays
 }
 
 func TestProxyChainStageFailureClearsPreviousState(t *testing.T) {
@@ -119,7 +138,7 @@ func TestProxyChainPrepareFailureConsumesStagedState(t *testing.T) {
 	}
 }
 
-func TestProxyChainSelectorOverlayBypassesGroupExclusions(t *testing.T) {
+func TestChangeProxySelfHealsMissingChainAndSelectorOverlay(t *testing.T) {
 	node := parseProxyChainTestProxy(t, map[string]any{
 		"name": "node-a",
 		"type": "direct",
@@ -151,16 +170,39 @@ func TestProxyChainSelectorOverlayBypassesGroupExclusions(t *testing.T) {
 		"Any configured name": adapter.NewProxy(selector),
 		flClashChainName:      chain,
 	}
-	overlays := installProxyChainTestRuntime(
+	installProxyChainTestRuntime(
 		t,
 		proxies,
 		map[string]P.ProxyProvider{provider.Name(): provider},
 	)
-	overlay := overlays["Any configured name"]
-
-	if err := overlay.Set(flClashChainName); err != nil {
-		t.Fatalf("select Chain despite exclude-type: %v", err)
+	delete(proxies, flClashChainName)
+	if err := selector.Set(flClashChainName); err == nil {
+		t.Fatal("native selector unexpectedly accepted Chain")
 	}
+	groupName := "Any configured name"
+	proxyName := flClashChainName
+	params, err := json.Marshal(ChangeProxyParams{
+		GroupName: &groupName,
+		ProxyName: &proxyName,
+	})
+	if err != nil {
+		t.Fatalf("marshal change proxy params: %v", err)
+	}
+	result := make(chan string, 1)
+	handleChangeProxy(string(params), func(message string) {
+		result <- message
+	})
+	if message := <-result; message != "" {
+		t.Fatalf("select Chain: %s", message)
+	}
+	if restored := tunnel.Proxies()[flClashChainName]; restored != chain {
+		t.Fatal("Chain runtime proxy was not republished")
+	}
+	overlay, ok := proxies["Any configured name"].Adapter().(*proxyChainSelectorOverlay)
+	if !ok {
+		t.Fatal("selector overlay was not installed")
+	}
+
 	if overlay.Now() != flClashChainName {
 		t.Fatalf("selector now = %q, want Chain", overlay.Now())
 	}
@@ -217,20 +259,27 @@ func TestProxyChainSelectorOverlayRejectsGroupCycle(t *testing.T) {
 		"Loop selector":  adapter.NewProxy(selector),
 		flClashChainName: chain,
 	}
-	overlays := installProxyChainTestRuntime(
+	installProxyChainTestRuntime(
 		t,
 		proxies,
 		map[string]P.ProxyProvider{provider.Name(): provider},
 	)
+	if err := ensureProxyChainSelectorOverlay("Loop selector"); err != nil {
+		t.Fatalf("ensure Chain-aware selector: %v", err)
+	}
+	overlay, ok := proxies["Loop selector"].Adapter().(*proxyChainSelectorOverlay)
+	if !ok {
+		t.Fatal("selector overlay was not installed")
+	}
 
-	err = overlays["Loop selector"].Set(flClashChainName)
+	err = overlay.Set(flClashChainName)
 	if err == nil || !strings.Contains(err.Error(), "dependency cycle") {
 		t.Fatalf("select cyclic Chain error = %v", err)
 	}
-	if overlays["Loop selector"].Now() != "node-a" {
+	if overlay.Now() != "node-a" {
 		t.Fatalf(
 			"selector changed after rejected cycle: %q",
-			overlays["Loop selector"].Now(),
+			overlay.Now(),
 		)
 	}
 }
