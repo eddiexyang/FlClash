@@ -220,7 +220,7 @@ jobs:
 
       - name: Release dev
         if: steps.release.outputs.eligible == 'true' && github.ref == 'refs/heads/dev'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: dev
           tag_name: dev
@@ -246,7 +246,7 @@ jobs:
 
       - name: Release main
         if: steps.release.outputs.eligible == 'true' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ steps.release.outputs.short_sha }}
           tag_name: ${{ steps.release.outputs.short_sha }}
@@ -258,7 +258,7 @@ jobs:
 
       - name: Release
         if: steps.release.outputs.eligible == 'true' && startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ./dist/**/*
           fail_on_unmatched_files: true
