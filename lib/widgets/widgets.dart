@@ -31,7 +31,6 @@ export 'scroll.dart';
 export 'selection_tap.dart';
 export 'setting.dart';
 export 'sheet.dart';
-export 'sidebar_navigation.dart';
 export 'side_sheet.dart';
 export 'subscription_info_view.dart';
 export 'super_grid.dart';

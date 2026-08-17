@@ -6,7 +6,6 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/manager/window_manager.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
-import 'package:fl_clash/widgets/sidebar_navigation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -189,22 +188,36 @@ class AppSidebarContainer extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: SidebarNavigation(
-                            destinations: navigationItems.map((item) {
-                              final label = Intl.message(item.label.name);
-                              return SidebarNavigationDestination(
-                                icon: item.icon,
-                                label: Text(label),
-                                tooltip: label,
-                              );
-                            }).toList(),
-                            selectedIndex: currentIndex,
-                            showLabels: showLabel,
+                          child: NavigationRail(
+                            scrollable: true,
+                            minExtendedWidth: 200,
+                            backgroundColor: Colors.transparent,
+                            selectedLabelTextStyle: context
+                                .textTheme
+                                .labelLarge!
+                                .copyWith(color: context.colorScheme.onSurface),
+                            unselectedLabelTextStyle: context
+                                .textTheme
+                                .labelLarge!
+                                .copyWith(color: context.colorScheme.onSurface),
+                            destinations: navigationItems
+                                .map(
+                                  (e) => NavigationRailDestination(
+                                    icon: e.icon,
+                                    label: Text(Intl.message(e.label.name)),
+                                  ),
+                                )
+                                .toList(),
                             onDestinationSelected: (index) {
                               appController.toPage(
                                 navigationItems[index].label,
                               );
                             },
+                            extended: false,
+                            selectedIndex: currentIndex,
+                            labelType: showLabel
+                                ? NavigationRailLabelType.all
+                                : NavigationRailLabelType.none,
                           ),
                         ),
                       ],
