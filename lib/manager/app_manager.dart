@@ -188,36 +188,43 @@ class AppSidebarContainer extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: NavigationRail(
-                            scrollable: true,
-                            minExtendedWidth: 200,
-                            backgroundColor: Colors.transparent,
-                            selectedLabelTextStyle: context
-                                .textTheme
-                                .labelLarge!
-                                .copyWith(color: context.colorScheme.onSurface),
-                            unselectedLabelTextStyle: context
-                                .textTheme
-                                .labelLarge!
-                                .copyWith(color: context.colorScheme.onSurface),
-                            destinations: navigationItems
-                                .map(
-                                  (e) => NavigationRailDestination(
-                                    icon: e.icon,
-                                    label: Text(Intl.message(e.label.name)),
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: NavigationRail(
+                              scrollable: true,
+                              minExtendedWidth: 200,
+                              backgroundColor: Colors.transparent,
+                              selectedLabelTextStyle: context
+                                  .textTheme
+                                  .labelLarge!
+                                  .copyWith(
+                                    color: context.colorScheme.onSurface,
                                   ),
-                                )
-                                .toList(),
-                            onDestinationSelected: (index) {
-                              appController.toPage(
-                                navigationItems[index].label,
-                              );
-                            },
-                            extended: false,
-                            selectedIndex: currentIndex,
-                            labelType: showLabel
-                                ? NavigationRailLabelType.all
-                                : NavigationRailLabelType.none,
+                              unselectedLabelTextStyle: context
+                                  .textTheme
+                                  .labelLarge!
+                                  .copyWith(
+                                    color: context.colorScheme.onSurface,
+                                  ),
+                              destinations: navigationItems
+                                  .map(
+                                    (e) => NavigationRailDestination(
+                                      icon: e.icon,
+                                      label: Text(Intl.message(e.label.name)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onDestinationSelected: (index) {
+                                appController.toPage(
+                                  navigationItems[index].label,
+                                );
+                              },
+                              extended: false,
+                              selectedIndex: currentIndex,
+                              labelType: showLabel
+                                  ? NavigationRailLabelType.all
+                                  : NavigationRailLabelType.none,
+                            ),
                           ),
                         ),
                       ],
