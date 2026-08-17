@@ -4,36 +4,21 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/controller.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/cupertino.dart';
 
 class Request {
   late final Dio dio;
-  late final Dio _clashDio;
-  String? userAgent;
 
   Request() {
     dio = Dio(BaseOptions(headers: {'User-Agent': browserUa}));
-    _clashDio = Dio();
-    _clashDio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        client.findProxy = (Uri uri) {
-          client.userAgent = appController.ua;
-          return FlClashHttpOverrides.handleFindProxy(uri);
-        };
-        return client;
-      },
-    );
   }
 
   Future<Response<Uint8List>> getFileResponseForUrl(String url) async {
     try {
-      return await _clashDio.get<Uint8List>(
+      return await dio.get<Uint8List>(
         url,
         options: Options(responseType: ResponseType.bytes),
       );
@@ -52,7 +37,7 @@ class Request {
   }
 
   Future<Response<String>> getTextResponseForUrl(String url) async {
-    final response = await _clashDio.get<String>(
+    final response = await dio.get<String>(
       url,
       options: Options(responseType: ResponseType.plain),
     );

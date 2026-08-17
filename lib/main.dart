@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:fl_clash/pages/error.dart';
 import 'package:fl_clash/state.dart';
@@ -14,7 +13,6 @@ Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
     final version = await system.version;
     final container = await globalState.init(version);
-    HttpOverrides.global = FlClashHttpOverrides();
     runApp(
       UncontrolledProviderScope(
         container: container,
