@@ -286,7 +286,7 @@ class ListItem<T> extends StatelessWidget {
       titleAlignment: tileTitleAlignment,
       onTap: onTap,
       mouseCursor: onTap == null
-          ? SystemMouseCursors.basic
+          ? MouseCursor.defer
           : SystemMouseCursors.click,
       trailing: trailing ?? this.trailing,
       contentPadding: padding,
