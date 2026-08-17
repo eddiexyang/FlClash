@@ -12,22 +12,24 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Material(
-          child: SidebarNavigation(
-            selectedIndex: 1,
-            showLabels: true,
-            onDestinationSelected: selectedIndexes.add,
-            destinations: const [
-              SidebarNavigationDestination(
-                icon: Icon(Icons.article),
-                label: Text('Proxies'),
-                tooltip: 'Proxies',
-              ),
-              SidebarNavigationDestination(
-                icon: Icon(Icons.folder),
-                label: Text('Profiles'),
-                tooltip: 'Profiles',
-              ),
-            ],
+          child: Center(
+            child: SidebarNavigation(
+              selectedIndex: 1,
+              showLabels: true,
+              onDestinationSelected: selectedIndexes.add,
+              destinations: const [
+                SidebarNavigationDestination(
+                  icon: Icon(Icons.article),
+                  label: Text('Proxies'),
+                  tooltip: 'Proxies',
+                ),
+                SidebarNavigationDestination(
+                  icon: Icon(Icons.folder),
+                  label: Text('Profiles'),
+                  tooltip: 'Profiles',
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -60,22 +62,24 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Material(
-          child: SidebarNavigation(
-            selectedIndex: 0,
-            showLabels: false,
-            onDestinationSelected: (_) {},
-            destinations: const [
-              SidebarNavigationDestination(
-                icon: Icon(Icons.article),
-                label: Text('Proxies'),
-                tooltip: 'Proxies',
-              ),
-              SidebarNavigationDestination(
-                icon: Icon(Icons.folder),
-                label: Text('Profiles'),
-                tooltip: 'Profiles',
-              ),
-            ],
+          child: Center(
+            child: SidebarNavigation(
+              selectedIndex: 0,
+              showLabels: false,
+              onDestinationSelected: (_) {},
+              destinations: const [
+                SidebarNavigationDestination(
+                  icon: Icon(Icons.article),
+                  label: Text('Proxies'),
+                  tooltip: 'Proxies',
+                ),
+                SidebarNavigationDestination(
+                  icon: Icon(Icons.folder),
+                  label: Text('Profiles'),
+                  tooltip: 'Profiles',
+                ),
+              ],
+            ),
           ),
         ),
       ),
