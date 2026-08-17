@@ -352,7 +352,14 @@ class NetworkDetection extends _$NetworkDetection
     }, duration: commonDuration);
   }
 
-  Future<void> _checkIp(int checkId) async {
+  void checkNow() {
+    final checkId = ++_checkId;
+    _cancelToken?.cancel();
+    debouncer.cancel(FunctionTag.checkIp);
+    unawaited(_checkIp(checkId, force: true));
+  }
+
+  Future<void> _checkIp(int checkId, {bool force = false}) async {
     if (checkId != _checkId) {
       return;
     }
@@ -361,7 +368,10 @@ class NetworkDetection extends _$NetworkDetection
       return;
     }
     final isStart = ref.read(isStartProvider);
-    if (!isStart && _preIsStart == false && state.ipInfo != null) {
+    if (!force &&
+        !isStart &&
+        _preIsStart == false &&
+        state.ipInfo != null) {
       return;
     }
     final cancelToken = CancelToken();
