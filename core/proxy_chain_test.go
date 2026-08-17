@@ -422,6 +422,42 @@ func TestProxyChainInnerTrackerIsHiddenForSingleHopChain(t *testing.T) {
 	}
 }
 
+func TestProxyChainRoutedInnerTrackerIsVisible(t *testing.T) {
+	proxyChainState.RLock()
+	previousNames := append([]string(nil), proxyChainState.proxyNames...)
+	proxyChainState.RUnlock()
+	setProxyChainNames([]string{"entry", "exit"})
+	t.Cleanup(func() {
+		setProxyChainNames(previousNames)
+	})
+	tracker := &proxyChainTestTracker{
+		info: &statistic.TrackerInfo{
+			Metadata: &C.Metadata{
+				Type:             C.INNER,
+				RouteRevisionSet: true,
+			},
+			Chain: C.Chain{
+				flClashChainName,
+				flClashChainHopPrefix + "0_test",
+				"Configured selector",
+			},
+		},
+	}
+
+	if !prepareProxyChainTracker(tracker) {
+		t.Fatal("routed inner Chain tracker was hidden")
+	}
+	want := C.Chain{
+		"exit",
+		"entry",
+		flClashChainName,
+		"Configured selector",
+	}
+	if !reflect.DeepEqual(tracker.info.Chain, want) {
+		t.Fatalf("tracker chain = %v, want %v", tracker.info.Chain, want)
+	}
+}
+
 type proxyChainRuntimeTestConn struct {
 	C.Conn
 	closeCalls    atomic.Int32

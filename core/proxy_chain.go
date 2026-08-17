@@ -529,7 +529,10 @@ func setProxyChainNames(proxyNames []string) {
 }
 
 func isProxyChainInnerTracker(info *statistic.TrackerInfo) bool {
-	if info == nil || info.Metadata == nil || info.Metadata.Type != C.INNER {
+	// Dialer-proxy hop trackers bypass the tunnel and have no route revision.
+	// Routed INNER traffic, including DNS and internal HTTP requests, does.
+	if info == nil || info.Metadata == nil ||
+		info.Metadata.Type != C.INNER || info.Metadata.RouteRevisionSet {
 		return false
 	}
 	for _, name := range info.Chain {
