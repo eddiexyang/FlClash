@@ -422,6 +422,19 @@ func TestProxyChainInnerTrackerIsHiddenForSingleHopChain(t *testing.T) {
 	}
 }
 
+func TestDialerProxyInnerTrackerIsHiddenWithoutInternalChainName(t *testing.T) {
+	tracker := &proxyChainTestTracker{
+		info: &statistic.TrackerInfo{
+			Metadata: &C.Metadata{Type: C.INNER},
+			Chain:    C.Chain{"configured-dialer-proxy"},
+		},
+	}
+
+	if prepareProxyChainTracker(tracker) {
+		t.Fatal("dialer-proxy inner tracker was exposed")
+	}
+}
+
 func TestProxyChainRoutedInnerTrackerIsVisible(t *testing.T) {
 	proxyChainState.RLock()
 	previousNames := append([]string(nil), proxyChainState.proxyNames...)
