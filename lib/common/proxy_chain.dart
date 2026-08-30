@@ -18,6 +18,16 @@ class ProxyChainOverlay {
   });
 }
 
+// Mihomo injects these names even when they are absent from the profile.
+const _builtinProxyNames = {
+  'DIRECT',
+  'REJECT',
+  'REJECT-DROP',
+  'COMPATIBLE',
+  'PASS',
+  'PASS-RULE',
+};
+
 String internalChainHopName(int index, String proxyName) {
   final encodedName = base64Url
       .encode(utf8.encode(proxyName))
@@ -216,7 +226,8 @@ List<Map<String, dynamic>> buildProxyChainProxies(
 /// Builds the runtime proxies for a GUI-managed proxy chain.
 ///
 /// Every hop is a copy of its profile proxy and uses mihomo's native
-/// `dialer-proxy` option. Subscription proxy groups remain unchanged.
+/// `dialer-proxy` option. Proxy group definitions remain unchanged except for
+/// stale references to proxies that are no longer present in the profile.
 ProxyChainOverlay applyProxyChainOverlay(
   Map<String, dynamic> config,
   List<String> requestedProxyNames, {
@@ -245,10 +256,25 @@ ProxyChainOverlay applyProxyChainOverlay(
     }
   }
 
-  final cleanGroups = <Object?>[];
   final configuredGroupNames = <String>{};
-  var removedInternalGroupReference = false;
   final rawGroups = config['proxy-groups'];
+  final knownProxyNames = <String>{
+    ..._builtinProxyNames,
+    ...sourceProxies.keys,
+  };
+  if (rawGroups is List) {
+    for (final rawGroup in rawGroups) {
+      final group = _toStringMap(rawGroup);
+      final groupName = group?['name'];
+      if (groupName is String) {
+        configuredGroupNames.add(groupName);
+        knownProxyNames.add(groupName);
+      }
+    }
+  }
+
+  final cleanGroups = <Object?>[];
+  var removedGroupReference = false;
   if (rawGroups is List) {
     for (final rawGroup in rawGroups) {
       final group = _toStringMap(rawGroup);
@@ -256,18 +282,31 @@ ProxyChainOverlay applyProxyChainOverlay(
         cleanGroups.add(rawGroup);
         continue;
       }
-      final groupName = group['name'];
-      if (groupName is String) {
-        configuredGroupNames.add(groupName);
-      }
       final rawGroupProxies = group['proxies'];
       if (rawGroupProxies is List) {
         final cleanGroupProxies = rawGroupProxies.where((name) {
-          return name is! String || !isInternalChainProxyName(name);
+          return name is! String ||
+              (!isInternalChainProxyName(name) &&
+                  knownProxyNames.contains(name));
         }).toList();
         if (cleanGroupProxies.length != rawGroupProxies.length) {
-          removedInternalGroupReference = true;
+          removedGroupReference = true;
           group['proxies'] = cleanGroupProxies;
+
+          // Mihomo rejects a group whose `proxies` and `use` are both empty.
+          // Keep a group that lost all of its stale entries usable, including
+          // when rules or another group still refer to it.
+          if (cleanGroupProxies.isEmpty &&
+              rawGroupProxies.isNotEmpty &&
+              !_hasProxyGroupSource(group)) {
+            group['proxies'] = [
+              _proxyGroupFallbackName(
+                group,
+                knownProxyNames,
+                configuredGroupNames,
+              ),
+            ];
+          }
           cleanGroups.add(group);
           continue;
         }
@@ -309,7 +348,7 @@ ProxyChainOverlay applyProxyChainOverlay(
   if (rawProxies is List && removedInternalProxy) {
     config['proxies'] = cleanProxies;
   }
-  if (rawGroups is List && removedInternalGroupReference) {
+  if (rawGroups is List && removedGroupReference) {
     config['proxy-groups'] = cleanGroups;
   }
   return ProxyChainOverlay(
@@ -319,4 +358,30 @@ ProxyChainOverlay applyProxyChainOverlay(
     chainProxies: chainProxies,
     resetReason: resetReason,
   );
+}
+
+bool _hasProxyGroupSource(Map<String, dynamic> group) {
+  final use = group['use'];
+  if (use is List && use.isNotEmpty) {
+    return true;
+  }
+  return group['include-all-proxies'] == true ||
+      group['include-all-providers'] == true ||
+      group['include-all'] == true;
+}
+
+String _proxyGroupFallbackName(
+  Map<String, dynamic> group,
+  Set<String> knownProxyNames,
+  Set<String> configuredGroupNames,
+) {
+  // Respect a valid configured fallback, while avoiding group names (which
+  // mihomo explicitly disallows for `empty-fallback`).
+  final fallback = group['empty-fallback'];
+  if (fallback is String &&
+      knownProxyNames.contains(fallback) &&
+      !configuredGroupNames.contains(fallback)) {
+    return fallback;
+  }
+  return 'COMPATIBLE';
 }

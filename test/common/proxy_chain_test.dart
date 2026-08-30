@@ -101,6 +101,52 @@ void main() {
     expect(config['proxy-groups'], originalGroups);
   });
 
+  test('removes unavailable proxy references from subscription groups', () {
+    final config = <String, dynamic>{
+      'proxies': [
+        {'name': 'node-a', 'type': 'ss'},
+      ],
+      'proxy-groups': [
+        {
+          'name': 'Nested',
+          'type': 'select',
+          'proxies': ['Selector'],
+        },
+        {
+          'name': 'Selector',
+          'type': 'select',
+          'proxies': ['node-a', 'removed-node', 'DIRECT'],
+        },
+      ],
+    };
+
+    applyProxyChainOverlay(config, const []);
+
+    final groups = (config['proxy-groups'] as List).cast<Map>();
+    expect(groups[0]['proxies'], ['Selector']);
+    expect(groups[1]['proxies'], ['node-a', 'DIRECT']);
+  });
+
+  test('keeps a group usable when every configured proxy disappeared', () {
+    final config = <String, dynamic>{
+      'proxies': [
+        {'name': 'node-a', 'type': 'ss'},
+      ],
+      'proxy-groups': [
+        {
+          'name': 'Selector',
+          'type': 'select',
+          'proxies': ['removed-node'],
+        },
+      ],
+    };
+
+    applyProxyChainOverlay(config, const []);
+
+    final groups = (config['proxy-groups'] as List).cast<Map>();
+    expect(groups.single['proxies'], ['COMPATIBLE']);
+  });
+
   test('preserves an absent or invalid subscription proxies field', () {
     final providerOnlyConfig = <String, dynamic>{
       'proxy-providers': {
