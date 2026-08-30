@@ -57,7 +57,7 @@ jobs:
         with:
           go-version: '1.24.0'
           cache-dependency-path: |
-            core/go.sum
+            core/mihomo/go.sum
 
       - name: Setup Flutter
         if: ${{ !(startsWith(matrix.os, 'windows-11-arm') || startsWith(matrix.os, 'ubuntu-24.04-arm')) }}
