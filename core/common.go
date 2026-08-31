@@ -322,6 +322,7 @@ func applyConfig(params *SetupParams) error {
 		patchSelectGroup(params.SelectedMap)
 	}
 	updateListeners()
+	closeConnections()
 	return configErr
 }
 

@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/metacubex/mihomo/config"
@@ -119,6 +121,50 @@ func TestConnectionsUsingGroupFiltersByChain(t *testing.T) {
 				tracker.closeCalls,
 				wantCloseCalls,
 			)
+		}
+	}
+}
+
+func TestApplyConfigClosesAllConnections(t *testing.T) {
+	previousConfig := currentConfig
+	previousHomeDir := C.Path.HomeDir()
+	previousManager := statistic.DefaultManager
+	previousRunning := isRunning
+	profileDir := t.TempDir()
+	C.SetHomeDir(profileDir)
+	statistic.DefaultManager = &statistic.Manager{}
+	isRunning = false
+	t.Cleanup(func() {
+		currentConfig = previousConfig
+		C.SetHomeDir(previousHomeDir)
+		statistic.DefaultManager = previousManager
+		isRunning = previousRunning
+	})
+
+	if err := os.WriteFile(filepath.Join(profileDir, "config.yaml"), nil, 0o600); err != nil {
+		t.Fatalf("write profile config: %v", err)
+	}
+	trackers := []*chainTracker{
+		{id: "first-profile-connection", manager: statistic.DefaultManager},
+		{id: "second-profile-connection", manager: statistic.DefaultManager},
+	}
+	for _, tracker := range trackers {
+		statistic.DefaultManager.Join(tracker)
+	}
+
+	if err := applyConfig(defaultSetupParams()); err != nil {
+		t.Fatalf("apply profile config: %v", err)
+	}
+	for _, tracker := range trackers {
+		if tracker.closeCalls != 1 {
+			t.Fatalf(
+				"tracker %q close calls = %d, want 1",
+				tracker.id,
+				tracker.closeCalls,
+			)
+		}
+		if statistic.DefaultManager.Get(tracker.id) != nil {
+			t.Fatalf("tracker %q remains in the manager", tracker.id)
 		}
 	}
 }
