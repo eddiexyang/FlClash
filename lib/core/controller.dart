@@ -98,9 +98,17 @@ class CoreController {
   Future<String> setupConfig({
     required SetupParams params,
     required SetupState setupState,
+    required String config,
+    required List<String> proxyChainNames,
+    required List<Map<String, dynamic>> proxyChainProxies,
     VoidCallback? preloadInvoke,
   }) async {
-    final res = _interface.setupConfig(params);
+    final res = _interface.setupConfig(
+      params,
+      config: config,
+      proxyChainNames: proxyChainNames,
+      proxyChainProxies: proxyChainProxies,
+    );
     if (preloadInvoke != null) {
       preloadInvoke();
     }

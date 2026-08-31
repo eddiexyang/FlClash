@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeCoreHandler extends CoreHandlerInterface {
@@ -15,12 +17,13 @@ class _FakeCoreHandler extends CoreHandlerInterface {
     }
   }
 
-  final bool? response;
+  final Object? response;
   final bool connected;
   final Duration responseDelay;
   final Completer<bool> _completer = Completer<bool>();
 
   ActionMethod? invokedMethod;
+  dynamic invokedData;
   Duration? invokedTimeout;
   int invocationCount = 0;
 
@@ -44,6 +47,7 @@ class _FakeCoreHandler extends CoreHandlerInterface {
   }) async {
     invocationCount++;
     invokedMethod = method;
+    invokedData = data;
     invokedTimeout = timeout;
     if (responseDelay > Duration.zero) {
       await Future<void>.delayed(responseDelay);
@@ -88,5 +92,29 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('profile setup sends config and Chain in one request', () async {
+    final handler = _FakeCoreHandler(response: '');
+    const Map<String, dynamic> chainProxy = {
+      'name': '__FLCLASH_INTERNAL_CHAIN__',
+      'type': 'reject',
+    };
+
+    expect(
+      await handler.setupConfig(
+        const SetupParams(selectedMap: {'group': 'CHAIN'}, testUrl: 'test'),
+        config: 'mode: rule\n',
+        proxyChainNames: const ['node-a'],
+        proxyChainProxies: const [chainProxy],
+      ),
+      isEmpty,
+    );
+
+    expect(handler.invokedMethod, ActionMethod.setupConfig);
+    final payload = json.decode(handler.invokedData as String) as Map;
+    expect(payload['config'], 'mode: rule\n');
+    expect(payload['proxy-chain-names'], ['node-a']);
+    expect(payload['proxy-chain-proxies'], [chainProxy]);
   });
 }

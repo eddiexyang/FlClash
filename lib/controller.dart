@@ -34,6 +34,7 @@ class AppController {
   final Map<int, List<String>> _proxyChainAvailableProxyNames = {};
   final Map<int, List<Map<String, dynamic>>> _proxyChainRuntimeProxies = {};
   final ValueNotifier<int> _proxyChainRevision = ValueNotifier(0);
+  int _profileApplyRevision = 0;
   int _routeConfigRevision = 0;
   int? _pendingRouteDetectionRevision;
   int? _pendingRouteDetectionCheckId;
@@ -835,12 +836,17 @@ extension SetupControllerExt on AppController {
     if (!force && !await needSetup()) {
       return;
     }
+    final revision = ++_profileApplyRevision;
     await loadingRun(
       () async {
-        await _setupConfig(
+        final applied = await _setupConfig(
+          revision: revision,
           preloadInvoke: preloadInvoke,
           allowTunAuthorization: allowTunAuthorization,
         );
+        if (!applied || revision != _profileApplyRevision) {
+          return;
+        }
         await updateGroups();
         await updateProviders();
       },
@@ -931,23 +937,31 @@ extension SetupControllerExt on AppController {
     return res;
   }
 
-  Future<String> _stageProxyChainRuntime(int? profileId) async {
-    if (profileId == null) {
-      return '';
+  Future<String> _applyCoreSetupConfig({
+    required SetupState setupState,
+    required SetupParams params,
+    required String config,
+    VoidCallback? preloadInvoke,
+  }) async {
+    final profileId = setupState.profileId;
+    final chainProxies = profileId == null
+        ? null
+        : _proxyChainRuntimeProxies[profileId];
+    if (profileId == null || chainProxies == null || chainProxies.isEmpty) {
+      return 'proxy chain runtime is unavailable for profile $profileId';
     }
-    final chainProxies = _proxyChainRuntimeProxies[profileId];
-    if (chainProxies == null || chainProxies.isEmpty) {
-      return '';
-    }
-    return await coreController.updateProxyChain(
-      _proxyChains[profileId] ?? const [],
-      chainProxies,
-      closeConnections: false,
-      stageOnly: true,
+    return await coreController.setupConfig(
+      setupState: setupState,
+      params: params,
+      config: config,
+      proxyChainNames: _proxyChains[profileId] ?? const [],
+      proxyChainProxies: chainProxies,
+      preloadInvoke: preloadInvoke,
     );
   }
 
-  Future<void> _setupConfig({
+  Future<bool> _setupConfig({
+    required int revision,
     VoidCallback? preloadInvoke,
     bool allowTunAuthorization = true,
   }) async {
@@ -963,7 +977,7 @@ extension SetupControllerExt on AppController {
     if (allowTunAuthorization) {
       final res = await _requestAdmin(patchConfig.tun.enable);
       if (res.isError) {
-        return;
+        return false;
       }
       realTunEnable = _ref.read(realTunEnableProvider);
     } else {
@@ -978,31 +992,36 @@ extension SetupControllerExt on AppController {
       tun: patchConfig.tun.copyWith(enable: realTunEnable),
     );
     final setupState = await _ref.read(setupStateProvider(profile?.id).future);
-    globalState.lastSetupState = setupState;
-    if (system.isAndroid) {
-      globalState.lastVpnState = _ref.read(vpnStateProvider);
-      await preferences.saveShareState(this.sharedState);
-    }
     final config = await getProfile(
       setupState: setupState,
       patchConfig: realPatchConfig,
     );
     final configFilePath = await appPath.configFilePath;
     final yamlString = await encodeYamlTask(config);
-    await File(configFilePath).safeWriteAsString(yamlString);
-    var message = await _stageProxyChainRuntime(profile?.id);
-    if (message.isEmpty) {
-      message = await coreController.setupConfig(
-        setupState: setupState,
-        params: setupParams,
-        preloadInvoke: preloadInvoke,
-      );
+    final profileSetupParams = SetupParams(
+      selectedMap: profile?.selectedMap ?? const {},
+      testUrl: _ref.read(
+        appSettingProvider.select((state) => state.testUrl),
+      ),
+    );
+    if (revision != _profileApplyRevision ||
+        setupState.profileId != _ref.read(currentProfileIdProvider)) {
+      return false;
     }
+    await File(configFilePath).safeWriteAsString(yamlString);
+    var message = await _applyCoreSetupConfig(
+      setupState: setupState,
+      params: profileSetupParams,
+      config: yamlString,
+      preloadInvoke: preloadInvoke,
+    );
     var hasShownDialog = false;
     if (message.isNotEmpty) {
       final result = await _handleSetupConfigForMacOSSshAuthorization(
         message: message,
         setupState: setupState,
+        params: profileSetupParams,
+        config: yamlString,
       );
       message = result.message;
       hasShownDialog = result.hasShownDialog;
@@ -1013,7 +1032,17 @@ extension SetupControllerExt on AppController {
         hasShownDialog: hasShownDialog,
       );
     }
+    if (revision != _profileApplyRevision ||
+        setupState.profileId != _ref.read(currentProfileIdProvider)) {
+      return false;
+    }
+    globalState.lastSetupState = setupState;
+    if (system.isAndroid) {
+      globalState.lastVpnState = _ref.read(vpnStateProvider);
+      await preferences.saveShareState(this.sharedState);
+    }
     addCheckIp();
+    return true;
   }
 
   bool _isMacOSSshPrivateKeyPermissionError(String message) {
@@ -1071,6 +1100,8 @@ extension SetupControllerExt on AppController {
   Future<_SetupConfigMessageResult> _handleSetupConfigForMacOSSshAuthorization({
     required String message,
     required SetupState setupState,
+    required SetupParams params,
+    required String config,
   }) async {
     if (_isMacOSSshPrivateKeyPermissionError(message)) {
       final privateKeyPath = _extractSshPrivateKeyPath(message) ?? '~/.ssh/*';
@@ -1105,13 +1136,11 @@ extension SetupControllerExt on AppController {
           hasShownDialog: true,
         );
       }
-      var retryMessage = await _stageProxyChainRuntime(setupState.profileId);
-      if (retryMessage.isEmpty) {
-        retryMessage = await coreController.setupConfig(
-          setupState: setupState,
-          params: setupParams,
-        );
-      }
+      final retryMessage = await _applyCoreSetupConfig(
+        setupState: setupState,
+        params: params,
+        config: config,
+      );
       return _SetupConfigMessageResult(
         message: retryMessage,
         hasShownDialog: true,

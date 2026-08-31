@@ -17,8 +17,11 @@ type InitParams struct {
 }
 
 type SetupParams struct {
-	SelectedMap map[string]string `json:"selected-map"`
-	TestURL     string            `json:"test-url"`
+	SelectedMap       map[string]string        `json:"selected-map"`
+	TestURL           string                   `json:"test-url"`
+	Config            string                   `json:"config,omitempty"`
+	ProxyChainNames   []string                 `json:"proxy-chain-names,omitempty"`
+	ProxyChainProxies []map[string]interface{} `json:"proxy-chain-proxies,omitempty"`
 }
 
 type UpdateParams struct {

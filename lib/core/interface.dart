@@ -25,7 +25,12 @@ mixin CoreInterface {
 
   Future<String> updateConfig(UpdateParams updateParams);
 
-  Future<String> setupConfig(SetupParams setupParams);
+  Future<String> setupConfig(
+    SetupParams setupParams, {
+    required String config,
+    required List<String> proxyChainNames,
+    required List<Map<String, dynamic>> proxyChainProxies,
+  });
 
   Future<ProxiesData> getProxies();
 
@@ -192,10 +197,19 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
-  Future<String> setupConfig(SetupParams setupParams) async {
+  Future<String> setupConfig(
+    SetupParams setupParams, {
+    required String config,
+    required List<String> proxyChainNames,
+    required List<Map<String, dynamic>> proxyChainProxies,
+  }) async {
+    final data = setupParams.toJson()
+      ..['config'] = config
+      ..['proxy-chain-names'] = proxyChainNames
+      ..['proxy-chain-proxies'] = proxyChainProxies;
     return await _invoke<String>(
           method: ActionMethod.setupConfig,
-          data: json.encode(setupParams),
+          data: json.encode(data),
         ) ??
         '';
   }

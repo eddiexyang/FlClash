@@ -297,9 +297,14 @@ func applyConfig(params *SetupParams) error {
 	runtime.GC()
 	runLock.Lock()
 	defer runLock.Unlock()
+	var nextConfig *config.Config
 	var configErr error
 	constant.DefaultTestURL = params.TestURL
-	nextConfig, configErr := executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
+	if params.Config != "" {
+		nextConfig, configErr = executor.ParseWithBytes([]byte(params.Config))
+	} else {
+		nextConfig, configErr = executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
+	}
 	if configErr != nil {
 		nextConfig, _ = config.ParseRawConfig(config.DefaultRawConfig())
 	}
@@ -308,7 +313,21 @@ func applyConfig(params *SetupParams) error {
 	nextConfig.General.Tun.MTU = 1500
 
 	proxyChainRuntimeState.Lock()
-	prepared, chainErr := prepareProxyChainConfigLocked(nextConfig, params.SelectedMap)
+	var prepared *preparedProxyChainConfig
+	var chainErr error
+	if params.ProxyChainProxies != nil {
+		proxyChainRuntimeState.staged = nil
+		prepared, chainErr = prepareProxyChainRuntimeConfigLocked(
+			nextConfig,
+			params.SelectedMap,
+			&proxyChainRuntimeConfig{
+				proxyNames: append([]string(nil), params.ProxyChainNames...),
+				configs:    cloneProxyChainConfigs(params.ProxyChainProxies),
+			},
+		)
+	} else {
+		prepared, chainErr = prepareProxyChainConfigLocked(nextConfig, params.SelectedMap)
+	}
 	if chainErr != nil {
 		proxyChainRuntimeState.Unlock()
 		return chainErr

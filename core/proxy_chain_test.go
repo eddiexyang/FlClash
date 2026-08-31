@@ -138,6 +138,30 @@ func TestProxyChainPrepareFailureConsumesStagedState(t *testing.T) {
 	}
 }
 
+func TestPrepareProxyChainRuntimeConfigUsesSuppliedState(t *testing.T) {
+	prepared, err := prepareProxyChainRuntimeConfigLocked(
+		&config.Config{},
+		nil,
+		&proxyChainRuntimeConfig{
+			proxyNames: []string{"profile-node"},
+			configs: []map[string]any{{
+				"name": flClashChainName,
+				"type": "reject",
+			}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("prepare supplied Chain runtime: %v", err)
+	}
+	t.Cleanup(prepared.runtime.closeProxies)
+	if len(prepared.proxyNames) != 1 || prepared.proxyNames[0] != "profile-node" {
+		t.Fatalf("prepared proxy names = %v, want [profile-node]", prepared.proxyNames)
+	}
+	if prepared.runtime.entry == nil {
+		t.Fatal("prepared Chain runtime has no entry")
+	}
+}
+
 func TestChangeProxySelfHealsMissingChainAndSelectorOverlay(t *testing.T) {
 	node := parseProxyChainTestProxy(t, map[string]any{
 		"name": "node-a",
