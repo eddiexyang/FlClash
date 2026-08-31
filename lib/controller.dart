@@ -832,21 +832,40 @@ extension SetupControllerExt on AppController {
     bool allowTunAuthorization = true,
     VoidCallback? preloadInvoke,
   }) async {
-    if (!force && !await needSetup()) {
-      return;
-    }
-    await loadingRun(
-      () async {
-        await _setupConfig(
-          preloadInvoke: preloadInvoke,
-          allowTunAuthorization: allowTunAuthorization,
+    final profileId = _ref.read(currentProfileIdProvider);
+    final apply = _proxyChainApplyQueue.then<void>((_) async {
+      if (profileId != _ref.read(currentProfileIdProvider)) {
+        return;
+      }
+      if (!force && !await needSetup()) {
+        return;
+      }
+      await loadingRun(
+        () async {
+          await _setupConfig(
+            preloadInvoke: preloadInvoke,
+            allowTunAuthorization: allowTunAuthorization,
+          );
+          if (profileId != _ref.read(currentProfileIdProvider)) {
+            return;
+          }
+          await updateGroups();
+          await updateProviders();
+        },
+        silence: true,
+        tag: !silence ? LoadingTag.proxies : null,
+      );
+    });
+    _proxyChainApplyQueue = apply.catchError(
+      (Object error, StackTrace stackTrace) {
+        commonPrint.log(
+          'apply_profile_queue_failed profile_id=$profileId '
+          'error=$error stack=$stackTrace',
+          logLevel: LogLevel.error,
         );
-        await updateGroups();
-        await updateProviders();
       },
-      silence: true,
-      tag: !silence ? LoadingTag.proxies : null,
     );
+    await apply;
   }
 
   Future<Map<String, dynamic>> getProfile({
