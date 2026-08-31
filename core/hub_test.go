@@ -141,7 +141,11 @@ func TestApplyConfigClosesAllConnections(t *testing.T) {
 		isRunning = previousRunning
 	})
 
-	if err := os.WriteFile(filepath.Join(profileDir, "config.yaml"), nil, 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(profileDir, "config.yaml"),
+		[]byte("mode: rule\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("write profile config: %v", err)
 	}
 	trackers := []*chainTracker{
