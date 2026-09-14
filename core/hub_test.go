@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/metacubex/mihomo/config"
@@ -125,7 +126,7 @@ func TestConnectionsUsingGroupFiltersByChain(t *testing.T) {
 	}
 }
 
-func TestApplyConfigClosesAllConnections(t *testing.T) {
+func TestApplyConfigPreservesConnections(t *testing.T) {
 	previousConfig := currentConfig
 	previousHomeDir := C.Path.HomeDir()
 	previousManager := statistic.DefaultManager
@@ -159,16 +160,36 @@ func TestApplyConfigClosesAllConnections(t *testing.T) {
 	if err := applyConfig(defaultSetupParams()); err != nil {
 		t.Fatalf("apply profile config: %v", err)
 	}
+	activeConfig := currentConfig
+	activeNames := config.GetProxyNameList()
+	invalid := defaultSetupParams()
+	invalid.Config = "proxy-groups:\n  - name: candidate\n    type: select\n    proxies: [DIRECT]\nrules: ['MATCH,missing']\n"
+	if err := applyConfig(invalid); err == nil {
+		t.Fatal("accepted invalid configuration")
+	}
+	if currentConfig != activeConfig || !reflect.DeepEqual(config.GetProxyNameList(), activeNames) {
+		t.Fatal("failed update changed active config or proxy names")
+	}
+	candidatePath := filepath.Join(profileDir, "candidate.yaml")
+	if err := os.WriteFile(candidatePath, []byte(invalid.Config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if message := handleValidateConfig(candidatePath); message == "" {
+		t.Fatal("validation accepted an unknown rule target")
+	}
+	if !reflect.DeepEqual(config.GetProxyNameList(), activeNames) {
+		t.Fatal("validation changed active proxy names")
+	}
 	for _, tracker := range trackers {
-		if tracker.closeCalls != 1 {
+		if tracker.closeCalls != 0 {
 			t.Fatalf(
-				"tracker %q close calls = %d, want 1",
+				"tracker %q close calls = %d, want 0",
 				tracker.id,
 				tracker.closeCalls,
 			)
 		}
-		if statistic.DefaultManager.Get(tracker.id) != nil {
-			t.Fatalf("tracker %q remains in the manager", tracker.id)
+		if statistic.DefaultManager.Get(tracker.id) == nil {
+			t.Fatalf("tracker %q was removed from the manager", tracker.id)
 		}
 	}
 }

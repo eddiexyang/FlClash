@@ -299,14 +299,20 @@ func applyConfig(params *SetupParams) error {
 	defer runLock.Unlock()
 	var nextConfig *config.Config
 	var configErr error
-	constant.DefaultTestURL = params.TestURL
+	previousNames := config.GetProxyNameList()
+	committed := false
+	defer func() {
+		if !committed {
+			config.SetProxyNameList(previousNames)
+		}
+	}()
 	if params.Config != "" {
 		nextConfig, configErr = executor.ParseWithBytes([]byte(params.Config))
 	} else {
 		nextConfig, configErr = executor.ParseWithPath(filepath.Join(constant.Path.HomeDir(), "config.yaml"))
 	}
 	if configErr != nil {
-		nextConfig, _ = config.ParseRawConfig(config.DefaultRawConfig())
+		return configErr
 	}
 
 	// Set MTU to 1500 to fix issues on some systems
@@ -332,16 +338,17 @@ func applyConfig(params *SetupParams) error {
 		proxyChainRuntimeState.Unlock()
 		return chainErr
 	}
+	constant.DefaultTestURL = params.TestURL
 	hub.ApplyConfig(nextConfig)
 	previousProxyChainRuntime := activatePreparedProxyChainLocked(prepared)
 	proxyChainRuntimeState.Unlock()
 	previousProxyChainRuntime.retire(false)
 	currentConfig = nextConfig
+	committed = true
 	if prepared == nil {
 		patchSelectGroup(params.SelectedMap)
 	}
 	updateListeners()
-	closeConnections()
 	return configErr
 }
 

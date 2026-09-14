@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -90,7 +91,19 @@ func handleShutdown() bool {
 
 func handleValidateConfig(path string) string {
 	buf, err := readFile(path)
-	_, err = config.UnmarshalRawConfig(buf)
+	if err != nil {
+		return err.Error()
+	}
+	if len(bytes.TrimSpace(buf)) == 0 {
+		return "empty configuration"
+	}
+	updateConfigMux.Lock()
+	defer updateConfigMux.Unlock()
+	runLock.Lock()
+	defer runLock.Unlock()
+	previousNames := config.GetProxyNameList()
+	defer config.SetProxyNameList(previousNames)
+	_, err = executor.ParseWithBytes(buf)
 	if err != nil {
 		return err.Error()
 	}
@@ -617,7 +630,6 @@ func handleSetupConfig(bytes []byte) string {
 	err := UnmarshalJson(bytes, params)
 	if err != nil {
 		log.Errorln("unmarshalRawConfig error %v", err)
-		_ = applyConfig(defaultSetupParams())
 		return err.Error()
 	}
 	err = applyConfig(params)

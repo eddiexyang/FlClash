@@ -1008,7 +1008,6 @@ extension SetupControllerExt on AppController {
         setupState.profileId != _ref.read(currentProfileIdProvider)) {
       return false;
     }
-    await File(configFilePath).safeWriteAsString(yamlString);
     var message = await _applyCoreSetupConfig(
       setupState: setupState,
       params: profileSetupParams,
@@ -1035,6 +1034,11 @@ extension SetupControllerExt on AppController {
     if (revision != _profileApplyRevision ||
         setupState.profileId != _ref.read(currentProfileIdProvider)) {
       return false;
+    }
+    await File(configFilePath).safeWriteAsString(yamlString);
+    if (globalState.lastSetupState != null &&
+        globalState.lastSetupState!.profileId != setupState.profileId) {
+      await coreController.closeConnections();
     }
     globalState.lastSetupState = setupState;
     if (system.isAndroid) {
