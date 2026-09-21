@@ -267,7 +267,7 @@ func updateConfigLocked(params *UpdateParams) {
 	}
 	if params.IPv6 != nil {
 		general.IPv6 = *params.IPv6
-		resolver.DisableIPv6 = !general.IPv6
+		tunnel.SetIPv6(general.IPv6)
 	}
 	if params.ExternalController != nil {
 		currentConfig.Controller.ExternalController = *params.ExternalController
