@@ -12,30 +12,38 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runs_on }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: android
             os: ubuntu-latest
+            runs_on: ubuntu-latest
           - platform: windows
             os: Windows-2022
+            runs_on: Windows-2022
             arch: amd64
           # - platform: linux
           #   os: ubuntu-22.04
-          #   arch: amd64
-          # - platform: macos
-          #   os: macos-15-intel
+          #   runs_on: ubuntu-22.04
           #   arch: amd64
           - platform: macos
-            os: macos-latest
+            os: macos-26-x64
+            runs_on:
+              - self-hosted
+              - macOS
+              - X64
             arch: arm64
-          #          - platform: windows
-          #            os: windows-11-arm
-          #            arch: arm64
+
+          # - platform: windows
+          #   os: windows-11-arm
+          #   runs_on: windows-11-arm
+          #   arch: arm64
+
           # - platform: linux
           #   os: ubuntu-24.04-arm
+          #   runs_on: ubuntu-24.04-arm
           #   arch: arm64
 
     steps:
