@@ -101,6 +101,7 @@ class CoreController {
     required String config,
     required List<String> proxyChainNames,
     required List<Map<String, dynamic>> proxyChainProxies,
+    bool proxyChainEnabled = true,
     VoidCallback? preloadInvoke,
   }) async {
     final res = _interface.setupConfig(
@@ -108,6 +109,7 @@ class CoreController {
       config: config,
       proxyChainNames: proxyChainNames,
       proxyChainProxies: proxyChainProxies,
+      proxyChainEnabled: proxyChainEnabled,
     );
     if (preloadInvoke != null) {
       preloadInvoke();
@@ -120,6 +122,7 @@ class CoreController {
     required DelayMap delayMap,
     required Map<String, String> selectedMap,
     required String defaultTestUrl,
+    bool proxyChainEnabled = true,
   }) async {
     final proxiesData = await _interface.getProxies();
     final groups = await toGroupsTask(
@@ -134,6 +137,7 @@ class CoreController {
     return buildProxyChainGuiGroups(
       groups: groups,
       proxiesData: proxiesData,
+      enabled: proxyChainEnabled,
     );
   }
 
@@ -146,12 +150,14 @@ class CoreController {
     List<Map<String, dynamic>> proxies, {
     required bool closeConnections,
     bool stageOnly = false,
+    bool? enabled,
   }) async {
     return await _interface.updateProxyChain(
       proxyNames,
       proxies,
       closeConnections: closeConnections,
       stageOnly: stageOnly,
+      enabled: enabled,
     );
   }
 

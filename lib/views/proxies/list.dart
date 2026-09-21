@@ -208,7 +208,7 @@ class _ProxiesListViewState extends State<ProxiesListView> {
             .separated(const SizedBox(height: 8));
         items.addAll([
           ...rows,
-          const _ProxyChainListBar(),
+          if (appController.proxyChainEnabled) const _ProxyChainListBar(),
           const SizedBox(height: 8),
         ]);
       }

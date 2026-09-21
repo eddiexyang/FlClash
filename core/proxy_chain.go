@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
@@ -26,12 +27,16 @@ const (
 	flClashChainHopPrefix = "__FLCLASH_INTERNAL_CHAIN_HOP_"
 )
 
+// Disabled is atomic because traffic reads it outside the runtime lock.
+var proxyChainDisabled atomic.Bool
+
 var proxyChainState = struct {
 	sync.RWMutex
 	proxyNames []string
 }{}
 
 type proxyChainRuntimeConfig struct {
+	disabled   bool
 	proxyNames []string
 	configs    []map[string]interface{}
 }
@@ -300,13 +305,13 @@ func newProxyChainSelectorOverlay(
 func (p *proxyChainSelectorOverlay) usesChain() bool {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	return p.useChain
+	return p.useChain && !proxyChainDisabled.Load()
 }
 
 func (p *proxyChainSelectorOverlay) currentTarget() string {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
-	if p.useChain {
+	if p.useChain && !proxyChainDisabled.Load() {
 		return flClashChainName
 	}
 	return p.ProxyGroup.Now()
@@ -332,8 +337,11 @@ func (p *proxyChainSelectorOverlay) Set(name string) error {
 	proxyChainRuntimeState.Lock()
 	defer proxyChainRuntimeState.Unlock()
 	runtime := proxyChainRuntimeState.current
-	if name == flClashChainName && runtime == nil {
+	if name == flClashChainName && (runtime == nil || proxyChainDisabled.Load()) {
 		return fmt.Errorf("proxy chain is unavailable")
+	}
+	if proxyChainDisabled.Load() {
+		return p.setTargetLocked(name, false)
 	}
 	proxies := tunnel.Proxies()
 	if runtime != nil {
@@ -352,7 +360,11 @@ func (p *proxyChainSelectorOverlay) ForceSet(name string) {
 	proxyChainRuntimeState.Lock()
 	defer proxyChainRuntimeState.Unlock()
 	runtime := proxyChainRuntimeState.current
-	if name == flClashChainName && runtime == nil {
+	if name == flClashChainName && (runtime == nil || proxyChainDisabled.Load()) {
+		return
+	}
+	if proxyChainDisabled.Load() {
+		_ = p.setTargetLocked(name, true)
 		return
 	}
 	proxies := tunnel.Proxies()
@@ -454,6 +466,9 @@ func (p *proxyChainSelectorOverlay) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	mapping["now"] = p.Now()
+	if proxyChainDisabled.Load() {
+		return json.Marshal(mapping)
+	}
 	all, _ := mapping["all"].([]interface{})
 	for _, name := range all {
 		if name == flClashChainName {
@@ -467,7 +482,7 @@ func (p *proxyChainSelectorOverlay) MarshalJSON() ([]byte, error) {
 func (p *proxyChainSelectorOverlay) Proxies() []C.Proxy {
 	proxies := append([]C.Proxy(nil), p.ProxyGroup.Proxies()...)
 	runtime := currentProxyChainRuntime()
-	if runtime == nil {
+	if runtime == nil || proxyChainDisabled.Load() {
 		return proxies
 	}
 	return append([]C.Proxy{runtime.entry}, proxies...)
@@ -478,6 +493,9 @@ func (p *proxyChainSelectorOverlay) URLTest(
 	url string,
 	expectedStatus utils.IntRanges[uint16],
 ) (map[string]uint16, error) {
+	if proxyChainDisabled.Load() {
+		return p.ProxyGroup.URLTest(ctx, url, expectedStatus)
+	}
 	type groupURLTestResult struct {
 		delays map[string]uint16
 		err    error
@@ -760,6 +778,7 @@ func validateProxyChainRuntimeGraph(
 }
 
 type preparedProxyChainConfig struct {
+	disabled   bool
 	proxyNames []string
 	runtime    *proxyChainRuntime
 }
@@ -804,11 +823,12 @@ func prepareProxyChainRuntimeConfigLocked(
 			selector.ForceSet(selected)
 		}
 	}
-	if err := validateProxyChainRuntimeGraph(current.Proxies, nil); err != nil {
+	if err := validateEnabledProxyChainGraph(current.Proxies, !staged.disabled); err != nil {
 		runtime.closeProxies()
 		return nil, err
 	}
 	return &preparedProxyChainConfig{
+		disabled:   staged.disabled,
 		proxyNames: append([]string(nil), staged.proxyNames...),
 		runtime:    runtime,
 	}, nil
@@ -824,6 +844,7 @@ func activatePreparedProxyChainLocked(
 		setProxyChainNames(nil)
 		return previous
 	}
+	proxyChainDisabled.Store(prepared.disabled)
 	proxyChainRuntimeState.current = prepared.runtime
 	setProxyChainNames(prepared.proxyNames)
 	return previous
@@ -839,8 +860,29 @@ func stageProxyChainLocked(params UpdateProxyChainParams) error {
 	proxyChainRuntimeState.staged = &proxyChainRuntimeConfig{
 		proxyNames: append([]string(nil), params.ProxyNames...),
 		configs:    cloneProxyChainConfigs(params.Proxies),
+		disabled:   params.Enabled != nil && !*params.Enabled,
 	}
 	return nil
+}
+
+// Validate the intended selections before enabling, while the live state is unchanged.
+func validateEnabledProxyChainGraph(proxies map[string]C.Proxy, enabled bool) error {
+	if !enabled {
+		return nil
+	}
+	overrides := map[string]string{}
+	for name, proxy := range proxies {
+		if overlay, ok := proxy.Adapter().(*proxyChainSelectorOverlay); ok {
+			overlay.mutex.RLock()
+			if overlay.useChain {
+				overrides[name] = flClashChainName
+			} else {
+				overrides[name] = overlay.ProxyGroup.Now()
+			}
+			overlay.mutex.RUnlock()
+		}
+	}
+	return validateProxyChainRuntimeGraph(proxies, overrides)
 }
 
 func updateProxyChainLocked(
@@ -852,7 +894,11 @@ func updateProxyChainLocked(
 	}
 	runtime := newProxyChainRuntime(chainProxies, chainProxy)
 	proxies := buildProxyChainProxyMap(tunnel.Proxies(), chainProxies)
-	if err := validateProxyChainRuntimeGraph(proxies, nil); err != nil {
+	enabled := !proxyChainDisabled.Load()
+	if params.Enabled != nil {
+		enabled = *params.Enabled
+	}
+	if err := validateEnabledProxyChainGraph(proxies, enabled); err != nil {
 		runtime.closeProxies()
 		return nil, err
 	}
@@ -863,6 +909,7 @@ func updateProxyChainLocked(
 	previous := proxyChainRuntimeState.current
 	tunnel.UpdateProxies(proxies, providers)
 	proxyChainRuntimeState.current = runtime
+	proxyChainDisabled.Store(!enabled)
 	setProxyChainNames(params.ProxyNames)
 	return previous, nil
 }
@@ -878,6 +925,18 @@ func handleUpdateProxyChain(data []byte) string {
 	var affectedConnections []statistic.Tracker
 	if !params.StageOnly && params.CloseConnections {
 		affectedConnections = connectionsUsingProxyChain()
+		if params.Enabled != nil && *params.Enabled && proxyChainDisabled.Load() {
+			for name, proxy := range tunnel.Proxies() {
+				if overlay, ok := proxy.Adapter().(*proxyChainSelectorOverlay); ok {
+					overlay.mutex.RLock()
+					selected := overlay.useChain
+					overlay.mutex.RUnlock()
+					if selected {
+						affectedConnections = append(affectedConnections, connectionsUsingGroup(name)...)
+					}
+				}
+			}
+		}
 	}
 	proxyChainRuntimeState.Lock()
 	if params.StageOnly {

@@ -33,6 +33,7 @@ class AppController {
   final Map<int, Map<String, Map<String, dynamic>>> _proxyChainSources = {};
   final Map<int, List<String>> _proxyChainAvailableProxyNames = {};
   final Map<int, List<Map<String, dynamic>>> _proxyChainRuntimeProxies = {};
+  bool _proxyChainEnabled = true;
   final ValueNotifier<int> _proxyChainRevision = ValueNotifier(0);
   int _profileApplyRevision = 0;
   int _routeConfigRevision = 0;
@@ -86,6 +87,7 @@ class _SetupConfigException implements Exception {
 
 extension InitControllerExt on AppController {
   Future<void> _init() async {
+    _proxyChainEnabled = await preferences.getBool('proxy_chain_enabled') ?? true;
     for (final profile in _ref.read(profilesProvider)) {
       final proxyChain = await preferences.getProxyChain(profile.id);
       if (proxyChain.isNotEmpty) {
@@ -367,6 +369,51 @@ extension LogsControllerExt on AppController {
 extension ProxiesControllerExt on AppController {
   ValueListenable<int> get proxyChainRevision => _proxyChainRevision;
 
+  bool get proxyChainEnabled => _proxyChainEnabled;
+
+  Future<String> setProxyChainEnabled(bool enabled) async {
+    final apply = _proxyChainApplyQueue.then<String>((_) async {
+      if (_proxyChainEnabled == enabled) return '';
+      final profileId = _ref.read(currentProfileProvider)?.id;
+      final cachedProxies = _proxyChainRuntimeProxies[profileId];
+      final proxies = enabled && cachedProxies != null
+          ? buildProxyChainProxies(
+              _proxyChains[profileId] ?? const [],
+              _proxyChainSources[profileId] ?? const {},
+            )
+          : cachedProxies;
+      if (profileId != null && proxies != null) {
+        final message = await coreController.updateProxyChain(
+          _proxyChains[profileId] ?? const [],
+          proxies,
+          enabled: enabled,
+          closeConnections: true,
+        );
+        if (message.isNotEmpty) return message;
+      }
+      if (!await preferences.setBool('proxy_chain_enabled', enabled)) {
+        if (profileId != null && proxies != null) {
+          await coreController.updateProxyChain(
+            _proxyChains[profileId] ?? const [],
+            proxies,
+            enabled: _proxyChainEnabled,
+            closeConnections: true,
+          );
+        }
+        return 'Failed to save GUI Chain setting';
+      }
+      _proxyChainEnabled = enabled;
+      if (profileId != null && proxies != null) {
+        _proxyChainRuntimeProxies[profileId] = proxies;
+      }
+      _proxyChainRevision.value++;
+      updateGroupsDebounce();
+      return '';
+    }).catchError((Object error) => error.toString());
+    _proxyChainApplyQueue = apply.then<void>((_) {});
+    return apply;
+  }
+
   List<String> get proxyChain {
     final profileId = _ref.read(currentProfileProvider)?.id;
     if (profileId == null) {
@@ -411,6 +458,7 @@ extension ProxiesControllerExt on AppController {
         final message = await coreController.updateProxyChain(
           pendingChain,
           chainProxies,
+          enabled: _proxyChainEnabled,
           closeConnections: closeConnections,
         );
         if (message.isNotEmpty) {
@@ -486,6 +534,7 @@ extension ProxiesControllerExt on AppController {
             sortType: sortType,
             delayMap: delayMap,
             defaultTestUrl: testUrl,
+            proxyChainEnabled: _proxyChainEnabled,
           );
         },
         retryIf: (res) => res.isEmpty,
@@ -906,7 +955,7 @@ extension SetupControllerExt on AppController {
       requestedProxyNames,
       fallbackSourceProxies: _proxyChainSources[profileId] ?? const {},
     );
-    if (overlay.resetReason != null) {
+    if (overlay.resetReason != null && _proxyChainEnabled) {
       _proxyChains.remove(profileId);
       _proxyChainRevision.value++;
       final didClear = await preferences.clearProxyChain(profileId);
@@ -956,6 +1005,7 @@ extension SetupControllerExt on AppController {
       config: config,
       proxyChainNames: _proxyChains[profileId] ?? const [],
       proxyChainProxies: chainProxies,
+      proxyChainEnabled: _proxyChainEnabled,
       preloadInvoke: preloadInvoke,
     );
   }

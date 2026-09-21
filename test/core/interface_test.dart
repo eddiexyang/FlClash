@@ -117,4 +117,26 @@ void main() {
     expect(payload['proxy-chain-names'], ['node-a']);
     expect(payload['proxy-chain-proxies'], [chainProxy]);
   });
+  test('global Chain setting is sent on setup and live update', () async {
+    final handler = _FakeCoreHandler(response: '');
+    await handler.setupConfig(
+      const SetupParams(selectedMap: {}, testUrl: 'test'),
+      config: 'mode: rule',
+      proxyChainNames: const [],
+      proxyChainProxies: const [],
+      proxyChainEnabled: false,
+    );
+    expect(
+      json.decode(handler.invokedData as String)['proxy-chain-enabled'],
+      false,
+    );
+    await handler.updateProxyChain(
+      const [],
+      const [],
+      closeConnections: true,
+      enabled: false,
+    );
+    expect(json.decode(handler.invokedData as String)['enabled'], false);
+  });
+
 }

@@ -1,5 +1,7 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/controller.dart';
 import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -212,6 +214,41 @@ class OpenLogsItem extends ConsumerWidget {
   }
 }
 
+class GuiChainItem extends StatefulWidget {
+  const GuiChainItem({super.key});
+
+  @override
+  State<GuiChainItem> createState() => _GuiChainItemState();
+}
+
+class _GuiChainItemState extends State<GuiChainItem> {
+  bool _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: appController.proxyChainRevision,
+      builder: (context, _, _) => ListItem.switchItem(
+        title: const Text('GUI Chain'),
+        subtitle: Text(appLocalizations.proxyChains),
+        delegate: SwitchDelegate(
+          value: appController.proxyChainEnabled,
+          onChanged: (value) async {
+            if (_saving) return;
+            _saving = true;
+            try {
+              final message = await appController.setProxyChainEnabled(value);
+              if (message.isNotEmpty) globalState.showNotifier(message);
+            } finally {
+              _saving = false;
+            }
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class ApplicationSettingView extends StatelessWidget {
   const ApplicationSettingView({super.key});
 
@@ -230,6 +267,7 @@ class ApplicationSettingView extends StatelessWidget {
       AnimateTabItem(),
       OpenLogsItem(),
       CloseConnectionsItem(),
+      GuiChainItem(),
       UsageItem(),
     ];
     return BaseScaffold(

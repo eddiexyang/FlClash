@@ -718,3 +718,70 @@ func TestProxyChainRuntimePreservesConnectionsUntilNaturalClose(t *testing.T) {
 		t.Fatalf("proxy close calls = %d, want 1", proxy.closeCalls.Load())
 	}
 }
+
+func TestProxyChainGlobalSwitchPreservesSelections(t *testing.T) {
+	previousDisabled := proxyChainDisabled.Load()
+	proxyChainDisabled.Store(false)
+	t.Cleanup(func() { proxyChainDisabled.Store(previousDisabled) })
+	node := parseProxyChainTestProxy(t, map[string]any{"name": "native", "type": "direct"})
+	chain := parseProxyChainTestProxy(t, map[string]any{"name": flClashChainName, "type": "reject"})
+	provider := &proxyChainTestProvider{name: "switch-provider", vehicleType: P.Compatible, proxies: []C.Proxy{node}}
+	proxies := map[string]C.Proxy{flClashChainName: chain}
+	for _, name := range []string{"group-a", "group-b"} {
+		selector, err := outboundgroup.NewSelector(
+			outboundgroup.GroupCommonOption{Name: name, Type: "select"},
+			outboundgroup.SelectorOption{}, node, []P.ProxyProvider{provider},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		proxies[name] = adapter.NewProxy(selector)
+	}
+	installProxyChainTestRuntime(t, proxies, map[string]P.ProxyProvider{provider.Name(): provider})
+	overlays := installProxyChainSelectorOverlays(proxies)
+	for _, overlay := range overlays {
+		if err := overlay.Set(flClashChainName); err != nil {
+			t.Fatal(err)
+		}
+	}
+	update := func(enabled bool, configs []map[string]any) string {
+		data, err := json.Marshal(UpdateProxyChainParams{Enabled: &enabled, ProxyNames: []string{"saved-node"}, Proxies: configs})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return handleUpdateProxyChain(data)
+	}
+	configs := []map[string]any{{"name": flClashChainName, "type": "reject"}}
+	if message := update(false, configs); message != "" {
+		t.Fatal(message)
+	}
+	for _, overlay := range overlays {
+		if overlay.Now() != "native" || overlay.usesChain() {
+			t.Fatal("disabled chain still selected")
+		}
+		if err := overlay.Set(flClashChainName); err == nil {
+			t.Fatal("disabled chain accepted selection")
+		}
+		if len(overlay.Proxies()) != 1 {
+			t.Fatal("disabled chain exposed as a candidate")
+		}
+	}
+	// A failed enable must retain the disabled state and the previous runtime.
+	before := currentProxyChainRuntime()
+	cyclic := []map[string]any{{"name": flClashChainName, "type": "socks5", "server": "127.0.0.1", "port": 1, "dialer-proxy": "group-a"}}
+	if message := update(true, cyclic); !strings.Contains(message, "dependency cycle") {
+		t.Fatalf("expected cycle rejection, got %q", message)
+	}
+	if !proxyChainDisabled.Load() || currentProxyChainRuntime() != before {
+		t.Fatal("failed enable changed live state")
+	}
+	if message := update(true, configs); message != "" {
+		t.Fatal(message)
+	}
+	for _, overlay := range overlays {
+		if overlay.Now() != flClashChainName || !overlay.usesChain() {
+			t.Fatal("saved chain selection was lost")
+		}
+	}
+	currentProxyChainRuntime().retire(true)
+}

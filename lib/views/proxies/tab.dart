@@ -979,6 +979,7 @@ class _ProxyChainEditorBarState extends ConsumerState<ProxyChainEditorBar> {
   Widget build(BuildContext context) {
     final groups = ref.watch(currentGroupsStateProvider).value;
     _syncChainProfile(groups);
+    if (!appController.proxyChainEnabled) return const SizedBox.shrink();
     return _ProxyChainBar(
       key: _chainBarKey,
       proxies: _chain,

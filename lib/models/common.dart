@@ -347,6 +347,10 @@ extension GroupExt on Group {
   String get realNow => now ?? '';
 
   String getCurrentSelectedName(String proxyName) {
+    if (proxyName == internalChainProxyName &&
+        !all.any((proxy) => proxy.name == internalChainProxyName)) {
+      return realNow;
+    }
     if (type.isComputedSelected) {
       return realNow.isNotEmpty ? realNow : proxyName;
     }

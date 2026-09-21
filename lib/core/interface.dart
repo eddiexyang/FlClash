@@ -30,6 +30,7 @@ mixin CoreInterface {
     required String config,
     required List<String> proxyChainNames,
     required List<Map<String, dynamic>> proxyChainProxies,
+    bool proxyChainEnabled = true,
   });
 
   Future<ProxiesData> getProxies();
@@ -39,6 +40,7 @@ mixin CoreInterface {
     List<Map<String, dynamic>> proxies, {
     required bool closeConnections,
     bool stageOnly = false,
+    bool? enabled,
   });
 
   Future<String> changeProxy(ChangeProxyParams changeProxyParams);
@@ -202,11 +204,13 @@ abstract class CoreHandlerInterface with CoreInterface {
     required String config,
     required List<String> proxyChainNames,
     required List<Map<String, dynamic>> proxyChainProxies,
+    bool proxyChainEnabled = true,
   }) async {
     final data = setupParams.toJson()
       ..['config'] = config
       ..['proxy-chain-names'] = proxyChainNames
-      ..['proxy-chain-proxies'] = proxyChainProxies;
+      ..['proxy-chain-proxies'] = proxyChainProxies
+      ..['proxy-chain-enabled'] = proxyChainEnabled;
     return await _invoke<String>(
           method: ActionMethod.setupConfig,
           data: json.encode(data),
@@ -235,6 +239,7 @@ abstract class CoreHandlerInterface with CoreInterface {
     List<Map<String, dynamic>> proxies, {
     required bool closeConnections,
     bool stageOnly = false,
+    bool? enabled,
   }) async {
     return await _invoke<String>(
           method: ActionMethod.updateProxyChain,
@@ -242,6 +247,7 @@ abstract class CoreHandlerInterface with CoreInterface {
             'proxy-names': proxyNames,
             'proxies': proxies,
             'stage-only': stageOnly,
+            if (enabled != null) 'enabled': enabled,
             'close-connections': closeConnections,
           }),
         ) ??

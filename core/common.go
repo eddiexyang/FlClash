@@ -329,6 +329,7 @@ func applyConfig(params *SetupParams) error {
 			&proxyChainRuntimeConfig{
 				proxyNames: append([]string(nil), params.ProxyChainNames...),
 				configs:    cloneProxyChainConfigs(params.ProxyChainProxies),
+				disabled:   params.ProxyChainEnabled != nil && !*params.ProxyChainEnabled,
 			},
 		)
 	} else {

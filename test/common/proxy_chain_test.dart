@@ -541,5 +541,16 @@ void main() {
     expect(result.first.testUrl, 'https://selector.test');
     expect(result[1].type, GroupType.URLTest);
     expect(groups.first.all, [nodeA]);
+
+    final disabled = buildProxyChainGuiGroups(
+      groups: result,
+      proxiesData: proxiesData,
+      enabled: false,
+    );
+    for (final group in disabled) {
+      expect(group.all.map((proxy) => proxy.name), ['node-a']);
+      expect(group.getCurrentSelectedName(internalChainProxyName), 'node-a');
+    }
+
   });
 }

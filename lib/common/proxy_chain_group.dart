@@ -23,6 +23,7 @@ Proxy? _proxyFromData(
 List<Group> buildProxyChainGuiGroups({
   required List<Group> groups,
   required ProxiesData proxiesData,
+  bool enabled = true,
 }) {
   final chainProxy =
       _proxyFromData(proxiesData.proxies, internalChainProxyName) ??
@@ -31,7 +32,7 @@ List<Group> buildProxyChainGuiGroups({
       .map(
         (group) => group.copyWith(
           all: [
-            chainProxy,
+            if (enabled) chainProxy,
             ...group.all.where(
               (proxy) => !isInternalChainProxyName(proxy.name),
             ),

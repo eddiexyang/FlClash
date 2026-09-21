@@ -17,6 +17,7 @@ type InitParams struct {
 }
 
 type SetupParams struct {
+	ProxyChainEnabled *bool                    `json:"proxy-chain-enabled,omitempty"`
 	SelectedMap       map[string]string        `json:"selected-map"`
 	TestURL           string                   `json:"test-url"`
 	Config            string                   `json:"config,omitempty"`
@@ -55,6 +56,7 @@ type ChangeProxyParams struct {
 }
 
 type UpdateProxyChainParams struct {
+	Enabled          *bool                    `json:"enabled,omitempty"`
 	ProxyNames       []string                 `json:"proxy-names"`
 	Proxies          []map[string]interface{} `json:"proxies"`
 	StageOnly        bool                     `json:"stage-only"`
