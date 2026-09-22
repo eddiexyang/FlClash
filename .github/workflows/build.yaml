@@ -64,6 +64,8 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: '1.24.0'
+          # Self-hosted runners reuse local caches; restoring over read-only modules fails.
+          cache: ${{ runner.environment != 'self-hosted' }}
           cache-dependency-path: |
             core/mihomo/go.sum
 
@@ -73,7 +75,8 @@ jobs:
         with:
           channel: stable
           flutter-version: 3.44.8
-          cache: true
+          # Reuse the local SDK and pub cache on self-hosted runners.
+          cache: ${{ runner.environment != 'self-hosted' }}
 
       - name: Setup Flutter With Other
         if: startsWith(matrix.os, 'windows-11-arm') || startsWith(matrix.os, 'ubuntu-24.04-arm')
@@ -81,7 +84,7 @@ jobs:
         with:
           channel: master
           flutter-version: 3.44.8
-          cache: true
+          cache: ${{ runner.environment != 'self-hosted' }}
 
       - name: Setup Java
         if: startsWith(matrix.platform, 'android')
