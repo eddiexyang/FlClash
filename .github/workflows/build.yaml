@@ -292,9 +292,26 @@ jobs:
       contents: write
     steps:
       - name: Delete staging release
-        shell: bash
+        uses: actions/github-script@v8
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
           STAGING_TAG: ${{ needs.prepare.outputs.staging_tag }}
-        run: gh release delete "$STAGING_TAG" --yes --cleanup-tag
+        with:
+          script: |
+            const tag = process.env.STAGING_TAG;
+            if (!tag) throw new Error('Missing staging release tag');
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              ...context.repo, per_page: 100,
+            });
+            const release = releases.find(release => release.tag_name === tag);
+            if (release) {
+              await github.rest.repos.deleteRelease({ ...context.repo, release_id: release.id });
+            }
+            // Draft releases do not necessarily create a Git tag.
+            try {
+              await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.info(`Staging tag ${tag} is already absent`);
+              return;
+            }
+            await github.rest.git.deleteRef({ ...context.repo, ref: `tags/${tag}` });
