@@ -11,7 +11,28 @@ concurrency:
   cancel-in-progress: ${{ github.ref == 'refs/heads/dev' }}
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      staging_tag: ${{ steps.staging.outputs.tag }}
+    steps:
+      - name: Create staging release
+        id: staging
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: prepare
+    permissions:
+      contents: write
     runs-on: ${{ matrix.runs_on }}
     strategy:
       fail-fast: false
@@ -171,17 +192,19 @@ jobs:
           test -n "$EXPECTED"
           test "$ACTUAL" = "$EXPECTED"
 
-      - name: Upload
-        uses: actions/upload-artifact@v6
+      - name: Upload to staging release
+        uses: softprops/action-gh-release@v3
         with:
-          name: artifact-${{ matrix.platform }}${{ matrix.arch && format('-{0}', matrix.arch) }}
-          path: ./dist
-          overwrite: true
+          tag_name: ${{ needs.prepare.outputs.staging_tag }}
+          target_commitish: ${{ github.sha }}
+          draft: true
+          files: ./dist/**/*
+          fail_on_unmatched_files: true
 
   release:
-    if: ${{ github.ref == 'refs/heads/main' || (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') && !contains(github.ref_name, '+')) }}
-    permissions: write-all
-    needs: [ build ]
+    permissions:
+      contents: write
+    needs: [ prepare, build ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -193,12 +216,16 @@ jobs:
         id: release
         shell: bash
         run: |
-          if [[ "$GITHUB_REF" == 'refs/heads/main' ]]; then
+          if [[ "$GITHUB_REF" == refs/heads/* ]]; then
             branch="${GITHUB_REF#refs/heads/}"
-            git fetch origin "$branch"
+            git fetch origin "+refs/heads/$branch:refs/remotes/origin/$branch"
             if [[ "$(git rev-parse "origin/$branch")" == "$GITHUB_SHA" ]]; then
               echo 'eligible=true' >> "$GITHUB_OUTPUT"
-              echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+              if [[ "$branch" == main ]]; then
+                echo "tag=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+              else
+                echo "tag=$branch" >> "$GITHUB_OUTPUT"
+              fi
             else
               echo 'eligible=false' >> "$GITHUB_OUTPUT"
               echo "A newer $branch commit exists; skipping stale release."
@@ -206,7 +233,8 @@ jobs:
             exit 0
           fi
 
-          git fetch origin main
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          git fetch origin +refs/heads/main:refs/remotes/origin/main
           if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo 'eligible=true' >> "$GITHUB_OUTPUT"
           else
@@ -214,30 +242,59 @@ jobs:
             echo 'Tag commit is not reachable from main; skipping release.'
           fi
 
-      - name: Download
+      - name: Download from staging release
         if: steps.release.outputs.eligible == 'true'
-        uses: actions/download-artifact@v7
-        with:
-          path: ./dist/
-          pattern: artifact-*
-          merge-multiple: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          STAGING_TAG: ${{ needs.prepare.outputs.staging_tag }}
+        run: gh release download "$STAGING_TAG" --dir ./dist
 
-      - name: Release main
-        if: steps.release.outputs.eligible == 'true' && github.ref == 'refs/heads/main'
+      - name: Update rolling branch tag
+        if: steps.release.outputs.eligible == 'true' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/main'
+        uses: actions/github-script@v8
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            let exists = true;
+            try {
+              await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              exists = false;
+            }
+            if (exists) {
+              await github.rest.git.updateRef({ ...context.repo, ref: `tags/${tag}`, sha: context.sha, force: true });
+            } else {
+              await github.rest.git.createRef({ ...context.repo, ref: `refs/tags/${tag}`, sha: context.sha });
+            }
+
+      - name: Publish release
+        if: steps.release.outputs.eligible == 'true'
         uses: softprops/action-gh-release@v3
         with:
-          name: ${{ steps.release.outputs.short_sha }}
-          tag_name: ${{ steps.release.outputs.short_sha }}
+          name: ${{ steps.release.outputs.tag }}
+          tag_name: ${{ steps.release.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          prerelease: false
-          make_latest: true
+          prerelease: ${{ startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/main' || env.IS_STABLE != 'true' && startsWith(github.ref, 'refs/tags/') }}
+          make_latest: ${{ github.ref == 'refs/heads/main' || env.IS_STABLE == 'true' }}
           files: ./dist/**/*
           fail_on_unmatched_files: true
 
-      - name: Release
-        if: steps.release.outputs.eligible == 'true' && startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v3
-        with:
-          files: ./dist/**/*
-          fail_on_unmatched_files: true
-#          body_path: './release.md'
+  cleanup:
+    if: always() && needs.prepare.result == 'success'
+    needs: [ prepare, build, release ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Delete staging release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          STAGING_TAG: ${{ needs.prepare.outputs.staging_tag }}
+        run: gh release delete "$STAGING_TAG" --yes --cleanup-tag
